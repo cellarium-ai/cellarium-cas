@@ -127,3 +127,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+src/data/
+.DS_Store
+.pre-commit-config.yaml
