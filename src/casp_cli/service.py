@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import functools
 import math
 import operator
@@ -38,10 +39,24 @@ class CASPClientService(_BaseService):
     def _get_number_of_chunks(self, adata, chunk_size):
         return math.ceil(len(adata) / chunk_size)
 
-    async def _annotate_anndata_chunk(self, adata_bytes, results, chunk_index, start_time) -> None:
+    def _get_timestamp(self) -> str:
+        return datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
+
+    def _print(self, str_to_print: str) -> None:
+        print(f"* [{self._get_timestamp()}] {str_to_print}")
+
+    async def _annotate_anndata_chunk(
+        self,
+        adata_bytes: bytes,
+        results: t.List,
+        chunk_index: int,
+        chunk_start_i: int,
+        chunk_end_i: int,
+        start_time: float,
+    ) -> None:
         data = {"myfile": adata_bytes}
         results[chunk_index] = await self.post("annotate", data=data)
-        print(f"--- FINISHED PROCESSING CHUNK {time.time() - start_time} ---")
+        self._print(f"Received the annotations for cell chunk #{chunk_index + 1} ({chunk_start_i}, {chunk_end_i}) ...")
 
     async def _annotate_anndata_task(self, adata, results, chunk_size, start_time) -> None:
         i, j = 0, chunk_size
@@ -49,9 +64,11 @@ class CASPClientService(_BaseService):
         number_of_chunks = self._get_number_of_chunks(adata, chunk_size=chunk_size)
         for chunk_index in range(number_of_chunks):
             chunk = adata[i:j, :]
+            chunk_start_i = i
+            chunk_end_i = i + len(chunk)
+            self._print(f"Submitting cell chunk #{chunk_index + 1} ({chunk_start_i}, {chunk_end_i}) to CAS ...")
             tmp_file_name = f"chunk_{chunk_index}.h5ad"
             chunk.write(tmp_file_name, compression="gzip")
-
             with open(tmp_file_name, "rb") as f:
                 chunk_bytes = f.read()
 
@@ -61,6 +78,8 @@ class CASPClientService(_BaseService):
                     adata_bytes=chunk_bytes,
                     results=results,
                     chunk_index=chunk_index,
+                    chunk_start_i=chunk_start_i,
+                    chunk_end_i=chunk_end_i,
                     start_time=start_time,
                 )
             )
@@ -70,13 +89,17 @@ class CASPClientService(_BaseService):
         await asyncio.wait(tasks)
 
     def annotate_anndata(self, adata: "anndata.AnnData", chunk_size=2000) -> t.List:
+        start = time.time()
+        self._print("CAS v1 (Model ID: PCA_002)")
+        self._print(f"Total number of input cells: {len(adata)}")
         number_of_chunks = math.ceil(len(adata) / chunk_size)
         results = [None] * number_of_chunks
-        start = time.time()
         loop = asyncio.get_event_loop()
         task = loop.create_task(
             self._annotate_anndata_task(adata=adata, results=results, chunk_size=chunk_size, start_time=start)
         )
         loop.run_until_complete(task)
-        print(f"--- TOTAL TIME SPENT {time.time() - start} -- ")
-        return functools.reduce(operator.iconcat, results, [])
+        result = functools.reduce(operator.iconcat, results, [])
+        self._print(f"Total wall clock time: {f'{time.time() - start:10.4f}'} seconds")
+        self._print("Finished!")
+        return result
