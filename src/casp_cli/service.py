@@ -18,9 +18,6 @@ nest_asyncio.apply()
 class _BaseService:
     BACKEND_URL: str
 
-    def __init__(self):
-        self.session = aiohttp.ClientSession(raise_for_status=True)
-
     @classmethod
     def _get_endpoint_url(cls, endpoint: str) -> str:
         return f"{cls.BACKEND_URL}/{endpoint}"
@@ -55,7 +52,13 @@ class CASPClientService(_BaseService):
         start_time: float,
     ) -> None:
         data = {"myfile": adata_bytes}
-        results[chunk_index] = await self.post("annotate", data=data)
+        for _ in range(3):
+            try:
+                results[chunk_index] = await self.post("annotate", data=data)
+            except Exception:
+                pass
+            else:
+                break
         self._print(f"Received the annotations for cell chunk #{chunk_index + 1} ({chunk_start_i}, {chunk_end_i}) ...")
 
     async def _annotate_anndata_task(self, adata, results, chunk_size, start_time) -> None:
@@ -93,7 +96,7 @@ class CASPClientService(_BaseService):
         self._print("CAS v1 (Model ID: PCA_002)")
         self._print(f"Total number of input cells: {len(adata)}")
         number_of_chunks = math.ceil(len(adata) / chunk_size)
-        results = [None] * number_of_chunks
+        results = [[] for _ in range(number_of_chunks)]
         loop = asyncio.get_event_loop()
         task = loop.create_task(
             self._annotate_anndata_task(adata=adata, results=results, chunk_size=chunk_size, start_time=start)
