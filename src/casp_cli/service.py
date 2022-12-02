@@ -56,10 +56,11 @@ class CASPClientService(_BaseService):
             try:
                 results[chunk_index] = await self.post("annotate", data=data)
             except Exception:
+                self._print(f"Something went wrong, resubmitting chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, {chunk_end_i:5.0f}) to CAS ...")
                 pass
             else:
                 break
-        self._print(f"Received the annotations for cell chunk #{chunk_index + 1} ({chunk_start_i}, {chunk_end_i}) ...")
+        self._print(f"Received the annotations for cell chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, {chunk_end_i:5.0f}) ...")
 
     async def _annotate_anndata_task(self, adata, results, chunk_size, start_time) -> None:
         i, j = 0, chunk_size
@@ -69,7 +70,7 @@ class CASPClientService(_BaseService):
             chunk = adata[i:j, :]
             chunk_start_i = i
             chunk_end_i = i + len(chunk)
-            self._print(f"Submitting cell chunk #{chunk_index + 1} ({chunk_start_i}, {chunk_end_i}) to CAS ...")
+            self._print(f"Submitting cell chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, {chunk_end_i:5.0f}) to CAS ...")
             tmp_file_name = f"chunk_{chunk_index}.h5ad"
             chunk.write(tmp_file_name, compression="gzip")
             with open(tmp_file_name, "rb") as f:
@@ -93,7 +94,7 @@ class CASPClientService(_BaseService):
 
     def annotate_anndata(self, adata: "anndata.AnnData", chunk_size=2000) -> t.List:
         start = time.time()
-        self._print("CAS v1 (Model ID: PCA_002)")
+        self._print("CAS v1.0 (Model ID: PCA_002)")
         self._print(f"Total number of input cells: {len(adata)}")
         number_of_chunks = math.ceil(len(adata) / chunk_size)
         results = [[] for _ in range(number_of_chunks)]

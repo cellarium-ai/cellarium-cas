@@ -3,7 +3,7 @@ Python Client libraries for Cell Annotation Service
 
 # Installation
 ```
-$ pip install git+https://github.com/broadinstitute/cell-annotation-service-client.git@fg-annotate
+$ pip install git+https://github.com/broadinstitute/cell-annotation-service-client.git
 ```
 # Usage
 To use CAS services create a client instance:
