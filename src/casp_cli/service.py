@@ -10,28 +10,58 @@ import typing as t
 import aiohttp
 import nest_asyncio
 
+from casp_cli import exceptions
+
 if t.TYPE_CHECKING:
     import anndata
+
+
 nest_asyncio.apply()
 
 
 class _BaseService:
     BACKEND_URL: str
 
+    def __init__(self, api_token: str, *args, **kwargs):
+        self.api_token = api_token
+        super().__init__(*args, **kwargs)
+
     @classmethod
     def _get_endpoint_url(cls, endpoint: str) -> str:
         return f"{cls.BACKEND_URL}/{endpoint}"
 
-    async def post(self, endpoint: str, data) -> t.Dict:
+    async def post(
+        self, endpoint: str, file, data: t.Optional[t.Dict] = None, headers: t.Optional[t.Dict] = None
+    ) -> t.Dict:
         url = self._get_endpoint_url(endpoint=endpoint)
+        _data = {}
+        _headers = {"Authorization": f"Bearer {self.api_token}"}
+
+        if data is not None:
+            _data.update(**data)
+        if headers is not None:
+            _headers.update(**headers)
+
+        form_data = aiohttp.FormData()
+        form_data.add_field("myfile", file, filename="adata.h5ad")
+
+        for key, value in data.items():
+            form_data.add_field(key, value)
 
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, data=data) as resp:
+            async with session.post(url, data=form_data, headers=_headers) as resp:
+                if resp.status == 401:
+                    raise exceptions.HTTPError401
+                elif resp.status == 403:
+                    raise exception.HTTPError403
+                elif resp.status == 500:
+                    raise exceptions.HTTPError500
+
                 return await resp.json()
 
 
 class CASPClientService(_BaseService):
-    BACKEND_URL = "https://cas-manager-vi7nxpvk7a-uc.a.run.app"
+    BACKEND_URL = "https://cas-api-test-2-vi7nxpvk7a-uc.a.run.app"
 
     def _get_number_of_chunks(self, adata, chunk_size):
         return math.ceil(len(adata) / chunk_size)
@@ -51,20 +81,24 @@ class CASPClientService(_BaseService):
         chunk_end_i: int,
         start_time: float,
     ) -> None:
-        data = {"myfile": adata_bytes}
+        number_of_cells = chunk_end_i - chunk_start_i
+        data = {"number_of_cells": str(number_of_cells)}
         for _ in range(3):
             try:
-                results[chunk_index] = await self.post("annotate", data=data)
-            except Exception:
+                results[chunk_index] = await self.post("annotate", file=adata_bytes, data=data)
+            except exceptions.HTTPError500:
                 self._print(
                     f"Something went wrong, resubmitting chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, {chunk_end_i:5.0f}) to CAS ..."
                 )
                 pass
-            else:
+            except exceptions.HTTPError401:
+                self._print("Unauthorized token. Please check your API token or request a new one.")
                 break
-        self._print(
-            f"Received the annotations for cell chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, {chunk_end_i:5.0f}) ..."
-        )
+            else:
+                self._print(
+                    f"Received the annotations for cell chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, {chunk_end_i:5.0f}) ..."
+                )
+                break
 
     async def _annotate_anndata_task(self, adata, results, chunk_size, start_time) -> None:
         i, j = 0, chunk_size
