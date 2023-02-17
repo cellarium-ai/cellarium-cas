@@ -25,7 +25,7 @@ include = ["cellarium.*"]
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements/base.txt"]}
-optional-dependencies = {docs = { file = ["requirements/docs.txt"] }, test = { file = ["requirements/test.txt"]}}
+optional-dependencies = {docs = { file = ["requirements/docs.txt"] }, test = { file = ["requirements/test.txt"]}, scanpy = { file = ["requirements/scanpy.txt"]}}
 readme = {file = ["README.md"]}
 
 [project.urls]
