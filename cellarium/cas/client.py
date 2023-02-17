@@ -70,13 +70,35 @@ class CASClient:
     def _print(self, str_to_print: str) -> None:
         print(f"* [{self._get_timestamp()}] {str_to_print}")
 
-    def _validate_and_sanitize_input_data(
+    def validate_and_sanitize_input_data(
         self,
         adata: anndata.AnnData,
         cas_model_name: str,
         count_matrix_name: str,
         feature_ids_column_name: str,
+        feature_names_column_name: t.Optional[str] = None,
     ) -> anndata.AnnData:
+        """
+        Validate and sanitize input :class:`anndata.AnnData` instance according to a specified feature schema associated
+        with a particular model.
+
+        :param adata: :class:`anndata.AnnData` instance to annotate
+        :param cas_model_name: The model associated with the schema used for sanitizing. |br|
+            `Allowed Values:` Model name from the :attr:`allowed_models_list` list or ``"default"``
+            keyword, which refers to the default selected model in the Cellarium backend. |br|
+        :param count_matrix_name:  Where to obtain a feature expression count matrix from. |br|
+            `Allowed Values:` Choice of either ``"X"``  or ``"raw.X"`` in order to use ``adata.X`` or ``adata.raw.X``,
+             respectively |br|
+        :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. |br|
+            `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
+            column. |br|
+        :param feature_names_column_name: Column name where to obtain feature names (symbols).
+        feature names wouldn't be mapped if value is ``None`` |br|
+            `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
+            column. |br|
+            `Default:` ``None``
+        :return: Validated and sanitized instance of :class:`anndata.AnnData`
+        """
         cas_model_obj = self._model_name_obj_map[cas_model_name]
         feature_schema_name = cas_model_obj["schema_name"]
         try:
@@ -120,6 +142,7 @@ class CASClient:
                 cas_feature_schema_list=cas_feature_schema_list,
                 count_matrix_name=count_matrix_name,
                 feature_ids_column_name=feature_ids_column_name,
+                feature_names_column_name=feature_names_column_name,
             )
         else:
             self._print(f"The input data matrix conforms with the '{feature_schema_name}' CAS schema.")
@@ -260,6 +283,7 @@ class CASClient:
         cas_model_name: str = "default",
         count_matrix_name: str = "X",
         feature_ids_column_name: str = "index",
+        feature_names_column_name: t.Optional[str] = None,
         include_dev_metadata: bool = False,
     ) -> t.List[t.Dict[str, t.Any]]:
         """
@@ -281,25 +305,32 @@ class CASClient:
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
             column. |br|
             `Default:` ``"index"``
+        :param feature_names_column_name: Column name where to obtain feature names (symbols).
+        feature names wouldn't be mapped if value is ``None`` |br|
+            `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
+            column. |br|
+            `Default:` ``None``
         :param include_dev_metadata: Boolean indicating whether to include a breakdown of the number of cells
             by dataset
         :return: A list of dictionaries with annotations for each of the cells from input adata
         """
-        assert cas_model_name == "default" or cas_model_name in self.allowed_models_list, (
-            "`cas_model_name` should have a value of either 'default' or one of the values from "
-            "`allowed_models_list`."
-        )
+        if cas_model_name != "default" and cas_model_name not in self.allowed_models_list:
+            raise ValueError(
+                "`cas_model_name` should have a value of either 'default' or one of the values from "
+                "`allowed_models_list`."
+            )
         cas_model_name = self.default_model_name if cas_model_name == "default" else cas_model_name
         start = time.time()
         cas_model = self._model_name_obj_map[cas_model_name]
         cas_model_name = cas_model["model_name"]
         self._print(f"Cellarium CAS (Model ID: {cas_model_name})")
         self._print(f"Total number of input cells: {len(adata)}")
-        adata = self._validate_and_sanitize_input_data(
+        adata = self.validate_and_sanitize_input_data(
             adata=adata,
             cas_model_name=cas_model_name,
             count_matrix_name=count_matrix_name,
             feature_ids_column_name=feature_ids_column_name,
+            feature_names_column_name=feature_names_column_name,
         )
 
         number_of_chunks = math.ceil(len(adata) / chunk_size)
@@ -336,6 +367,7 @@ class CASClient:
         cas_model_name: str = "default",
         count_matrix_name: str = "X",
         feature_ids_column_name: str = "index",
+        feature_names_column_name: t.Optional[str] = None,
         include_dev_metadata: bool = False,
     ) -> t.List[t.Dict[str, t.Any]]:
         """
@@ -355,6 +387,11 @@ class CASClient:
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
             column. |br|
             `Default:` ``"index"``
+        :param feature_names_column_name: Column name where to obtain feature names (symbols).
+        feature names wouldn't be mapped if value is ``None`` |br|
+            `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
+            column. |br|
+            `Default:` ``None``
         :param include_dev_metadata: Boolean indicating whether to include a breakdown of the number of cells
             per dataset
         :return: A list of dictionaries with annotations for each of the cells from input adata
@@ -369,6 +406,7 @@ class CASClient:
             cas_model_name=cas_model_name,
             count_matrix_name=count_matrix_name,
             feature_ids_column_name=feature_ids_column_name,
+            feature_names_column_name=feature_names_column_name,
             include_dev_metadata=include_dev_metadata,
         )
 
@@ -379,6 +417,7 @@ class CASClient:
         cas_model_name: str = "default",
         count_matrix_name: str = "X",
         feature_ids_column_name: str = "index",
+        feature_names_column_name: t.Optional[str] = None,
         include_dev_metadata: bool = False,
     ) -> t.List[t.Dict[str, t.Any]]:
         """
@@ -398,6 +437,11 @@ class CASClient:
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
             column. |br|
             `Default:` ``"index"``
+        :param feature_names_column_name: Column name where to obtain feature names (symbols).
+        feature names wouldn't be mapped if value is ``None`` |br|
+            `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
+            column. |br|
+            `Default:` ``None``
         :param include_dev_metadata: Boolean indicating whether to include a breakdown of the number of cells by dataset
         :return: A list of dictionaries with annotations for each of the cells from input adata
         """
@@ -408,5 +452,6 @@ class CASClient:
             cas_model_name=cas_model_name,
             count_matrix_name=count_matrix_name,
             feature_ids_column_name=feature_ids_column_name,
+            feature_names_column_name=feature_names_column_name,
             include_dev_metadata=include_dev_metadata,
         )
