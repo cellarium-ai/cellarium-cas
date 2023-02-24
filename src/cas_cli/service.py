@@ -88,7 +88,7 @@ class CASClientService(_BaseService):
                 results[chunk_index] = await self.post("annotate", file=adata_bytes, data=data)
             except exceptions.HTTPError500:
                 self._print(
-                    f"Something went wrong, resubmitting chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, {chunk_end_i:5.0f}) to CAS ..."
+                    f"Something went wrong, resubmitting chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, {chunk_end_i:5.0f}) to Cellarium CAS ..."
                 )
                 pass
             except exceptions.HTTPError401:
@@ -109,7 +109,7 @@ class CASClientService(_BaseService):
             chunk_start_i = i
             chunk_end_i = i + len(chunk)
             self._print(
-                f"Submitting cell chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, {chunk_end_i:5.0f}) to CAS ..."
+                f"Submitting cell chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, {chunk_end_i:5.0f}) to Cellarium CAS ..."
             )
             tmp_file_name = f"chunk_{chunk_index}.h5ad"
             chunk.write(tmp_file_name, compression="gzip")
@@ -134,7 +134,7 @@ class CASClientService(_BaseService):
 
     def annotate_anndata(self, adata: "anndata.AnnData", chunk_size=2000) -> t.List:
         start = time.time()
-        self._print("CAS v1.0 (Model ID: PCA_002)")
+        self._print("Cellarium CAS v1.0 (Model ID: PCA_002)")
         self._print(f"Total number of input cells: {len(adata)}")
         number_of_chunks = math.ceil(len(adata) / chunk_size)
         results = [[] for _ in range(number_of_chunks)]
