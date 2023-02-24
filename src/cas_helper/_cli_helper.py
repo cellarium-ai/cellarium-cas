@@ -8,6 +8,7 @@ from collections import defaultdict
 from operator import itemgetter
 from typing import Optional
 
+from tqdm.notebook import tqdm
 
 def validate_adata_for_cas(
         adata: sc.AnnData,
@@ -169,4 +170,127 @@ def reduce_cas_query_result_by_majority_vote_per_cluster(
     
     return cluster_detailed_info_dict
     
+
+def reduce_cas_query_result_by_wnn(
+        adata: sc.AnnData,
+        cas_query_res: dict,
+        n_neighbors: int = 10,
+        wnn_strategy: str = 'connectivities',
+        connectivities_key: str = 'connectivities',
+        self_connectivity: float = 1.0,
+        min_n_cells_per_type: int = 10,
+        output_unreliable_type: str = 'Unknown or Unconfident',
+        output_cell_type_key: str = 'cas_cell_type',
+        output_cell_type_confidence_score_key: str = 'cas_cell_type_confidence_score'):
+
+    assert wnn_strategy in {'connectivities'}
+    assert n_neighbors <= adata.uns['neighbors']['params']['n_neighbors']
+    assert len(adata) == len(cas_query_res)
+
+    all_cell_types = []
+    for single_cell_query in cas_query_res:
+        for match in single_cell_query['matches']:
+            all_cell_types.append(match['cell_type'])
+    all_cell_types = list(set(all_cell_types))
+    cell_type_to_idx_map = {cell_type: idx for idx, cell_type in enumerate(all_cell_types)}
+
+    def _get_weights_via_fuzzy_simplicial_sets(i, adata, n_neighbors, self_connectivity) -> tuple:
+        connectivity_values = adata.obsp[connectivities_key][i].data
+        connectivity_indices = adata.obsp[connectivities_key][i].indices
+        
+        # append self
+        connectivity_values = np.append(connectivity_values, self_connectivity)
+        connectivity_indices = np.append(connectivity_indices, i)
+        
+        # convert to weights
+        _order = np.argsort(connectivity_values)[::-1][:n_neighbors]
+        sorted_connectivity_values = connectivity_values[_order]
+        sorted_connectivity_indices = connectivity_indices[_order]
+        weights = sorted_connectivity_values / np.sum(sorted_connectivity_values)
+        return sorted_connectivity_indices, weights
+
+    def _get_cell_type_probs(single_cell_query, all_cell_types, cell_type_to_idx_map) -> np.ndarray:
+        probs = np.zeros((len(all_cell_types),))
+        for match in single_cell_query['matches']:
+            probs[cell_type_to_idx_map[match['cell_type']]] += match['cell_count']
+        return probs / np.sum(probs)
+
+    cell_type_probs_list = []
+    majority_vote_cell_type_list = []
+    majority_vote_confidence_score_list = []
+
+    n_cells = len(cas_query_res)
+    for i in tqdm(range(n_cells)):
+
+        neighbor_indices, neighbor_weights = _get_weights_via_fuzzy_simplicial_sets(
+            i, adata, n_neighbors, self_connectivity)
+        assert np.isclose(np.sum(neighbor_weights), 1.)
+
+        cell_type_probs = np.zeros((len(all_cell_types),))
+        for j, weight in zip(neighbor_indices, neighbor_weights):
+            cell_type_probs += weight * _get_cell_type_probs(cas_query_res[j], all_cell_types, cell_type_to_idx_map)
+
+        best_cell_type_idx = np.argmax(cell_type_probs)
+        best_cell_type = all_cell_types[best_cell_type_idx]
+        best_cell_type_prob = cell_type_probs[best_cell_type_idx]
+
+        cell_type_probs_list.append(cell_type_probs)
+        majority_vote_cell_type_list.append(best_cell_type)
+        majority_vote_confidence_score_list.append(best_cell_type_prob)
+
+    all_cell_types = set(majority_vote_cell_type_list)
+    update_map = dict()
+    for cell_type in all_cell_types:
+        n_counts = sum([_cell_type == cell_type for _cell_type in majority_vote_cell_type_list])
+        if n_counts < min_n_cells_per_type:
+            update_map[cell_type] = output_unreliable_type
+        else:
+            update_map[cell_type] = cell_type
+    majority_vote_cell_type_list = list(map(update_map.get, majority_vote_cell_type_list))
+
+    adata.obs[output_cell_type_key] = majority_vote_cell_type_list
+    adata.obs[output_cell_type_confidence_score_key] = majority_vote_confidence_score_list
     
+    return cell_type_to_idx_map, cell_type_probs_list
+    
+    
+def hex_to_rgb(value: str) -> np.ndarray:
+    value = value.lstrip('#')
+    lv = len(value)
+    return np.asarray(tuple(float(int(value[i:i + lv // 3], 16)) for i in range(0, lv, lv // 3)))
+
+
+def rgb_to_tuple(value: np.ndarray) -> tuple:
+    return (int(value[0]), int(value[1]), int(value[2]))
+
+
+def rgb_to_hex(rgb: np.ndarray) -> str:
+    return '#%02x%02x%02x' % rgb
+
+
+def get_interpolated_cell_type_colors(
+        adata,
+        cell_type_to_idx_map,
+        cell_type_probs_list,
+        na_cell_type_key='Unknown or Unconfident') -> np.ndarray:
+    idx_to_cell_type_map = {idx: cell_type for cell_type, idx in cell_type_to_idx_map.items()}
+    all_cell_types = list(map(idx_to_cell_type_map.get, range(len(cell_type_to_idx_map))))
+    plot_cell_type_colors = adata.uns['cas_cell_type_colors']
+    plot_cell_types = list(adata.obs['cas_cell_type'].values.categories)
+    plot_cell_types_to_idx_map = {cell_type: idx for idx, cell_type in enumerate(plot_cell_types)}
+
+    cell_type_probs_nk = np.asarray(cell_type_probs_list)
+    cell_type_map_kq = np.zeros((len(all_cell_types), len(plot_cell_types)))
+    na_index = plot_cell_types.index(na_cell_type_key)
+    plot_cell_type_colors[na_index] = rgb_to_hex((255, 255, 255))
+    for k, input_cell_type in enumerate(all_cell_types):
+        if input_cell_type in plot_cell_types_to_idx_map:
+            q = plot_cell_types_to_idx_map[input_cell_type]
+        else:
+            q = na_index
+        cell_type_map_kq[k, q] += 1
+
+    plot_colors_q3 = np.asarray(list(hex_to_rgb(hex_color) for hex_color in plot_cell_type_colors))
+    cell_colors_n3 = (cell_type_probs_nk @ cell_type_map_kq @ plot_colors_q3) / 255
+    
+    return np.clip(cell_colors_n3, 0., 1.)

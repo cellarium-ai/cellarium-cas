@@ -1,5 +1,5 @@
-# Cell Annotation Service Client
-Python Client libraries for Cell Annotation Service
+# Cellarium Cloud Cell Annotation Service (CAS) Client
+Python client libraries
 
 # Installation
 ```
@@ -8,10 +8,10 @@ $ pip install git+https://github.com/broadinstitute/cell-annotation-service-clie
 # Usage
 To use CAS services create a client instance:
 ```
-from casp_cli import service
+from cas_cli import service
 
 
-cli = service.CASPClientService()
+cli = service.CASClientService()
 ```
 CAS cli takes anndata.AnnData as an input to proceed with further analysis
 

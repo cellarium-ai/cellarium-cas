@@ -10,7 +10,7 @@ import typing as t
 import aiohttp
 import nest_asyncio
 
-from casp_cli import exceptions
+from cas_cli import exceptions
 
 if t.TYPE_CHECKING:
     import anndata
@@ -60,7 +60,7 @@ class _BaseService:
                 return await resp.json()
 
 
-class CASPClientService(_BaseService):
+class CASClientService(_BaseService):
     BACKEND_URL = "https://cas-api-test-2-vi7nxpvk7a-uc.a.run.app"
 
     def _get_number_of_chunks(self, adata, chunk_size):

@@ -1,1 +1,6 @@
 aiohttp[speedups]
+pandas
+numpy
+scipy
+scanpy[leiden]
+tqdm

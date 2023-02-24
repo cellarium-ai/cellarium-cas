@@ -14,9 +14,8 @@ version = "0.1.0"
 setup(
     name="cell-annotation-service-client",
     version=version,
-    description="Cell Annotation Service Client",
-    author="Variants Team",
-    author_email="variants@broadinstitute.org",
+    description="Cellarium Cloud Cell Annotation Service (CAS) Client",
+    author="Cellarium Cloud Team",
     long_description=long_description,
     install_requires=install_requires,
     tests_require=["coverage", "pytest"],
