@@ -1,1 +1,6 @@
 aiohttp[speedups]
+requests
+anndata
+pandas
+numpy
+nest_asyncio
