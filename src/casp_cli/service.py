@@ -10,8 +10,11 @@ import typing as t
 import aiohttp
 import nest_asyncio
 
+from casp_cli import _read_data
+
 if t.TYPE_CHECKING:
     import anndata
+
 nest_asyncio.apply()
 
 
@@ -98,7 +101,7 @@ class CASPClientService(_BaseService):
 
         await asyncio.wait(tasks)
 
-    def annotate_anndata(self, adata: "anndata.AnnData", chunk_size=2000) -> t.List:
+    def annotate_anndata(self, adata: "anndata.AnnData", chunk_size=2000) -> t.List[t.Dict[str, t.Any]]:
         start = time.time()
         self._print("CAS v1.0 (Model ID: PCA_002)")
         self._print(f"Total number of input cells: {len(adata)}")
@@ -113,3 +116,7 @@ class CASPClientService(_BaseService):
         self._print(f"Total wall clock time: {f'{time.time() - start:10.4f}'} seconds")
         self._print("Finished!")
         return result
+
+    def annotate_10x_h5(self, filepath: str, chunk_size=2000) -> t.List[t.Dict[str, t.Any]]:
+        adata = _read_data.read_10x_h5(filepath)
+        return self.annotate_anndata(adata=adata, chunk_size=chunk_size)
