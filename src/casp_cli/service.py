@@ -10,11 +10,10 @@ import typing as t
 import aiohttp
 import nest_asyncio
 
-from casp_cli import exceptions
+from casp_cli import _read_data, exceptions
 
 if t.TYPE_CHECKING:
     import anndata
-
 
 nest_asyncio.apply()
 
@@ -85,7 +84,7 @@ class CASClientService(_BaseService):
     Service that is designed to call Cellarium Cloud Backend API service
     """
 
-    BACKEND_URL = "https://cas-api-test-2-vi7nxpvk7a-uc.a.run.app"
+    BACKEND_URL = "https://cas-manager-vi7nxpvk7a-uc.a.run.app"
 
     def _get_number_of_chunks(self, adata, chunk_size):
         return math.ceil(len(adata) / chunk_size)
@@ -176,7 +175,7 @@ class CASClientService(_BaseService):
 
         await asyncio.wait(tasks)
 
-    def annotate_anndata(self, adata: "anndata.AnnData", chunk_size=2000) -> t.List:
+    def annotate_anndata(self, adata: "anndata.AnnData", chunk_size=2000) -> t.List[t.Dict[str, t.Any]]:
         """
         Send an anndata object to Cellarium Cloud backend to get annotations. Split the input
         adata to smaller chunks and send them all asynchronously to the backend API service.
@@ -202,3 +201,7 @@ class CASClientService(_BaseService):
         self._print(f"Total wall clock time: {f'{time.time() - start:10.4f}'} seconds")
         self._print("Finished!")
         return result
+
+    def annotate_10x_h5(self, filepath: str, chunk_size=2000) -> t.List[t.Dict[str, t.Any]]:
+        adata = _read_data.read_10x_h5(filepath)
+        return self.annotate_anndata(adata=adata, chunk_size=chunk_size)
