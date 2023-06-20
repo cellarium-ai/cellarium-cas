@@ -1,1 +1,1 @@
-from .service import CASPClientService  # noqa
+from .service import CASClientService  # noqa

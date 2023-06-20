@@ -36,7 +36,6 @@ jobs:
         # Run tox using the version of Python in `PATH`
         run: tox -e lint
 
-        # TODO: Uncomment when have at least 1 unit test
-        # - name: Run Pytest through Tox
-        # Run tox using the version of Python in `PATH`
-        # run: tox -e unit
+      - name: Run Pytest through Tox
+       # Run tox using the version of Python in `PATH`
+        run: tox -e unit
