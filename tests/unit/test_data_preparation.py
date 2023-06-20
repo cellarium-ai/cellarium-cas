@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 
-from casp_cli import data_preparation, exceptions
+from cas_cli import data_preparation, exceptions
 
 
 class TestdataPreparation(unittest.TestCase):

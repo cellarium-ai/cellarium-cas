@@ -7,119 +7,21 @@ import os
 import time
 import typing as t
 
-import aiohttp
 import anndata
-import nest_asyncio
-import requests
 
-from casp_cli import data_preparation, endpoints, exceptions, _read_data
-
-nest_asyncio.apply()
+from cas_cli import _read_data, data_preparation, exceptions, service
 
 
-class _BaseService:
-    BACKEND_URL: str
-
-    def __init__(self, api_token: str, *args, **kwargs):
-        """
-        Base clas for communicating with a Cellarium Cloud API service
-        It leverages async request library `aiohttp` to asynchronously execute HTTP requests.
-
-        :param api_token: A token that could be authenticated by Cellarium Cloud Backend API service
-        """
-        self.api_token = api_token
-        super().__init__(*args, **kwargs)
-
-    @classmethod
-    def _get_endpoint_url(cls, endpoint: str) -> str:
-        """
-        Configure a specific method endpoint from backend url and endpoint
-
-        :param endpoint: Endpoint string without a leading slash
-        :return: Full url with backend domains/subdomains and endpoint joint
-        """
-        return f"{cls.BACKEND_URL}/{endpoint}"
-
-    @staticmethod
-    def __validate_response_code(response_code):
-        if response_code == 401:
-            raise exceptions.HTTPError401
-        elif response_code == 403:
-            raise exceptions.HTTPError403
-        elif response_code == 500:
-            raise exceptions.HTTPError500
-
-    def get(self, endpoint: str) -> requests.Response:
-        url = self._get_endpoint_url(endpoint)
-        headers = {"Authorization": f"Bearer {self.api_token}"}
-        response = requests.get(url=url, headers=headers)
-        self.__validate_response_code(response.status_code)
-        return response
-
-    def get_json(self, endpoint: str) -> dict:
-        return self.get(endpoint=endpoint).json()
-
-    async def async_post(
-        self,
-        endpoint: str,
-        file,
-        data: t.Optional[t.Dict] = None,
-        headers: t.Optional[t.Dict] = None,
-    ) -> t.Dict:
-        """
-        Make an async multiform POST request to backend service
-
-        :param endpoint: Endpoint string without a leading slash
-        :param file: Byte file to attach to request
-        :param data: Dictionary to include to HTTP POST request body
-        :param headers: Dictionary to include to HTTP POST request Headers
-        """
-        url = self._get_endpoint_url(endpoint=endpoint)
-        _data = {}
-        _headers = {"Authorization": f"Bearer {self.api_token}"}
-
-        if data is not None:
-            _data.update(**data)
-        if headers is not None:
-            _headers.update(**headers)
-
-        form_data = aiohttp.FormData()
-        form_data.add_field("myfile", file, filename="adata.h5ad")
-
-        for key, value in data.items():
-            form_data.add_field(key, value)
-
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, data=form_data, headers=_headers) as resp:
-                self.__validate_response_code(resp.status)
-                return await resp.json()
-
-
-class CASClientService(_BaseService):
+class CASClient:
     """
     Service that is designed to call Cellarium Cloud Backend API service
     """
 
-    BACKEND_URL = "https://cas-manager-vi7nxpvk7a-uc.a.run.app"
-
-    def __init__(self, api_token: str, *args, **kwargs):
-        super().__init__(api_token=api_token, *args, **kwargs)
+    def __init__(self, api_token: str) -> None:
         self._print("Connecting with Cellarium Cloud backend...")
-        # Validate Auth Token
-        self.get(endpoint=endpoints.VALIDATE_TOKEN)
-        # Get application info
-        app_info = self.get_json(endpoint=endpoints.APPLICATION_INFO)
-        self.default_feature_schema_name = app_info["default_feature_schema"]
-        # Retrieve feature schemas
-        self.feature_schemas = [x["schema_name"] for x in self.get_json(endpoint=endpoints.GET_FEATURE_SCHEMAS)]
-        self._app_version = app_info["application_version"]
+        self.cas_api_service = service.CASAPIService(api_token=api_token)
+        self.feature_schemas = []
         self._feature_schemas_cache = {}
-        self._print(
-            (
-                f"Authorized. CAS v {self._app_version}. You're using a default feature schema "
-                f"{self.default_feature_schema_name}."
-            )
-        )
 
     @staticmethod
     def _get_number_of_chunks(adata, chunk_size):
@@ -142,9 +44,7 @@ class CASClientService(_BaseService):
         try:
             cas_feature_schema_list = self._feature_schemas_cache[feature_schema_name]
         except KeyError:
-            cas_feature_schema_list = self.get_json(
-                endpoint=endpoints.GET_SCHEMA_BY_NAME.format(schema_name=feature_schema_name)
-            )
+            cas_feature_schema_list = self.cas_api_service.get_cas_pca_002_schema_from_dump()
             self._feature_schemas_cache[feature_schema_name] = cas_feature_schema_list
 
         try:
@@ -187,7 +87,6 @@ class CASClientService(_BaseService):
         chunk_index: int,
         chunk_start_i: int,
         chunk_end_i: int,
-        start_time: float,
     ) -> None:
         """
         A wrapper around POST request that handles HTTP 500 and HTTP 401 status responses
@@ -199,13 +98,14 @@ class CASClientService(_BaseService):
         :param chunk_index: Consequent number of the chunk (e.g Chunk 1, Chunk 2)
         :param chunk_start_i: Index pointing to the main adata file start position of the current chunk
         :param chunk_end_i: Index pointing to the main adata file end position of the current chunk
-        :param start_time: Start time of the execution before any task was submitted
         """
         number_of_cells = chunk_end_i - chunk_start_i
-        data = {"number_of_cells": str(number_of_cells)}
         for _ in range(3):
             try:
-                results[chunk_index] = await self.async_post(endpoints.ANNOTATE, file=adata_bytes, data=data)
+                results[chunk_index] = await self.cas_api_service.async_annotate_anndata_chunk(
+                    adata_file_bytes=adata_bytes, number_of_cells=number_of_cells
+                )
+
             except exceptions.HTTPError500:
                 self._print(
                     f"Something went wrong, resubmitting chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, {chunk_end_i:5.0f}) to CAS ..."
@@ -252,7 +152,6 @@ class CASClientService(_BaseService):
                     chunk_index=chunk_index,
                     chunk_start_i=chunk_start_i,
                     chunk_end_i=chunk_end_i,
-                    start_time=start_time,
                 )
             )
             i = j
@@ -296,6 +195,8 @@ class CASClientService(_BaseService):
             count_matrix_name=count_matrix_name,
             feature_ids_column_name=feature_ids_column_name,
         )
+        # TODO: Deprecation of having `raw` is needed in newer versions of CAS.
+        adata.raw = adata
         number_of_chunks = math.ceil(len(adata) / chunk_size)
         results = [[] for _ in range(number_of_chunks)]
         loop = asyncio.get_event_loop()
@@ -308,6 +209,30 @@ class CASClientService(_BaseService):
         self._print("Finished!")
         return result
 
-    def annotate_10x_h5(self, filepath: str, chunk_size=2000) -> t.List[t.Dict[str, t.Any]]:
+    def annotate_10x_h5(
+        self,
+        filepath: str,
+        chunk_size=2000,
+        feature_schema_name: str = "default",
+        count_matrix_name: str = "X",
+        feature_ids_column_name: str = "index",
+    ) -> t.List[t.Dict[str, t.Any]]:
+        """
+        Parse 10x 'h5' matrix and apply the annotate method on it.
+
+        :param filepath: Filepath of the local 'h5' matrix
+        :param chunk_size: Size of chunks to split on
+        :param feature_schema_name: feature schema name to use for data preparation. if 'default' default schema will
+            be used.
+        :param count_matrix_name:  Where to obtain a feature expression count matrix from. Choice of: 'X', 'raw.X'
+        :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. Default `index`.
+        :return: A list of dictionaries with annotations for each of the cells from input adata
+        """
         adata = _read_data.read_10x_h5(filepath)
-        return self.annotate_anndata(adata=adata, chunk_size=chunk_size)
+        return self.annotate_anndata(
+            adata=adata,
+            chunk_size=chunk_size,
+            feature_schema_name=feature_schema_name,
+            count_matrix_name=count_matrix_name,
+            feature_ids_column_name=feature_ids_column_name,
+        )

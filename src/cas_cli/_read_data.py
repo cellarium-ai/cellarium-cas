@@ -92,9 +92,9 @@ def _read_v3_10x_h5(filename: str):
                 matrix,
                 obs=dict(obs_names=dsets["barcodes"].astype(str)),
                 var=dict(
-                    var_names=dsets["name"].astype(str),
-                    gene_ids=dsets["id"].astype(str),
-                    feature_types=dsets["feature_type"].astype(str),
+                    var_names=dsets["id"].astype(str),
+                    gene_name=dsets["name"].astype(str),
+                    feature_type=dsets["feature_type"].astype(str),
                     genome=dsets["genome"].astype(str),
                 ),
             )

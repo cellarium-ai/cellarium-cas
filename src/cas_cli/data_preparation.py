@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 
-from casp_cli import exceptions
+from cas_cli import exceptions
 
 
 def validate(
