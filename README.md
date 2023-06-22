@@ -1,12 +1,12 @@
-# Cell Annotation Service Client
-Python Client libraries for Cell Annotation Service
+# Cellarium Cell Annotation Service (CAS) Client
+This codebase contains the Python client library for using Cellarium Cell Annotation Service (CAS).
 
 # Installation
 ```
 $ pip install git+https://github.com/broadinstitute/cell-annotation-service-client.git@fg-data-reading-validation
 ```
 # Usage
-To use CAS services create a client instance with an API token:
+To use Cellarium CAS, create a client instance with your API token:
 
 ```python3
 from cas_cli import CASClient
@@ -16,12 +16,12 @@ cas = CASClient(api_token=api_token)
 ```
 
 ## Annotation
-You can annotate 10x h5 matrices from local disk:
+You can annotate 10x Cell Ranger h5 matrices from local disk:
 ```python3
 
 response = cas.annotate_10x_h5_file(filepath="your_path_to_local_h5_file.h5")
 ```
-or anndata file from local disk:
+or an anndata file from local disk:
 ```python3
 response = cas.annotate_anndata_file(filepath="your_path_to_local_h5_file.h5ad")
 ```
