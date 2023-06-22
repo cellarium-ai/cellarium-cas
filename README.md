@@ -3,7 +3,7 @@ This codebase contains the Python client library for using Cellarium Cell Annota
 
 # Installation
 ```
-$ pip install git+https://github.com/broadinstitute/cell-annotation-service-client.git@fg-data-reading-validation
+$ pip install git+https://github.com/broadinstitute/cell-annotation-service-client.git
 ```
 # Usage
 To use Cellarium CAS, create a client instance with your API token:
