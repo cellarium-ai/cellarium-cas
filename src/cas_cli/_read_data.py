@@ -109,7 +109,8 @@ def read_10x_h5(
 ) -> "anndata.AnnData":
     """
      Read 10x-Genomics-formatted hdf5 file.
-     Refer to scanpy library https://github.com/scverse/scanpy/blob/1.6.x/scanpy/readwrite.py#LL138C10-L138C10.
+     This method is borrowed from scanpy, please refer to scanpy library:
+     https://github.com/scverse/scanpy/blob/1.6.x/scanpy/readwrite.py#LL138C10-L138C10.
 
     :param filename:  Path to a 10x hdf5 file.
     :param genome: Filter expression to genes within this genome. For legacy 10x h5 files, this must be provided

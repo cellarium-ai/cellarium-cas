@@ -17,13 +17,16 @@ cas = CASClient(api_token=api_token)
 
 ## Annotation
 You can annotate 10x h5 matrices from local disk:
-```python
+```python3
 
-response = cas.annotate_10x_h5(filepath="your_path_to_local_h5_file.h5")
+response = cas.annotate_10x_h5_file(filepath="your_path_to_local_h5_file.h5")
 ```
-
-Or anndata files using anndata library:
+or anndata file from local disk:
+```python3
+response = cas.annotate_anndata_file(filepath="your_path_to_local_h5_file.h5ad")
 ```
+or a previously loaded (unnormalized) anndata object:
+```python3
 import anndata
 
 

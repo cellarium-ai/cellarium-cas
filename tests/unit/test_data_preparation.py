@@ -12,6 +12,8 @@ import scipy.sparse as sp
 
 from cas_cli import data_preparation, exceptions
 
+np_random_state = np.random.RandomState(0)
+
 
 class TestdataPreparation(unittest.TestCase):
     SMALLER_feature_SCHEMA_LENGTH = 12
@@ -50,7 +52,7 @@ class TestdataPreparation(unittest.TestCase):
         ]
 
     @staticmethod
-    def get_bigger_feature_schema() -> t.List:
+    def get_larger_feature_schema() -> t.List:
         return [
             "ENSG00000162639",
             "ENSG00000163568",
@@ -111,7 +113,7 @@ class TestdataPreparation(unittest.TestCase):
         data_validation_error_was_raised = False
         number_of_missing_features = 0
         number_of_extra_features = 0
-        d = np.random.randint(0, 500, size=(self.INPUT_DATASET_LENGTH, len(adata_feature_schema_list)))
+        d = np_random_state.randint(0, 500, size=(self.INPUT_DATASET_LENGTH, len(adata_feature_schema_list)))
         adata = anndata.AnnData(
             X=sp.csr_matrix(d),
             obs=pd.DataFrame(index=np.arange(0, self.INPUT_DATASET_LENGTH)),
@@ -144,11 +146,11 @@ class TestdataPreparation(unittest.TestCase):
 
     def test_data_validation_input_has_extra_features(self):
         cas_feature_schema_list = self.get_feature_schema()
-        adata_feature_schema_list = self.get_bigger_feature_schema()
+        adata_feature_schema_list = self.get_larger_feature_schema()
         data_validation_error_was_raised = False
         number_of_missing_features = 0
         number_of_extra_features = 0
-        d = np.random.randint(0, 500, size=(self.INPUT_DATASET_LENGTH, len(adata_feature_schema_list)))
+        d = np_random_state.randint(0, 500, size=(self.INPUT_DATASET_LENGTH, len(adata_feature_schema_list)))
         adata = anndata.AnnData(
             X=sp.csr_matrix(d),
             obs=pd.DataFrame(index=np.arange(0, self.INPUT_DATASET_LENGTH)),
@@ -189,7 +191,7 @@ class TestdataPreparation(unittest.TestCase):
         data_validation_error_was_raised = False
         number_of_missing_features = 0
         number_of_extra_features = 0
-        d = np.random.randint(0, 500, size=(self.INPUT_DATASET_LENGTH, len(adata_feature_schema_list)))
+        d = np_random_state.randint(0, 500, size=(self.INPUT_DATASET_LENGTH, len(adata_feature_schema_list)))
         adata = anndata.AnnData(
             X=sp.csr_matrix(d),
             obs=pd.DataFrame(index=np.arange(0, self.INPUT_DATASET_LENGTH)),
@@ -221,7 +223,7 @@ class TestdataPreparation(unittest.TestCase):
         data_validation_error_was_raised = False
         number_of_missing_features = 0
         number_of_extra_features = 0
-        d = np.random.randint(0, 500, size=(self.INPUT_DATASET_LENGTH, len(adata_feature_schema_list)))
+        d = np_random_state.randint(0, 500, size=(self.INPUT_DATASET_LENGTH, len(adata_feature_schema_list)))
         adata = anndata.AnnData(
             X=sp.csr_matrix(d),
             obs=pd.DataFrame(index=np.arange(0, self.INPUT_DATASET_LENGTH)),
@@ -248,7 +250,7 @@ class TestdataPreparation(unittest.TestCase):
     def test_data_sanitizing(self):
         cas_feature_schema_list = self.get_feature_schema()
         adata_feature_schema_list = self.get_schema_that_has_missing_and_extra()
-        d = np.random.randint(0, 500, size=(self.INPUT_DATASET_LENGTH, len(adata_feature_schema_list)))
+        d = np_random_state.randint(0, 500, size=(self.INPUT_DATASET_LENGTH, len(adata_feature_schema_list)))
         adata = anndata.AnnData(
             X=sp.csr_matrix(d),
             obs=pd.DataFrame(index=np.arange(0, self.INPUT_DATASET_LENGTH)),

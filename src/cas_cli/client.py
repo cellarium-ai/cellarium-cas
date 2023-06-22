@@ -11,17 +11,20 @@ import anndata
 
 from cas_cli import _read_data, data_preparation, exceptions, service
 
+NUM_ATTEMPTS_PER_CHUNK_DEFAULT = 3
+
 
 class CASClient:
     """
     Service that is designed to call Cellarium Cloud Backend API service
     """
 
-    def __init__(self, api_token: str) -> None:
-        self._print("Connecting with Cellarium Cloud backend...")
+    def __init__(self, api_token: str, num_attempts_per_chunk: int = NUM_ATTEMPTS_PER_CHUNK_DEFAULT) -> None:
+        self._print("Connecting to Cellarium Cloud backend...")
         self.cas_api_service = service.CASAPIService(api_token=api_token)
         self.feature_schemas = []
         self._feature_schemas_cache = {}
+        self.num_attempts_per_chunk = num_attempts_per_chunk
 
     @staticmethod
     def _get_number_of_chunks(adata, chunk_size):
@@ -56,19 +59,26 @@ class CASClient:
         except exceptions.DataValidationError as e:
             if e.extra_features > 0:
                 self._print(
-                    f"Input datafile has {e.extra_features} more features than {feature_schema_name} schema in CAS. "
-                    f"They will be omitted..."
+                    f"The input data matrix has {e.extra_features} extra features compared to '{feature_schema_name}' "
+                    f"CAS schema ({len(cas_feature_schema_list)}). "
+                    f"Extra input features will be dropped."
                 )
             if e.missing_features > 0:
                 self._print(
-                    f"Input datafile has {e.missing_features} missing features compared with {feature_schema_name} in CAS. "
-                    f"They will be filled with zeros..."
+                    f"The input data matrix has {e.missing_features} missing features compared to "
+                    f"'{feature_schema_name}' CAS schema ({len(cas_feature_schema_list)}). "
+                    f"Missing features will be imputed with zeros."
                 )
             if e.extra_features == 0 and e.missing_features == 0:
                 self._print(
                     f"Input datafile has all the necessary features as {feature_schema_name}, but it's still "
                     f"incompatible because of the different order. The features will be reordered "
                     f"according to {feature_schema_name}..."
+                )
+                self._print(
+                    f"The input data matrix contains all of the features specified in '{feature_schema_name}' "
+                    f"CAS schema but in a different order. The input features will be reordered according to "
+                    f"'{feature_schema_name}'"
                 )
             return data_preparation.sanitize(
                 adata=adata,
@@ -77,7 +87,7 @@ class CASClient:
                 feature_ids_column_name=feature_ids_column_name,
             )
         else:
-            self._print(f"Input dataset is validated and fully compatible with {feature_schema_name} schema...")
+            self._print(f"The input data matrix conforms with the '{feature_schema_name}' CAS schema.")
             return adata
 
     async def _annotate_anndata_chunk(
@@ -93,14 +103,14 @@ class CASClient:
         In case of HTTP 500 response resubmit task 2 times.
         In case of HTTP 501 print a message
 
-        :param adata_bytes: Dumped bytes of anndata chunk
+        :param adata_bytes: Dumped bytes of `anndata.AnnData` chunk
         :param results: Results list that needs to be used to inplace the response from the server
         :param chunk_index: Consequent number of the chunk (e.g Chunk 1, Chunk 2)
         :param chunk_start_i: Index pointing to the main adata file start position of the current chunk
         :param chunk_end_i: Index pointing to the main adata file end position of the current chunk
         """
         number_of_cells = chunk_end_i - chunk_start_i
-        for _ in range(3):
+        for _ in range(self.num_attempts_per_chunk):
             try:
                 results[chunk_index] = await self.cas_api_service.async_annotate_anndata_chunk(
                     adata_file_bytes=adata_bytes, number_of_cells=number_of_cells
@@ -108,7 +118,8 @@ class CASClient:
 
             except exceptions.HTTPError500:
                 self._print(
-                    f"Something went wrong, resubmitting chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, {chunk_end_i:5.0f}) to CAS ..."
+                    f"Error occurred in CAS backend (HTTPError500), "
+                    f"resubmitting chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, {chunk_end_i:5.0f}) to CAS ..."
                 )
                 pass
             except exceptions.HTTPError401:
@@ -124,7 +135,7 @@ class CASClient:
         """
         Submit chunks asynchronously as asyncio tasks
 
-        :param adata: AnnData file to process
+        :param adata: `anndata.AnnData` file to process
         :param results: Results list that is used to inplace the responses from the server
         :param chunk_size: Chunk size to split on
         :param start_time: Start time of the execution before this task was submitted
@@ -168,13 +179,13 @@ class CASClient:
         feature_ids_column_name: str = "index",
     ) -> t.List[t.Dict[str, t.Any]]:
         """
-        Send an anndata object to Cellarium Cloud backend to get annotations. Split the input
+        Send an `anndata.AnnData` instance to Cellarium Cloud backend to get annotations. Split the input
         adata to smaller chunks and send them all asynchronously to the backend API service.
-        All the chunks have equal size apart of the last one, which is usually smaller than
+        All the chunks have equal size apart from the last one, which is usually smaller than
         the rest of the chunks. Backend API processes all of these chunks in parallel and
         returns them as soon as they are ready.
 
-        :param adata: AnnData instance to annotate
+        :param adata: `anndata.AnnData` instance to annotate
         :param chunk_size: Size of chunks to split on
         :param feature_schema_name: feature schema name to use for data preparation. if 'default' default schema will
             be used.
@@ -209,7 +220,35 @@ class CASClient:
         self._print("Finished!")
         return result
 
-    def annotate_10x_h5(
+    def annotate_anndata_file(
+        self,
+        filepath: str,
+        chunk_size=2000,
+        feature_schema_name: str = "default",
+        count_matrix_name: str = "X",
+        feature_ids_column_name: str = "index",
+    ) -> t.List[t.Dict[str, t.Any]]:
+        """
+        Read `anndata.AnnData` matrix and apply the annotate method on it.
+
+        :param filepath: Filepath of the local `anndata.AnnData` matrix
+        :param chunk_size: Size of chunks to split on
+        :param feature_schema_name: feature schema name to use for data preparation. if 'default' default schema will
+            be used.
+        :param count_matrix_name:  Where to obtain a feature expression count matrix from. Choice of: 'X', 'raw.X'
+        :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. Default `index`.
+        :return: A list of dictionaries with annotations for each of the cells from input adata
+        """
+        adata = anndata.read_h5ad(filename=filepath)
+        return self.annotate_anndata(
+            adata=adata,
+            chunk_size=chunk_size,
+            feature_schema_name=feature_schema_name,
+            count_matrix_name=count_matrix_name,
+            feature_ids_column_name=feature_ids_column_name,
+        )
+
+    def annotate_10x_h5_file(
         self,
         filepath: str,
         chunk_size=2000,

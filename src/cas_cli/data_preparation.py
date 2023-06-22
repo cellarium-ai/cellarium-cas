@@ -53,7 +53,7 @@ def sanitize(
 ) -> anndata.AnnData:
     """
     Cellarium CAS sanitizing script. Returns a new `anndata.AnnData` instance, based on the feature expression
-    matrix of the input instance. Extra Features get omitted. Missing features get filled with zeros.
+    matrix of the input instance. Extra features get omitted. Missing features get filled with zeros.
 
     :param adata: Instance to sanitize
     :param cas_feature_schema_list: List of Ensembl feature ids to rely on.
