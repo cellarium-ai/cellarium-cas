@@ -8,7 +8,8 @@ __pycache__/
 
 # Distribution / packaging
 .Python
-docs/build/
+build/
+docs/build
 develop-eggs/
 dist/
 downloads/
@@ -70,7 +71,7 @@ instance/
 
 # Sphinx documentation
 docs/_build/
-requirements/docs.txt/
+
 
 # PyBuilder
 target/

@@ -98,7 +98,7 @@ class CASAPIService(_BaseService):
     Class with all the API methods of Cellarium Cloud CAS infrastructure.
     """
 
-    BACKEND_URL = "https://cas-api-test-2-vi7nxpvk7a-uc.a.run.app"
+    BACKEND_URL = "https://cas-api-june-release-vi7nxpvk7a-uc.a.run.app"
 
     def validate_token(self) -> None:
         """
@@ -142,25 +142,18 @@ class CASAPIService(_BaseService):
         """
         return self.get_json(endpoint=endpoints.GET_SCHEMA_BY_NAME.format(schema_name=name))
 
-    @staticmethod
-    def get_cas_pca_002_schema_from_dump() -> t.List[str]:
+    def get_model_list(self) -> t.List[t.Dict[str, t.Any]]:
         """
-        This method should be deprecated and used only before Cellarium Cloud CAS backend will have feature schemas
-        API methods
+        Retrieve list of all models that are in CAS
 
-        :return: list with gene ids
+        Refer to API Docs: {BACKEND_URL}/docs#/default/list_models_list_models_get
+
+        :return: List of models
         """
-        import os
-
-        curr_path = os.path.dirname(os.path.realpath(__file__))
-
-        with open(f"{curr_path}/assets/cellarium_cas_tx_pca_002_grch38_2020_a.json", "r") as f:
-            cas_feature_schema_list = json.loads(f.read())
-
-        return cas_feature_schema_list
+        return self.get_json(endpoint=endpoints.LIST_MODELS)
 
     async def async_annotate_anndata_chunk(
-        self, adata_file_bytes: t.ByteString, number_of_cells: int
+        self, adata_file_bytes: t.ByteString, number_of_cells: int, model_system_name: str
     ) -> t.List[t.Dict[str, t.Any]]:
         """
         Request Cellarium Cloud infrastructure to annotate an input anndata file
@@ -169,7 +162,8 @@ class CASAPIService(_BaseService):
 
         :param adata_file_bytes: Validated anndata file
         :param number_of_cells: Number of cells being processed in this dataset
+        :param model_system_name: System name of the model to use.
         :return: A list of dictionaries with annotations.
         """
-        request_data = {"number_of_cells": str(number_of_cells)}
+        request_data = {"number_of_cells": str(number_of_cells), "model_system_name": model_system_name}
         return await self.async_post(endpoints.ANNOTATE, file=adata_file_bytes, data=request_data)

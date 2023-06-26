@@ -1,4 +1,5 @@
 import typing as t
+import warnings
 
 import anndata
 import h5py
@@ -54,14 +55,16 @@ def _read_legacy_10x_h5(filename, *, genome=None):
             )
             # the csc matrix is automatically the transposed csr matrix
             # as scanpy expects it, so, no need for a further transposition
-            adata = anndata.AnnData(
-                matrix,
-                obs=dict(obs_names=dsets["barcodes"].astype(str)),
-                var=dict(
-                    var_names=dsets["gene_names"].astype(str),
-                    gene_ids=dsets["genes"].astype(str),
-                ),
-            )
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                adata = anndata.AnnData(
+                    matrix,
+                    obs=dict(obs_names=dsets["barcodes"].astype(str)),
+                    var=dict(
+                        var_names=dsets["gene_names"].astype(str),
+                        gene_ids=dsets["genes"].astype(str),
+                    ),
+                )
 
             return adata
         except KeyError:
@@ -88,16 +91,18 @@ def _read_v3_10x_h5(filename: str):
                 (data, dsets["indices"], dsets["indptr"]),
                 shape=(N, M),
             )
-            adata = anndata.AnnData(
-                matrix,
-                obs=dict(obs_names=dsets["barcodes"].astype(str)),
-                var=dict(
-                    var_names=dsets["id"].astype(str),
-                    gene_name=dsets["name"].astype(str),
-                    feature_type=dsets["feature_type"].astype(str),
-                    genome=dsets["genome"].astype(str),
-                ),
-            )
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                adata = anndata.AnnData(
+                    matrix,
+                    obs=dict(obs_names=dsets["barcodes"].astype(str)),
+                    var=dict(
+                        var_names=dsets["id"].astype(str),
+                        gene_name=dsets["name"].astype(str),
+                        feature_type=dsets["feature_type"].astype(str),
+                        genome=dsets["genome"].astype(str),
+                    ),
+                )
             return adata
         except KeyError:
             raise Exception("File is missing one or more required datasets.")
