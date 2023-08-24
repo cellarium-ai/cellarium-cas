@@ -1,0 +1,5 @@
+VALIDATE_TOKEN = "validate-token"
+APPLICATION_INFO = "application-info"
+ANNOTATE = "annotate"
+GET_FEATURE_SCHEMAS = "feature-schemas"
+GET_SCHEMA_BY_NAME = "feature-schema/{schema_name}"
