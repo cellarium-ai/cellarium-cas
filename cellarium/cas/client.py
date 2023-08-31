@@ -8,7 +8,6 @@ import time
 import typing as t
 import warnings
 
-
 import anndata
 
 from cellarium.cas import _read_data, data_preparation, exceptions, service
@@ -170,11 +169,11 @@ class CASClient:
                 break
 
     async def _annotate_anndata_task(
-            self,
-            adata: "anndata.AnnData",
-            model_system_name: str,
-            results: t.List,
-            chunk_size: int,
+        self,
+        adata: "anndata.AnnData",
+        model_system_name: str,
+        results: t.List,
+        chunk_size: int,
     ) -> None:
         """
         Submit chunks asynchronously as asyncio tasks
@@ -245,7 +244,7 @@ class CASClient:
         :return: A list of dictionaries with annotations for each of the cells from input adata
         """
         assert cas_model_name == "default" or cas_model_name in self.allowed_models_list, (
-            "`cas_model_name` should have a value of either 'default' or one of the values from " 
+            "`cas_model_name` should have a value of either 'default' or one of the values from "
             "`allowed_models_list`."
         )
         cas_model_name = self.default_model_name if cas_model_name == "default" else cas_model_name
@@ -265,7 +264,9 @@ class CASClient:
         results = [[] for _ in range(number_of_chunks)]
         loop = asyncio.get_event_loop()
         task = loop.create_task(
-            self._annotate_anndata_task(adata=adata, results=results, chunk_size=chunk_size, model_system_name=cas_model_name)
+            self._annotate_anndata_task(
+                adata=adata, results=results, chunk_size=chunk_size, model_system_name=cas_model_name
+            )
         )
         loop.run_until_complete(task)
         result = functools.reduce(operator.iconcat, results, [])
