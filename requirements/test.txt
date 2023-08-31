@@ -1,0 +1,3 @@
+pytest~=7.3
+coverage~=4.5
+click~=8.0

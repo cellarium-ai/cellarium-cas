@@ -9,7 +9,7 @@ import typing as t
 
 import anndata
 
-from cas_cli import _read_data, data_preparation, exceptions, service
+from cellarium.cas import _read_data, data_preparation, exceptions, service
 
 NUM_ATTEMPTS_PER_CHUNK_DEFAULT = 3
 

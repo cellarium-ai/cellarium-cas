@@ -1,3 +1,3 @@
 include README.md
-include requirements.txt
+include requirements/
 include src/cas_cli/assets/cellarium_cas_tx_pca_002_grch38_2020_a.json

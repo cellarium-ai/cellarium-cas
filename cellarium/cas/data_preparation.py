@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 
-from cas_cli import exceptions
+from cellarium.cas import exceptions
 
 
 def validate(
