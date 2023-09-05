@@ -93,7 +93,7 @@ class CASAPIService(_BaseService):
     Class with all the API methods of Cellarium Cloud CAS infrastructure.
     """
 
-    BACKEND_URL = "https://cas-manager-vi7nxpvk7a-uc.a.run.app"
+    BACKEND_URL = "https://cas-api-test-2-vi7nxpvk7a-uc.a.run.app"
 
     def validate_token(self) -> None:
         """
