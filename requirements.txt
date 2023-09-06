@@ -4,3 +4,4 @@ anndata
 pandas
 numpy
 nest_asyncio
+certifi
