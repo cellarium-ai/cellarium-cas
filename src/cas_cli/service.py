@@ -1,7 +1,9 @@
 import json
+import ssl
 import typing as t
 
 import aiohttp
+import certifi
 import nest_asyncio
 import requests
 
@@ -82,7 +84,10 @@ class _BaseService:
         for key, value in data.items():
             form_data.add_field(key, value)
 
-        async with aiohttp.ClientSession() as session:
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
+        conn = aiohttp.TCPConnector(ssl=ssl_context)
+
+        async with aiohttp.ClientSession(connector=conn) as session:
             async with session.post(url, data=form_data, headers=_headers) as resp:
                 self.__validate_response_code(resp.status)
                 return await resp.json()
