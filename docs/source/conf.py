@@ -6,7 +6,7 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'cellarium-cas'
+project = 'Cellarium CAS'
 copyright = '2023, Cellarium AI'
 author = 'Cellarium AI'
 

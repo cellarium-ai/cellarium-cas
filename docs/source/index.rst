@@ -1,20 +1,19 @@
-.. cellarium-cas documentation master file, created by
-   sphinx-quickstart on Thu Aug 31 17:31:17 2023.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+:tocdepth: 3
 
-Welcome to Cellarium Cell Annotation Service documentation!
-===========================================================
+Cellarium Cell Annotation Service
+#################################
 
+**What's Cell Annotation Service (CAS)?** CAS is a software library for rapid querying of single-cell omics data relying on ML algorithms.
+
+Quick Start
+===========
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+   :maxdepth: 1
 
+   modules/installation
+   modules/usage
+   modules/workflow
 
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+Other Tools
+===========
+    * `Machine Learning library Cellarium ML <https://cellarium-ai.github.io/cellarium-ml/index.html>`_
