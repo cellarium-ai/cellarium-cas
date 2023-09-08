@@ -9,7 +9,7 @@ $ pip install git+https://github.com/broadinstitute/cell-annotation-service-clie
 To use Cellarium CAS, create a client instance with your API token:
 
 ```python3
-from cas import CASClient
+from cellarium.cas import CASClient
 
 api_token = "a_very_long_string_with_some_symbols"
 cas = CASClient(api_token=api_token)

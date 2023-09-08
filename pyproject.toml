@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=41", "setuptools-scm"]
+requires = ["setuptools>=41", "setuptools-git-versioning<2"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -33,10 +33,6 @@ readme = {file = ["README.md"]}
 
 [tool.setuptools-git-versioning]
 enabled = true
-
-[tool.ruff]
-line-length = 120
-select = ["E", "F", "I", "W"]
 
 [tool.black]
 line-length = 120
