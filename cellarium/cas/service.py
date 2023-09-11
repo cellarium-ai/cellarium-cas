@@ -7,7 +7,7 @@ import certifi
 import nest_asyncio
 import requests
 
-from cas_cli import endpoints, exceptions
+from cellarium.cas import endpoints, exceptions
 
 nest_asyncio.apply()
 
