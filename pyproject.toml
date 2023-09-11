@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=41", "setuptools-git-versioning<2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cellarium-cas"
+authors = [
+    { name="Cellarium AI", email="info@cellarium.ai" }
+]
+description = "Cellarium Cell Annotation Service client tool"
+requires-python = ">=3.7"
+license = {file = "LICENSE.md"}
+classifiers = [
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: Implementation :: CPython",
+]
+dynamic = ["dependencies", "version", "readme"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements/base.txt"]}
+optional-dependencies = {test = { file = ["requirements/test.txt"] }}
+readme = {file = ["README.md"]}
+
+[project.urls]
+"Homepage" = "https://cellarium.ai"
+"Source Code" = "https://github.com/cellarium-ai/cellarium-cas"
+"Bug Tracker" = "https://github.com/cellarium-ai/cellarium-cas/issues"
+"Discussion Forum" = "https://github.com/cellarium-ai/cellarium-cas/discussions"
+
+[tool.setuptools-git-versioning]
+enabled = true
+
+[tool.black]
+line-length = 120
