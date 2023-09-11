@@ -7,6 +7,6 @@ Installation
 From github repository
 ++++++++++++++++++++++
 
-Install latest alpha version using `pip` with a specified version::
+Install the latest alpha version using `pip` with a specified version::
 
-    pip install git+https://github.com/broadinstitute/cellarium-cas.git@1.0a1
+    pip install git+https://github.com/cellarium-ai/cellarium-cas.git@1.0a1

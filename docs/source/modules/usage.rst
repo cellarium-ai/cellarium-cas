@@ -23,12 +23,12 @@ Annotation
 
 10x Cell Ranger h5 matrices
 +++++++++++++++++++++++++++
-You can annotate 10x Cell Ranger h5 matrices from local disk::
+You can annotate 10x Cell Ranger h5 matrices from the local disk::
 
     response = cas.annotate_10x_h5_file(filepath="your_path_to_local_h5_file.h5")
 
-Anndata File from disk
-++++++++++++++++++++++
+Anndata File from the disk
+++++++++++++++++++++++++++
 ::
 
     response = cas.annotate_anndata_file(filepath="your_path_to_local_h5_file.h5ad")
