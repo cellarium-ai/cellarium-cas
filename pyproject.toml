@@ -18,11 +18,11 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: Implementation :: CPython",
 ]
-dynamic = ["dependencies", "version", "readme"]
+dynamic = ["dependencies", "optional-dependencies", "version", "readme"]
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements/base.txt"]}
-optional-dependencies = {test = { file = ["requirements/test.txt"] }}
+optional-dependencies = {docs = { file = ["requirements/docs.txt"] }, test = { file = ["requirements/test.txt"]}}
 readme = {file = ["README.md"]}
 
 [project.urls]
