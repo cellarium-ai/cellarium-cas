@@ -36,7 +36,7 @@ class _BaseService:
         return f"{cls.BACKEND_URL}/{endpoint}"
 
     @staticmethod
-    def __validate_response_code(response_code):
+    def __validate_response_code(response_code: int):
         if response_code == 401:
             raise exceptions.HTTPError401
         elif response_code == 403:
@@ -147,6 +147,7 @@ class CASAPIService(_BaseService):
         """
         This method should be deprecated and used only before Cellarium Cloud CAS backend will have feature schemas
         API methods
+
         :return: list with gene ids
         """
         import os
