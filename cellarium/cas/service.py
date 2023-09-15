@@ -153,7 +153,7 @@ class CASAPIService(_BaseService):
         return self.get_json(endpoint=endpoints.LIST_MODELS)
 
     async def async_annotate_anndata_chunk(
-        self, adata_file_bytes: t.ByteString, number_of_cells: int, model_system_name: str
+        self, adata_file_bytes: t.ByteString, number_of_cells: int, model_name: str
     ) -> t.List[t.Dict[str, t.Any]]:
         """
         Request Cellarium Cloud infrastructure to annotate an input anndata file
@@ -162,8 +162,8 @@ class CASAPIService(_BaseService):
 
         :param adata_file_bytes: Validated anndata file
         :param number_of_cells: Number of cells being processed in this dataset
-        :param model_system_name: System name of the model to use.
+        :param model_name: Name of the model to use.
         :return: A list of dictionaries with annotations.
         """
-        request_data = {"number_of_cells": str(number_of_cells), "model_system_name": model_system_name}
+        request_data = {"number_of_cells": str(number_of_cells), "model_name": model_name}
         return await self.async_post(endpoints.ANNOTATE, file=adata_file_bytes, data=request_data)

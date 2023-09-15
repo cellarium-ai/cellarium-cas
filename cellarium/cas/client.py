@@ -27,7 +27,7 @@ class CASClient:
     def _print_models(self, models):
         s = "Allowed model list in Cellarium Cloud CAS:\n"
         for model in models:
-            model_name = model["system_name"]
+            model_name = model["model_name"]
             model_schema = model["schema_name"]
             embedding_dimension = model["embedding_dimension"]
             if model["is_default_model"]:
@@ -47,9 +47,9 @@ class CASClient:
         application_info = self.cas_api_service.get_application_info()
 
         self.model_objects_list = self.cas_api_service.get_model_list()
-        self.allowed_models_list = [x["system_name"] for x in self.model_objects_list]
-        self._model_name_obj_map = {x["system_name"]: x for x in self.model_objects_list}
-        self.default_model_name = [x["system_name"] for x in self.model_objects_list if x["is_default_model"]][0]
+        self.allowed_models_list = [x["model_name"] for x in self.model_objects_list]
+        self._model_name_obj_map = {x["model_name"]: x for x in self.model_objects_list}
+        self.default_model_name = [x["model_name"] for x in self.model_objects_list if x["is_default_model"]][0]
 
         self.feature_schemas = self.cas_api_service.get_feature_schemas()
         self._feature_schemas_cache = {}
@@ -130,7 +130,7 @@ class CASClient:
         adata_bytes: bytes,
         results: t.List,
         chunk_index: int,
-        model_system_name: str,
+        model_name: str,
         chunk_start_i: int,
         chunk_end_i: int,
     ) -> None:
@@ -141,7 +141,7 @@ class CASClient:
 
         :param adata_bytes: Dumped bytes of `anndata.AnnData` chunk
         :param results: Results list that needs to be used to inplace the response from the server
-        :param model_system_name: A system name of the model to use for annotations
+        :param model_name: A system name of the model to use for annotations
         :param chunk_index: Consequent number of the chunk (e.g. Chunk 1, Chunk 2)
         :param chunk_start_i: Index pointing to the main adata file start position of the current chunk
         :param chunk_end_i: Index pointing to the main adata file end position of the current chunk
@@ -150,7 +150,7 @@ class CASClient:
         for _ in range(self.num_attempts_per_chunk):
             try:
                 results[chunk_index] = await self.cas_api_service.async_annotate_anndata_chunk(
-                    adata_file_bytes=adata_bytes, number_of_cells=number_of_cells, model_system_name=model_system_name
+                    adata_file_bytes=adata_bytes, number_of_cells=number_of_cells, model_name=model_name
                 )
 
             except exceptions.HTTPError500:
@@ -171,7 +171,7 @@ class CASClient:
     async def _annotate_anndata_task(
         self,
         adata: "anndata.AnnData",
-        model_system_name: str,
+        model_name: str,
         results: t.List,
         chunk_size: int,
     ) -> None:
@@ -179,7 +179,7 @@ class CASClient:
         Submit chunks asynchronously as asyncio tasks
 
         :param adata: `anndata.AnnData` file to process
-        :param model_system_name: Model system name to use for annotations
+        :param model_name: Model system name to use for annotations
         :param results: Results list that is used to inplace the responses from the server
         :param chunk_size: Chunk size to split on
         """
@@ -203,7 +203,7 @@ class CASClient:
                 self._annotate_anndata_chunk(
                     adata_bytes=chunk_bytes,
                     results=results,
-                    model_system_name=model_system_name,
+                    model_name=model_name,
                     chunk_index=chunk_index,
                     chunk_start_i=chunk_start_i,
                     chunk_end_i=chunk_end_i,
@@ -250,8 +250,8 @@ class CASClient:
         cas_model_name = self.default_model_name if cas_model_name == "default" else cas_model_name
         start = time.time()
         cas_model = self._model_name_obj_map[cas_model_name]
-        cas_model_system_name = cas_model["system_name"]
-        self._print(f"CAS v1.0 (Model ID: {cas_model_system_name})")
+        cas_model_name = cas_model["model_name"]
+        self._print(f"CAS v1.0 (Model ID: {cas_model_name})")
         self._print(f"Total number of input cells: {len(adata)}")
         adata = self._validate_and_sanitize_input_data(
             adata=adata,
@@ -264,9 +264,7 @@ class CASClient:
         results = [[] for _ in range(number_of_chunks)]
         loop = asyncio.get_event_loop()
         task = loop.create_task(
-            self._annotate_anndata_task(
-                adata=adata, results=results, chunk_size=chunk_size, model_system_name=cas_model_name
-            )
+            self._annotate_anndata_task(adata=adata, results=results, chunk_size=chunk_size, model_name=cas_model_name)
         )
         loop.run_until_complete(task)
         result = functools.reduce(operator.iconcat, results, [])
