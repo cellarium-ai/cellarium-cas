@@ -33,7 +33,7 @@ class CASClient:
             if model["is_default_model"]:
                 model_name += " (default)"
 
-            s += f"\t- {model_name}\n\t\tSchema: {model_schema}\n\t\tEmbedding dimension: {embedding_dimension}\n"
+            s += f"  - {model_name}\n    Schema: {model_schema}\n    Embedding dimension: {embedding_dimension}\n"
 
         self._print(s)
 
@@ -141,7 +141,7 @@ class CASClient:
 
         :param adata_bytes: Dumped bytes of `anndata.AnnData` chunk
         :param results: Results list that needs to be used to inplace the response from the server
-        :param model_name: A system name of the model to use for annotations
+        :param model_name: A name of the model to use for annotations
         :param chunk_index: Consequent number of the chunk (e.g. Chunk 1, Chunk 2)
         :param chunk_start_i: Index pointing to the main adata file start position of the current chunk
         :param chunk_end_i: Index pointing to the main adata file end position of the current chunk
@@ -179,7 +179,7 @@ class CASClient:
         Submit chunks asynchronously as asyncio tasks
 
         :param adata: `anndata.AnnData` file to process
-        :param model_name: Model system name to use for annotations
+        :param model_name: Model name to use for annotations
         :param results: Results list that is used to inplace the responses from the server
         :param chunk_size: Chunk size to split on
         """
@@ -229,9 +229,9 @@ class CASClient:
 
         :param adata: :class:`anndata.AnnData` instance to annotate
         :param chunk_size: Size of chunks to split on
-        :param feature_schema_name: feature schema name to use for data preparation. |br|
-            `Allowed Values:` Feature schema name from the :attr:`feature_schemas` list or ``"default"``
-            keyword, which refers to the default selected feature schema in the Cellarium backend. |br|
+        :param cas_model_name: Model name to use for annotation. |br|
+            `Allowed Values:` Model name from the :attr:`allowed_models_list` list or ``"default"``
+            keyword, which refers to the default selected model in the Cellarium backend. |br|
             `Default:` ``"default"``
         :param count_matrix_name:  Where to obtain a feature expression count matrix from. |br|
             `Allowed Values:` Choice of either ``"X"``  or ``"raw.X"`` in order to use ``adata.X`` or ``adata.raw.X``,
@@ -285,9 +285,9 @@ class CASClient:
 
         :param filepath: Filepath of the local :class:`anndata.AnnData` matrix
         :param chunk_size: Size of chunks to split on
-        :param feature_schema_name: feature schema name to use for data preparation. |br|
-            `Allowed Values:` Feature schema name from the :attr:`feature_schemas` list or ``"default"``
-            keyword, which refers to the default selected feature schema in the Cellarium backend. |br|
+        :param cas_model_name: Model name to use for annotation. |br|
+            `Allowed Values:` Model name from the :attr:`allowed_models_list` list or ``"default"``
+            keyword, which refers to the default selected model in the Cellarium backend. |br|
             `Default:` ``"default"``
         :param count_matrix_name:  Where to obtain a feature expression count matrix from. |br|
             `Allowed Values:` Choice of either ``"X"``  or ``"raw.X"`` in order to use ``adata.X`` or ``adata.raw.X``,
@@ -324,9 +324,9 @@ class CASClient:
 
         :param filepath: Filepath of the local 'h5' matrix
         :param chunk_size: Size of chunks to split on
-        :param feature_schema_name: feature schema name to use for data preparation. |br|
-            `Allowed Values:` Feature schema name from the :attr:`feature_schemas` list or ``"default"``
-            keyword, which refers to the default selected feature schema in the Cellarium backend. |br|
+        :param cas_model_name: Model name to use for annotation. |br|
+            `Allowed Values:` Model name from the :attr:`allowed_models_list` list or ``"default"``
+            keyword, which refers to the default selected model in the Cellarium backend. |br|
             `Default:` ``"default"``
         :param count_matrix_name:  Where to obtain a feature expression count matrix from. |br|
             `Allowed Values:` Choice of either ``"X"``  or ``"raw.X"`` in order to use ``adata.X`` or ``adata.raw.X``,
