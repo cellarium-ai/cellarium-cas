@@ -16,15 +16,15 @@ NUM_ATTEMPTS_PER_CHUNK_DEFAULT = 3
 
 class CASClient:
     """
-    Service that is designed to communicate with Cellarium Cloud Backend.
+    Service that is designed to communicate with the Cellarium Cloud Backend.
 
-    :param api_token: API token issued by Cellarium team
+    :param api_token: API token issued by the Cellarium team
     :param num_attempts_per_chunk: Number of attempts the client should make to annotate each chunk. |br|
         `Default:` ``3``
     """
 
     def __init__(self, api_token: str, num_attempts_per_chunk: int = NUM_ATTEMPTS_PER_CHUNK_DEFAULT) -> None:
-        self._print("Connecting to Cellarium Cloud backend...")
+        self._print("Connecting to the Cellarium Cloud backend...")
         self.cas_api_service = service.CASAPIService(api_token=api_token)
         self.feature_schemas = []
         self._feature_schemas_cache = {}
@@ -190,14 +190,15 @@ class CASClient:
         :param adata: :class:`anndata.AnnData` instance to annotate
         :param chunk_size: Size of chunks to split on
         :param feature_schema_name: feature schema name to use for data preparation. |br|
-            `Allowed Values:` Allowed feature schema names in the :attr:`feature_schemas` or ``"default"``
+            `Allowed Values:` Feature schema name from the :attr:`feature_schemas` list or ``"default"``
             keyword, which refers to the default selected feature schema in the Cellarium backend. |br|
             `Default:` ``"default"``
         :param count_matrix_name:  Where to obtain a feature expression count matrix from. |br|
-            `Allowed Values:` Choice of ``"X"``  or ``"raw.X"`` to use ``adata.X`` or ``adata.raw.X`` respectively |br|
+            `Allowed Values:` Choice of either ``"X"``  or ``"raw.X"`` in order to use ``adata.X`` or ``adata.raw.X``,
+             respectively |br|
             `Default:` ``"X"``
         :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. |br|
-            `Allowed Values:` Values from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
+            `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
             column. |br|
             `Default:` ``"index"``
         :return: A list of dictionaries with annotations for each of the cells from input adata
@@ -238,16 +239,17 @@ class CASClient:
         feature_ids_column_name: str = "index",
     ) -> t.List[t.Dict[str, t.Any]]:
         """
-        Read the 'h5ad' file into a :class:anndata.AnnData matrix and apply the :meth:annotate method to it.
+        Read the 'h5ad' file into a :class:`anndata.AnnData` matrix and apply the :meth:`annotate_anndata` method to it.
 
         :param filepath: Filepath of the local :class:`anndata.AnnData` matrix
         :param chunk_size: Size of chunks to split on
         :param feature_schema_name: feature schema name to use for data preparation. |br|
-            `Allowed Values:` A value from the list of allowed feature schema names in the :attr:`feature_schemas`
-            or ``"default"`` keyword, which refers to the default selected feature schema in the Cellarium backend. |br|
+            `Allowed Values:` Feature schema name from the :attr:`feature_schemas` list or ``"default"``
+            keyword, which refers to the default selected feature schema in the Cellarium backend. |br|
             `Default:` ``"default"``
         :param count_matrix_name:  Where to obtain a feature expression count matrix from. |br|
-            `Allowed Values:` Choice of ``"X"`` or ``"raw.X"`` to use ``adata.X`` or ``adata.raw.X`` respectively |br|
+            `Allowed Values:` Choice of either ``"X"``  or ``"raw.X"`` in order to use ``adata.X`` or ``adata.raw.X``,
+             respectively |br|
             `Default:` ``"X"``
         :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. |br|
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
@@ -273,23 +275,23 @@ class CASClient:
         feature_ids_column_name: str = "index",
     ) -> t.List[t.Dict[str, t.Any]]:
         """
-        Parse the 10x 'h5' matrix and apply the :meth:annotate method to it.
+        Parse the 10x 'h5' matrix and apply the :meth:`annotate_anndata` method to it.
 
         :param filepath: Filepath of the local 'h5' matrix
         :param chunk_size: Size of chunks to split on
-        :param feature_schema_name: Feature schema name to use for data preparation. |br|
-            `Allowed Values:` A value from the list of allowed feature schema names in the :attr:`feature_schemas`
-            attribute or ``"default"``, which refers to the default selected feature schema in the
-            Cellarium backend. |br|
+        :param feature_schema_name: feature schema name to use for data preparation. |br|
+            `Allowed Values:` Feature schema name from the :attr:`feature_schemas` list or ``"default"``
+            keyword, which refers to the default selected feature schema in the Cellarium backend. |br|
             `Default:` ``"default"``
         :param count_matrix_name:  Where to obtain a feature expression count matrix from. |br|
-            `Allowed Values:` Choice of ``"X"`` or ``"raw.X"`` to use ``adata.X`` or ``adata.raw.X`` respectively |br|
+            `Allowed Values:` Choice of either ``"X"``  or ``"raw.X"`` in order to use ``adata.X`` or ``adata.raw.X``,
+             respectively |br|
             `Default:` ``"X"``
-        :param feature_ids_column_name: Column name where to obtain Ensembl feature ids.
+        :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. |br|
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
             column. |br|
             `Default:` ``"index"``
-        :return: A list of dictionaries with annotations for each of the cell from the input adata
+        :return: A list of dictionaries with annotations for each of the cells from input adata
         """
         adata = _read_data.read_10x_h5(filepath)
         return self.annotate_anndata(
