@@ -1,5 +1,4 @@
 import typing as t
-import warnings
 
 import anndata
 import numpy as np
@@ -82,24 +81,28 @@ def sanitize(
     feature_id_intersection_cas_indices = list(map(cas_feature_id_map.get, feature_id_intersection))
     feature_id_intersection_adata_indices = list(map(adata_feature_id_map.get, feature_id_intersection))
 
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", sp.SparseEfficiencyWarning)
-        n_cells = adata.shape[0]
-        n_features = len(cas_feature_schema_list)
-        result_matrix = sp.csc_matrix((n_cells, n_features), dtype=np.float32)
-        input_matrix = adata.X if count_matrix_name == "X" else adata.raw.X
 
-        result_matrix[:, feature_id_intersection_cas_indices] = input_matrix.tocsc()[
-            :, feature_id_intersection_adata_indices
-        ]
+    n_cells = adata.shape[0]
+    n_features = len(cas_feature_schema_list)
+    input_matrix = adata.X if count_matrix_name == "X" else adata.raw.X
 
-        # Create `obs` index
-        obs = adata.obs.copy()
-        obs.index = pd.Index([str(x) for x in np.arange(adata.shape[0])])
+    # Translate the columns from one matrix to another, convert to COO format to make this efficient.
+    col_trans = np.zeros(n_features, dtype=int)
+    for i, k in enumerate(feature_id_intersection_cas_indices):
+        col_trans[i] = k
+    vals = input_matrix.tocsc()[:, feature_id_intersection_adata_indices]
+    vals = vals.tocoo()
+    new_col = col_trans[vals.col]
+    result_matrix = sp.coo_matrix((vals.data, (vals.row, new_col)), shape=(n_cells,n_features))
+    del col_trans, vals, new_col
 
-        return anndata.AnnData(
-            result_matrix.tocsr(),
-            obs=obs,
-            obsm=adata.obsm,
-            var=pd.DataFrame(index=cas_feature_schema_list),
-        )
+    # Create `obs` index
+    obs = adata.obs.copy()
+    obs.index = pd.Index([str(x) for x in np.arange(adata.shape[0])])
+
+    return anndata.AnnData(
+        result_matrix.tocsr(),
+        obs=obs,
+        obsm=adata.obsm,
+        var=pd.DataFrame(index=cas_feature_schema_list),
+    )
