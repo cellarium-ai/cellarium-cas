@@ -16,11 +16,15 @@ NUM_ATTEMPTS_PER_CHUNK_DEFAULT = 3
 
 class CASClient:
     """
-    Service that is designed to call Cellarium Cloud Backend API service
+    Service that is designed to communicate with the Cellarium Cloud Backend.
+
+    :param api_token: API token issued by the Cellarium team
+    :param num_attempts_per_chunk: Number of attempts the client should make to annotate each chunk. |br|
+        `Default:` ``3``
     """
 
     def __init__(self, api_token: str, num_attempts_per_chunk: int = NUM_ATTEMPTS_PER_CHUNK_DEFAULT) -> None:
-        self._print("Connecting to Cellarium Cloud backend...")
+        self._print("Connecting to the Cellarium Cloud backend...")
         self.cas_api_service = service.CASAPIService(api_token=api_token)
         self.feature_schemas = []
         self._feature_schemas_cache = {}
@@ -179,18 +183,24 @@ class CASClient:
         feature_ids_column_name: str = "index",
     ) -> t.List[t.Dict[str, t.Any]]:
         """
-        Send an `anndata.AnnData` instance to Cellarium Cloud backend to get annotations. Split the input
-        adata to smaller chunks and send them all asynchronously to the backend API service.
-        All the chunks have equal size apart from the last one, which is usually smaller than
-        the rest of the chunks. Backend API processes all of these chunks in parallel and
-        returns them as soon as they are ready.
+        Send an instance of :class:`anndata.AnnData` to the Cellarium Cloud backend for annotations. The function
+        splits the ``adata`` into smaller chunks and asynchronously sends them to the backend API service. Each chunk is
+        of equal size, except for the last one, which may be smaller. The backend processes these chunks in parallel.
 
-        :param adata: `anndata.AnnData` instance to annotate
+        :param adata: :class:`anndata.AnnData` instance to annotate
         :param chunk_size: Size of chunks to split on
-        :param feature_schema_name: feature schema name to use for data preparation. if 'default' default schema will
-            be used.
-        :param count_matrix_name:  Where to obtain a feature expression count matrix from. Choice of: 'X', 'raw.X'
-        :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. Default `index`.
+        :param feature_schema_name: feature schema name to use for data preparation. |br|
+            `Allowed Values:` Feature schema name from the :attr:`feature_schemas` list or ``"default"``
+            keyword, which refers to the default selected feature schema in the Cellarium backend. |br|
+            `Default:` ``"default"``
+        :param count_matrix_name:  Where to obtain a feature expression count matrix from. |br|
+            `Allowed Values:` Choice of either ``"X"``  or ``"raw.X"`` in order to use ``adata.X`` or ``adata.raw.X``,
+             respectively |br|
+            `Default:` ``"X"``
+        :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. |br|
+            `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
+            column. |br|
+            `Default:` ``"index"``
         :return: A list of dictionaries with annotations for each of the cells from input adata
         """
         start = time.time()
@@ -229,14 +239,22 @@ class CASClient:
         feature_ids_column_name: str = "index",
     ) -> t.List[t.Dict[str, t.Any]]:
         """
-        Read `anndata.AnnData` matrix and apply the annotate method on it.
+        Read the 'h5ad' file into a :class:`anndata.AnnData` matrix and apply the :meth:`annotate_anndata` method to it.
 
-        :param filepath: Filepath of the local `anndata.AnnData` matrix
+        :param filepath: Filepath of the local :class:`anndata.AnnData` matrix
         :param chunk_size: Size of chunks to split on
-        :param feature_schema_name: feature schema name to use for data preparation. if 'default' default schema will
-            be used.
-        :param count_matrix_name:  Where to obtain a feature expression count matrix from. Choice of: 'X', 'raw.X'
-        :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. Default `index`.
+        :param feature_schema_name: feature schema name to use for data preparation. |br|
+            `Allowed Values:` Feature schema name from the :attr:`feature_schemas` list or ``"default"``
+            keyword, which refers to the default selected feature schema in the Cellarium backend. |br|
+            `Default:` ``"default"``
+        :param count_matrix_name:  Where to obtain a feature expression count matrix from. |br|
+            `Allowed Values:` Choice of either ``"X"``  or ``"raw.X"`` in order to use ``adata.X`` or ``adata.raw.X``,
+             respectively |br|
+            `Default:` ``"X"``
+        :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. |br|
+            `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
+            column. |br|
+            `Default:` ``"index"``
         :return: A list of dictionaries with annotations for each of the cells from input adata
         """
         adata = anndata.read_h5ad(filename=filepath)
@@ -251,20 +269,28 @@ class CASClient:
     def annotate_10x_h5_file(
         self,
         filepath: str,
-        chunk_size=2000,
+        chunk_size: int = 2000,
         feature_schema_name: str = "default",
         count_matrix_name: str = "X",
         feature_ids_column_name: str = "index",
     ) -> t.List[t.Dict[str, t.Any]]:
         """
-        Parse 10x 'h5' matrix and apply the annotate method on it.
+        Parse the 10x 'h5' matrix and apply the :meth:`annotate_anndata` method to it.
 
         :param filepath: Filepath of the local 'h5' matrix
         :param chunk_size: Size of chunks to split on
-        :param feature_schema_name: feature schema name to use for data preparation. if 'default' default schema will
-            be used.
-        :param count_matrix_name:  Where to obtain a feature expression count matrix from. Choice of: 'X', 'raw.X'
-        :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. Default `index`.
+        :param feature_schema_name: feature schema name to use for data preparation. |br|
+            `Allowed Values:` Feature schema name from the :attr:`feature_schemas` list or ``"default"``
+            keyword, which refers to the default selected feature schema in the Cellarium backend. |br|
+            `Default:` ``"default"``
+        :param count_matrix_name:  Where to obtain a feature expression count matrix from. |br|
+            `Allowed Values:` Choice of either ``"X"``  or ``"raw.X"`` in order to use ``adata.X`` or ``adata.raw.X``,
+             respectively |br|
+            `Default:` ``"X"``
+        :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. |br|
+            `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
+            column. |br|
+            `Default:` ``"index"``
         :return: A list of dictionaries with annotations for each of the cells from input adata
         """
         adata = _read_data.read_10x_h5(filepath)
