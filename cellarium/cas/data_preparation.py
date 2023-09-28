@@ -81,7 +81,6 @@ def sanitize(
     feature_id_intersection_cas_indices = list(map(cas_feature_id_map.get, feature_id_intersection))
     feature_id_intersection_adata_indices = list(map(adata_feature_id_map.get, feature_id_intersection))
 
-
     n_cells = adata.shape[0]
     n_features = len(cas_feature_schema_list)
     input_matrix = adata.X if count_matrix_name == "X" else adata.raw.X
@@ -93,7 +92,7 @@ def sanitize(
     vals = input_matrix.tocsc()[:, feature_id_intersection_adata_indices]
     vals = vals.tocoo()
     new_col = col_trans[vals.col]
-    result_matrix = sp.coo_matrix((vals.data, (vals.row, new_col)), shape=(n_cells,n_features))
+    result_matrix = sp.coo_matrix((vals.data, (vals.row, new_col)), shape=(n_cells, n_features))
     del col_trans, vals, new_col
 
     # Create `obs` index
