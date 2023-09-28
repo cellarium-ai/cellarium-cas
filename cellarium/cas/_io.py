@@ -1,3 +1,4 @@
+import tempfile
 import typing as t
 
 import anndata
@@ -137,3 +138,27 @@ def read_10x_h5(
     else:
         adata = _read_legacy_10x_h5(filename, genome=genome)
     return adata
+
+
+def adata_to_bytes(adata: "anndata.AnnData", compression: str = "gzip") -> bytes:
+    """
+    Convert an anndata.AnnData object to a compressed byte stream.
+
+    :param adata: The AnnData object to be serialized.
+    :param compression: The compression type to be used. Should be any compression type supported by h5py.
+        `Default:` ``"gzip"``
+    :return: Serialized byte stream of the AnnData object.
+
+    Usage example:
+
+    .. code-block:: python
+
+        import anndata
+        data = anndata.AnnData(some_data)
+        byte_stream = adata_to_bytestream(data)
+    """
+
+    with tempfile.NamedTemporaryFile(suffix=".h5ad") as temp_file:
+        adata.write(temp_file.name, compression=compression)
+        temp_file.seek(0)
+        return temp_file.read()

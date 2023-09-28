@@ -3,13 +3,12 @@ import datetime
 import functools
 import math
 import operator
-import os
 import time
 import typing as t
 
 import anndata
 
-from cellarium.cas import _read_data, data_preparation, exceptions, service
+from cellarium.cas import _io, data_preparation, exceptions, service
 
 NUM_ATTEMPTS_PER_CHUNK_DEFAULT = 3
 
@@ -154,12 +153,8 @@ class CASClient:
             self._print(
                 f"Submitting cell chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, {chunk_end_i:5.0f}) to CAS ..."
             )
-            tmp_file_name = f"chunk_{chunk_index}.h5ad"
-            chunk.write(tmp_file_name, compression="gzip")
-            with open(tmp_file_name, "rb") as f:
-                chunk_bytes = f.read()
 
-            os.remove(tmp_file_name)
+            chunk_bytes = _io.adata_to_bytes(adata=chunk)
             tasks.append(
                 self._annotate_anndata_chunk(
                     adata_bytes=chunk_bytes,
@@ -293,7 +288,8 @@ class CASClient:
             `Default:` ``"index"``
         :return: A list of dictionaries with annotations for each of the cells from input adata
         """
-        adata = _read_data.read_10x_h5(filepath)
+        adata = _io.read_10x_h5(filepath)
+
         return self.annotate_anndata(
             adata=adata,
             chunk_size=chunk_size,
