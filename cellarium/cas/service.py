@@ -13,8 +13,8 @@ from cellarium.cas import endpoints, exceptions
 
 nest_asyncio.apply()
 
-AIOHTTP_TOTAL_TIMEOUT_SECONDS = 220
-AIOHTTP_READ_TIMEOUT_SECONDS = 200
+AIOHTTP_TOTAL_TIMEOUT_SECONDS = 350
+AIOHTTP_READ_TIMEOUT_SECONDS = 320
 
 
 class _BaseService:
