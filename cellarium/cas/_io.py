@@ -156,7 +156,7 @@ def adata_to_bytes(adata: "anndata.AnnData", compression: str = "gzip") -> bytes
         import anndata
 
         adata = anndata.AnnData(X)
-        byte_stream = adata_to_bytestream(data)
+        byte_stream = adata_to_bytestream(adata)
     """
 
     with tempfile.NamedTemporaryFile(suffix=".h5ad") as temp_file:
