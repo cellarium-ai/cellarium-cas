@@ -11,7 +11,7 @@ from cellarium.cas._io import adata_to_bytes
 
 def test_adata_to_bytes():
     """
-    Test the :meth:`cellarium.cas._io.adata_to_bytes` function for correctness.
+    Test the :func:`cellarium.cas._io.adata_to_bytes` function for correctness.
 
     This test does the following:
 

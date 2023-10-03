@@ -142,7 +142,7 @@ def read_10x_h5(
 
 def adata_to_bytes(adata: "anndata.AnnData", compression: str = "gzip") -> bytes:
     """
-    Convert an anndata.AnnData object to a compressed byte stream.
+    Convert an :class:`anndata.AnnData` object to a compressed byte stream.
 
     :param adata: The AnnData object to be serialized.
     :param compression: The compression type to be used. Should be any compression type supported by h5py.
@@ -154,7 +154,8 @@ def adata_to_bytes(adata: "anndata.AnnData", compression: str = "gzip") -> bytes
     .. code-block:: python
 
         import anndata
-        data = anndata.AnnData(some_data)
+
+        adata = anndata.AnnData(X)
         byte_stream = adata_to_bytestream(data)
     """
 
