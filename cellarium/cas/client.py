@@ -9,7 +9,7 @@ import typing as t
 
 import anndata
 
-from cellarium.cas import _read_data, data_preparation, exceptions, service
+from cellarium.cas import _read_data, _utils, data_preparation, exceptions, service
 
 NUM_ATTEMPTS_PER_CHUNK_DEFAULT = 3
 
@@ -210,6 +210,10 @@ class CASClient:
             "`feature_schema_name` should have a value of either 'default' or one of the values from "
             "`feature_schemas`."
         )
+        assert isinstance(chunk_size, int) or chunk_size == "auto", (
+            f"`chunk_size` should either be an integer or the string keyword 'auto', but got {type(chunk_size)} "
+            f"with value '{chunk_size}'"
+        )
         adata = self._validate_and_sanitize_input_data(
             adata=adata,
             feature_schema_name=feature_schema_name,
@@ -218,6 +222,12 @@ class CASClient:
         )
         # TODO: Deprecation of having `raw` is needed in newer versions of CAS.
         adata.raw = adata
+
+        if chunk_size == "auto":
+            self._print("Estimating preferred chunk size...")
+            chunk_size = _utils.get_preferred_chunk_size(adata=adata)
+            self._print(f"Preferred chunk size is {chunk_size}")
+
         number_of_chunks = math.ceil(len(adata) / chunk_size)
         results = [[] for _ in range(number_of_chunks)]
         loop = asyncio.get_event_loop()
@@ -269,7 +279,7 @@ class CASClient:
     def annotate_10x_h5_file(
         self,
         filepath: str,
-        chunk_size: int = 2000,
+        chunk_size: t.Union[int, str] = "auto",
         feature_schema_name: str = "default",
         count_matrix_name: str = "X",
         feature_ids_column_name: str = "index",
@@ -278,7 +288,10 @@ class CASClient:
         Parse the 10x 'h5' matrix and apply the :meth:`annotate_anndata` method to it.
 
         :param filepath: Filepath of the local 'h5' matrix
-        :param chunk_size: Size of chunks to split on
+        :param chunk_size: Size of chunks to split on. |br|
+            `Allowed Values:` Either an integer or a string keyword ``"auto"`` meaning it will define the chunk size
+            automatically. |br|
+            `Default:` ``"auto"``
         :param feature_schema_name: feature schema name to use for data preparation. |br|
             `Allowed Values:` Feature schema name from the :attr:`feature_schemas` list or ``"default"``
             keyword, which refers to the default selected feature schema in the Cellarium backend. |br|
@@ -294,6 +307,7 @@ class CASClient:
         :return: A list of dictionaries with annotations for each of the cells from input adata
         """
         adata = _read_data.read_10x_h5(filepath)
+
         return self.annotate_anndata(
             adata=adata,
             chunk_size=chunk_size,
