@@ -25,7 +25,7 @@ class CASClient:
     """
 
     def _print_models(self, models):
-        s = "Allowed model list in Cellarium Cloud CAS:\n"
+        s = "Allowed model list in Cellarium CAS:\n"
         for model in models:
             model_name = model["model_name"]
             model_schema = model["schema_name"]
