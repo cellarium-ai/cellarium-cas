@@ -20,6 +20,7 @@ Added
 - Add `CHANGELOG.rst` file
 - Add settings module that chooses the correct settings file based on the environment according to current git version. Since now package will use development settings if it's tagged as a pre-release (alpha, beta, or release candidate (rc)), and production settings otherwise.
 - Add version determination based on git tags
+- Add callback methods to data_preparation module. Include total total_mrna_umis calculation as a callback before data sanitization
 
 Changed
 ~~~~~~~
@@ -29,6 +30,7 @@ Changed
 - Make :meth:`__validate_and_sanitize_input_data` method public (now it's a :meth:`validate_and_sanitize_input_data`) in CASClient
 - Update backend API url to point to the new API endpoints depending on the environment
 - Update `pyproject.toml` file to include scanpy optional dependencies
+- Restructure data_preparation into a module.
 
 Removed
 ~~~~~~~
@@ -41,11 +43,11 @@ File Structure Changes
 - Add `cellarium/cas/scanpy_utils.py` (Not necessary for the client methods, but useful for the demo)
 - Add `cellarium/cas/settings` directory, including `__init__.py`, `base.py`, `development.py`, and `production.py` files
 - Add cas/version.py file
+- Add `cellarium/cas/data_preparation` directory, including `__init__.py`, `callbacks.py`, `sanitizer.py` and `validator.py` files
+- Add `tests/unit/test_data_preparation_callbacks.py` file
 - Add `cellarium/cas/constants.py` file
 - Remove `.github/actions/docs` folder (docs are now hosted on readthedocs)
 
 Notes
 ~~~~~
 - Users will need a new API token to use this version
-
-

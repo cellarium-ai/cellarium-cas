@@ -9,11 +9,9 @@ import anndata
 import numpy as np
 
 from cellarium.cas import CASClient
+from tests.unit import constants
 
 np_random_state = np.random.RandomState(0)
-
-
-TEST_ADATA_PATH = "tests/assets/test_adata.h5ad"
 
 
 def test_cell_annotation(test_api_token: str):
@@ -31,6 +29,6 @@ def test_cell_annotation(test_api_token: str):
     - Ensure that TEST_ADATA_PATH is correctly defined and points to a valid dataset file.
     """
     cas = CASClient(api_token=test_api_token)
-    adata = anndata.read_h5ad(TEST_ADATA_PATH)
+    adata = anndata.read_h5ad(constants.TEST_ADATA_PATH)
     result = cas.annotate_anndata(adata=adata, chunk_size=50)
     assert len(result) == len(adata), "Result length does not correspond to original number of cells"
