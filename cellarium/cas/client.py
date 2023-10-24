@@ -6,6 +6,7 @@ import operator
 import os
 import time
 import typing as t
+import warnings
 
 import anndata
 
@@ -23,12 +24,40 @@ class CASClient:
         `Default:` ``3``
     """
 
+    def _print_models(self, models):
+        s = "Allowed model list in Cellarium CAS:\n"
+        for model in models:
+            model_name = model["model_name"]
+            model_schema = model["schema_name"]
+            embedding_dimension = model["embedding_dimension"]
+            if model["is_default_model"]:
+                model_name += " (default)"
+
+            s += f"  - {model_name}\n    Schema: {model_schema}\n    Embedding dimension: {embedding_dimension}\n"
+
+        self._print(s)
+
     def __init__(self, api_token: str, num_attempts_per_chunk: int = NUM_ATTEMPTS_PER_CHUNK_DEFAULT) -> None:
-        self._print("Connecting to the Cellarium Cloud backend...")
         self.cas_api_service = service.CASAPIService(api_token=api_token)
-        self.feature_schemas = []
+
+        self._print("Connecting to the Cellarium Cloud backend...")
+        self.cas_api_service.validate_token()
+
+        # Retrieving General Info
+        application_info = self.cas_api_service.get_application_info()
+
+        self.model_objects_list = self.cas_api_service.get_model_list()
+        self.allowed_models_list = [x["model_name"] for x in self.model_objects_list]
+        self._model_name_obj_map = {x["model_name"]: x for x in self.model_objects_list}
+        self.default_model_name = [x["model_name"] for x in self.model_objects_list if x["is_default_model"]][0]
+
+        self.feature_schemas = self.cas_api_service.get_feature_schemas()
         self._feature_schemas_cache = {}
+
         self.num_attempts_per_chunk = num_attempts_per_chunk
+        self._print(f"Authenticated in Cellarium Cloud v. {application_info['application_version']}")
+
+        self._print_models(self.model_objects_list)
 
     @staticmethod
     def _get_number_of_chunks(adata, chunk_size):
@@ -44,14 +73,16 @@ class CASClient:
     def _validate_and_sanitize_input_data(
         self,
         adata: anndata.AnnData,
-        feature_schema_name: str,
+        cas_model_name: str,
         count_matrix_name: str,
         feature_ids_column_name: str,
     ) -> anndata.AnnData:
+        cas_model_obj = self._model_name_obj_map[cas_model_name]
+        feature_schema_name = cas_model_obj["schema_name"]
         try:
             cas_feature_schema_list = self._feature_schemas_cache[feature_schema_name]
         except KeyError:
-            cas_feature_schema_list = self.cas_api_service.get_cas_pca_002_schema_from_dump()
+            cas_feature_schema_list = self.cas_api_service.get_feature_schema_by(name=feature_schema_name)
             self._feature_schemas_cache[feature_schema_name] = cas_feature_schema_list
 
         try:
@@ -99,6 +130,7 @@ class CASClient:
         adata_bytes: bytes,
         results: t.List,
         chunk_index: int,
+        model_name: str,
         chunk_start_i: int,
         chunk_end_i: int,
     ) -> None:
@@ -109,7 +141,8 @@ class CASClient:
 
         :param adata_bytes: Dumped bytes of `anndata.AnnData` chunk
         :param results: Results list that needs to be used to inplace the response from the server
-        :param chunk_index: Consequent number of the chunk (e.g Chunk 1, Chunk 2)
+        :param model_name: A name of the model to use for annotations
+        :param chunk_index: Consequent number of the chunk (e.g. Chunk 1, Chunk 2)
         :param chunk_start_i: Index pointing to the main adata file start position of the current chunk
         :param chunk_end_i: Index pointing to the main adata file end position of the current chunk
         """
@@ -117,7 +150,7 @@ class CASClient:
         for _ in range(self.num_attempts_per_chunk):
             try:
                 results[chunk_index] = await self.cas_api_service.async_annotate_anndata_chunk(
-                    adata_file_bytes=adata_bytes, number_of_cells=number_of_cells
+                    adata_file_bytes=adata_bytes, number_of_cells=number_of_cells, model_name=model_name
                 )
 
             except exceptions.HTTPError500:
@@ -135,14 +168,20 @@ class CASClient:
                 )
                 break
 
-    async def _annotate_anndata_task(self, adata, results, chunk_size, start_time) -> None:
+    async def _annotate_anndata_task(
+        self,
+        adata: "anndata.AnnData",
+        model_name: str,
+        results: t.List,
+        chunk_size: int,
+    ) -> None:
         """
         Submit chunks asynchronously as asyncio tasks
 
         :param adata: `anndata.AnnData` file to process
+        :param model_name: Model name to use for annotations
         :param results: Results list that is used to inplace the responses from the server
         :param chunk_size: Chunk size to split on
-        :param start_time: Start time of the execution before this task was submitted
         """
         i, j = 0, chunk_size
         tasks = []
@@ -164,6 +203,7 @@ class CASClient:
                 self._annotate_anndata_chunk(
                     adata_bytes=chunk_bytes,
                     results=results,
+                    model_name=model_name,
                     chunk_index=chunk_index,
                     chunk_start_i=chunk_start_i,
                     chunk_end_i=chunk_end_i,
@@ -178,7 +218,7 @@ class CASClient:
         self,
         adata: "anndata.AnnData",
         chunk_size=2000,
-        feature_schema_name: str = "default",
+        cas_model_name: str = "default",
         count_matrix_name: str = "X",
         feature_ids_column_name: str = "index",
     ) -> t.List[t.Dict[str, t.Any]]:
@@ -189,9 +229,9 @@ class CASClient:
 
         :param adata: :class:`anndata.AnnData` instance to annotate
         :param chunk_size: Size of chunks to split on
-        :param feature_schema_name: feature schema name to use for data preparation. |br|
-            `Allowed Values:` Feature schema name from the :attr:`feature_schemas` list or ``"default"``
-            keyword, which refers to the default selected feature schema in the Cellarium backend. |br|
+        :param cas_model_name: Model name to use for annotation. |br|
+            `Allowed Values:` Model name from the :attr:`allowed_models_list` list or ``"default"``
+            keyword, which refers to the default selected model in the Cellarium backend. |br|
             `Default:` ``"default"``
         :param count_matrix_name:  Where to obtain a feature expression count matrix from. |br|
             `Allowed Values:` Choice of either ``"X"``  or ``"raw.X"`` in order to use ``adata.X`` or ``adata.raw.X``,
@@ -203,26 +243,28 @@ class CASClient:
             `Default:` ``"index"``
         :return: A list of dictionaries with annotations for each of the cells from input adata
         """
-        start = time.time()
-        self._print("CAS v1.0 (Model ID: PCA_002)")
-        self._print(f"Total number of input cells: {len(adata)}")
-        assert feature_schema_name == "default" or feature_schema_name in self.feature_schemas, (
-            "`feature_schema_name` should have a value of either 'default' or one of the values from "
-            "`feature_schemas`."
+        assert cas_model_name == "default" or cas_model_name in self.allowed_models_list, (
+            "`cas_model_name` should have a value of either 'default' or one of the values from "
+            "`allowed_models_list`."
         )
+        cas_model_name = self.default_model_name if cas_model_name == "default" else cas_model_name
+        start = time.time()
+        cas_model = self._model_name_obj_map[cas_model_name]
+        cas_model_name = cas_model["model_name"]
+        self._print(f"CAS v1.0 (Model ID: {cas_model_name})")
+        self._print(f"Total number of input cells: {len(adata)}")
         adata = self._validate_and_sanitize_input_data(
             adata=adata,
-            feature_schema_name=feature_schema_name,
+            cas_model_name=cas_model_name,
             count_matrix_name=count_matrix_name,
             feature_ids_column_name=feature_ids_column_name,
         )
-        # TODO: Deprecation of having `raw` is needed in newer versions of CAS.
-        adata.raw = adata
+
         number_of_chunks = math.ceil(len(adata) / chunk_size)
         results = [[] for _ in range(number_of_chunks)]
         loop = asyncio.get_event_loop()
         task = loop.create_task(
-            self._annotate_anndata_task(adata=adata, results=results, chunk_size=chunk_size, start_time=start)
+            self._annotate_anndata_task(adata=adata, results=results, chunk_size=chunk_size, model_name=cas_model_name)
         )
         loop.run_until_complete(task)
         result = functools.reduce(operator.iconcat, results, [])
@@ -234,7 +276,7 @@ class CASClient:
         self,
         filepath: str,
         chunk_size=2000,
-        feature_schema_name: str = "default",
+        cas_model_name: str = "default",
         count_matrix_name: str = "X",
         feature_ids_column_name: str = "index",
     ) -> t.List[t.Dict[str, t.Any]]:
@@ -243,9 +285,9 @@ class CASClient:
 
         :param filepath: Filepath of the local :class:`anndata.AnnData` matrix
         :param chunk_size: Size of chunks to split on
-        :param feature_schema_name: feature schema name to use for data preparation. |br|
-            `Allowed Values:` Feature schema name from the :attr:`feature_schemas` list or ``"default"``
-            keyword, which refers to the default selected feature schema in the Cellarium backend. |br|
+        :param cas_model_name: Model name to use for annotation. |br|
+            `Allowed Values:` Model name from the :attr:`allowed_models_list` list or ``"default"``
+            keyword, which refers to the default selected model in the Cellarium backend. |br|
             `Default:` ``"default"``
         :param count_matrix_name:  Where to obtain a feature expression count matrix from. |br|
             `Allowed Values:` Choice of either ``"X"``  or ``"raw.X"`` in order to use ``adata.X`` or ``adata.raw.X``,
@@ -257,11 +299,14 @@ class CASClient:
             `Default:` ``"index"``
         :return: A list of dictionaries with annotations for each of the cells from input adata
         """
-        adata = anndata.read_h5ad(filename=filepath)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            adata = anndata.read_h5ad(filename=filepath)
+
         return self.annotate_anndata(
             adata=adata,
             chunk_size=chunk_size,
-            feature_schema_name=feature_schema_name,
+            cas_model_name=cas_model_name,
             count_matrix_name=count_matrix_name,
             feature_ids_column_name=feature_ids_column_name,
         )
@@ -270,7 +315,7 @@ class CASClient:
         self,
         filepath: str,
         chunk_size: int = 2000,
-        feature_schema_name: str = "default",
+        cas_model_name: str = "default",
         count_matrix_name: str = "X",
         feature_ids_column_name: str = "index",
     ) -> t.List[t.Dict[str, t.Any]]:
@@ -279,9 +324,9 @@ class CASClient:
 
         :param filepath: Filepath of the local 'h5' matrix
         :param chunk_size: Size of chunks to split on
-        :param feature_schema_name: feature schema name to use for data preparation. |br|
-            `Allowed Values:` Feature schema name from the :attr:`feature_schemas` list or ``"default"``
-            keyword, which refers to the default selected feature schema in the Cellarium backend. |br|
+        :param cas_model_name: Model name to use for annotation. |br|
+            `Allowed Values:` Model name from the :attr:`allowed_models_list` list or ``"default"``
+            keyword, which refers to the default selected model in the Cellarium backend. |br|
             `Default:` ``"default"``
         :param count_matrix_name:  Where to obtain a feature expression count matrix from. |br|
             `Allowed Values:` Choice of either ``"X"``  or ``"raw.X"`` in order to use ``adata.X`` or ``adata.raw.X``,
@@ -297,7 +342,7 @@ class CASClient:
         return self.annotate_anndata(
             adata=adata,
             chunk_size=chunk_size,
-            feature_schema_name=feature_schema_name,
+            cas_model_name=cas_model_name,
             count_matrix_name=count_matrix_name,
             feature_ids_column_name=feature_ids_column_name,
         )
