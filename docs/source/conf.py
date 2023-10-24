@@ -23,7 +23,7 @@ extensions = [
 ]
 
 templates_path = ["_templates"]
-exclude_patterns = ["**/installation.rst"]
+exclude_patterns = ["**/installation_template.rst"]
 
 rst_epilog = """
 .. |br| raw:: html
@@ -48,14 +48,14 @@ def substitute_installation_version():
     dir_path = os.path.dirname(os.path.realpath(__file__))
     cellarium_cas_version = get_tag()
 
-    with open(f"{dir_path}/modules/installation.rst", "r") as f:
+    with open(f"{dir_path}/modules/installation_template.rst", "r") as f:
         content = f.read()
 
     # Replace the placeholder with the version
     content = content.replace("|cas_version|", cellarium_cas_version)
 
     # Write the processed content to the actual .rst file
-    with open(f"{dir_path}/modules/installation_.rst", "w") as f:
+    with open(f"{dir_path}/modules/installation.rst", "w") as f:
         f.write(content)
 
 
