@@ -10,7 +10,7 @@ Cellarium Cell Annotation Service Test documentation fix client
    :maxdepth: 1
    :caption: General Info
 
-   modules/installation
+   modules/installation_
    modules/usage
    modules/workflow
 
