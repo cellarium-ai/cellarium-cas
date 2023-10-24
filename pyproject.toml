@@ -36,7 +36,6 @@ readme = {file = ["README.md"]}
 
 [tool.setuptools-git-versioning]
 enabled = true
-write_to = "cellarium/cas/_version.py"
 
 [tool.black]
 line-length = 120
