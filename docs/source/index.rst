@@ -1,8 +1,8 @@
 :tocdepth: 3
 
 
-Cellarium Cell Annotation Service
-#################################
+Cellarium Cell Annotation Service Test documentation fix client
+##############################################################
 
 **What's Cell Annotation Service (CAS)?** CAS is a software library for rapid querying of single-cell omics data relying on ML algorithms.
 
