@@ -2,7 +2,7 @@
 
 
 Cellarium Cell Annotation Service
-##################################
+#################################
 
 **What's Cell Annotation Service (CAS)?** CAS is a software library for rapid querying of single-cell omics data relying on ML algorithms.
 
