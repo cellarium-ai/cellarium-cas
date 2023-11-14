@@ -269,6 +269,12 @@ class CASClient:
         loop.run_until_complete(task)
         result = functools.reduce(operator.iconcat, results, [])
         self._print(f"Total wall clock time: {f'{time.time() - start:10.4f}'} seconds")
+
+        if len(result) != len(adata):
+            raise exceptions.CASClientError(
+                "Number of cells in the result doesn't match the number of cells in `adata`"
+            )
+
         self._print("Finished!")
         return result
 
