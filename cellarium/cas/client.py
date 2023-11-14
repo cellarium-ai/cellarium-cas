@@ -133,6 +133,7 @@ class CASClient:
         model_name: str,
         chunk_start_i: int,
         chunk_end_i: int,
+        include_dev_metadata: bool = False,
     ) -> None:
         """
         A wrapper around POST request that handles HTTP 500 and HTTP 401 status responses
@@ -145,12 +146,16 @@ class CASClient:
         :param chunk_index: Consequent number of the chunk (e.g. Chunk 1, Chunk 2)
         :param chunk_start_i: Index pointing to the main adata file start position of the current chunk
         :param chunk_end_i: Index pointing to the main adata file end position of the current chunk
+        :param include_dev_metadata: Boolean indicating whether to include a breakdown of the number of cells by dataset
         """
         number_of_cells = chunk_end_i - chunk_start_i
         for _ in range(self.num_attempts_per_chunk):
             try:
                 results[chunk_index] = await self.cas_api_service.async_annotate_anndata_chunk(
-                    adata_file_bytes=adata_bytes, number_of_cells=number_of_cells, model_name=model_name
+                    adata_file_bytes=adata_bytes,
+                    number_of_cells=number_of_cells,
+                    model_name=model_name,
+                    include_dev_metadata=include_dev_metadata,
                 )
 
             except exceptions.HTTPError500:
@@ -174,6 +179,7 @@ class CASClient:
         model_name: str,
         results: t.List,
         chunk_size: int,
+        include_dev_metadata: bool = False,
     ) -> None:
         """
         Submit chunks asynchronously as asyncio tasks
@@ -182,6 +188,7 @@ class CASClient:
         :param model_name: Model name to use for annotations
         :param results: Results list that is used to inplace the responses from the server
         :param chunk_size: Chunk size to split on
+        :param include_dev_metadata: Boolean indicating whether to include a breakdown of the number of cells by dataset
         """
         i, j = 0, chunk_size
         tasks = []
@@ -207,6 +214,7 @@ class CASClient:
                     chunk_index=chunk_index,
                     chunk_start_i=chunk_start_i,
                     chunk_end_i=chunk_end_i,
+                    include_dev_metadata=include_dev_metadata,
                 )
             )
             i = j
@@ -221,6 +229,7 @@ class CASClient:
         cas_model_name: str = "default",
         count_matrix_name: str = "X",
         feature_ids_column_name: str = "index",
+        include_dev_metadata: bool = False,
     ) -> t.List[t.Dict[str, t.Any]]:
         """
         Send an instance of :class:`anndata.AnnData` to the Cellarium Cloud backend for annotations. The function
@@ -241,6 +250,8 @@ class CASClient:
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
             column. |br|
             `Default:` ``"index"``
+        :param include_dev_metadata: Boolean indicating whether to include a breakdown of the number of cells
+            by dataset
         :return: A list of dictionaries with annotations for each of the cells from input adata
         """
         assert cas_model_name == "default" or cas_model_name in self.allowed_models_list, (
@@ -264,7 +275,13 @@ class CASClient:
         results = [[] for _ in range(number_of_chunks)]
         loop = asyncio.get_event_loop()
         task = loop.create_task(
-            self._annotate_anndata_task(adata=adata, results=results, chunk_size=chunk_size, model_name=cas_model_name)
+            self._annotate_anndata_task(
+                adata=adata,
+                results=results,
+                chunk_size=chunk_size,
+                model_name=cas_model_name,
+                include_dev_metadata=include_dev_metadata,
+            )
         )
         loop.run_until_complete(task)
         result = functools.reduce(operator.iconcat, results, [])
@@ -285,6 +302,7 @@ class CASClient:
         cas_model_name: str = "default",
         count_matrix_name: str = "X",
         feature_ids_column_name: str = "index",
+        include_dev_metadata: bool = False,
     ) -> t.List[t.Dict[str, t.Any]]:
         """
         Read the 'h5ad' file into a :class:`anndata.AnnData` matrix and apply the :meth:`annotate_anndata` method to it.
@@ -303,6 +321,8 @@ class CASClient:
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
             column. |br|
             `Default:` ``"index"``
+        :param include_dev_metadata: Boolean indicating whether to include a breakdown of the number of cells
+            per dataset
         :return: A list of dictionaries with annotations for each of the cells from input adata
         """
         with warnings.catch_warnings():
@@ -315,6 +335,7 @@ class CASClient:
             cas_model_name=cas_model_name,
             count_matrix_name=count_matrix_name,
             feature_ids_column_name=feature_ids_column_name,
+            include_dev_metadata=include_dev_metadata,
         )
 
     def annotate_10x_h5_file(
@@ -324,6 +345,7 @@ class CASClient:
         cas_model_name: str = "default",
         count_matrix_name: str = "X",
         feature_ids_column_name: str = "index",
+        include_dev_metadata: bool = False,
     ) -> t.List[t.Dict[str, t.Any]]:
         """
         Parse the 10x 'h5' matrix and apply the :meth:`annotate_anndata` method to it.
@@ -342,6 +364,7 @@ class CASClient:
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
             column. |br|
             `Default:` ``"index"``
+        :param include_dev_metadata: Boolean indicating whether to include a breakdown of the number of cells by dataset
         :return: A list of dictionaries with annotations for each of the cells from input adata
         """
         adata = _read_data.read_10x_h5(filepath)
@@ -351,4 +374,5 @@ class CASClient:
             cas_model_name=cas_model_name,
             count_matrix_name=count_matrix_name,
             feature_ids_column_name=feature_ids_column_name,
+            include_dev_metadata=include_dev_metadata,
         )
