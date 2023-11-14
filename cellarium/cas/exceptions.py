@@ -1,7 +1,17 @@
 from dataclasses import dataclass
 
 
-class HTTPBaseError(Exception):
+class CASBaseError(Exception):
+    """Base class for all CAS exceptions"""
+
+    pass
+
+
+class CASClientError(CASBaseError):
+    pass
+
+
+class HTTPBaseError(CASBaseError):
     pass
 
 
@@ -18,6 +28,6 @@ class HTTPError401(HTTPBaseError):
 
 
 @dataclass
-class DataValidationError(Exception):
+class DataValidationError(CASBaseError):
     missing_features: int
     extra_features: int
