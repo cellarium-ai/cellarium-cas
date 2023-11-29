@@ -4,26 +4,24 @@ from dataclasses import dataclass
 class CASBaseError(Exception):
     """Base class for all CAS exceptions"""
 
-    pass
-
 
 class CASClientError(CASBaseError):
     pass
 
 
-class HTTPBaseError(CASBaseError):
+class HTTPError(CASBaseError):
     pass
 
 
-class HTTPError500(HTTPBaseError):
+class HTTPError500(HTTPError):
     pass
 
 
-class HTTPError403(HTTPBaseError):
+class HTTPError403(HTTPError):
     pass
 
 
-class HTTPError401(HTTPBaseError):
+class HTTPError401(HTTPError):
     pass
 
 

@@ -1,3 +1,4 @@
+import json
 import ssl
 import typing as t
 
@@ -35,22 +36,59 @@ class _BaseService:
         return f"{cls.BACKEND_URL}/{endpoint}"
 
     @staticmethod
-    def __validate_response_code(response_code: int):
-        if response_code == 401:
-            raise exceptions.HTTPError401
-        elif response_code == 403:
-            raise exceptions.HTTPError403
-        elif response_code == 500:
-            raise exceptions.HTTPError500
+    def raise_response_exception(status_code: int, detail: str) -> None:
+        """
+        Raise an exception based on the status code returned by the server, including the detail message
+
+        :param status_code: HTTP status code
+        :param detail: Detail message returned by the server
+        :raises: HTTPError401, HTTPError403, HTTPError500, HTTPBaseError
+        """
+        message = f"Server returned status code {status_code}, Detail: {detail}"
+        if status_code == 401:
+            raise exceptions.HTTPError401(message)
+        elif status_code == 403:
+            raise exceptions.HTTPError403(message)
+        elif status_code == 500:
+            raise exceptions.HTTPError500(message)
+        else:
+            raise exceptions.HTTPError(message)
 
     def get(self, endpoint: str) -> requests.Response:
+        """
+        Make a GET request to backend service
+
+        :param endpoint: Endpoint string without a leading slash
+
+        :raises: HTTPError401, HTTPError403, HTTPError500, HTTPBaseError
+
+        :return: Response object
+        """
         url = self._get_endpoint_url(endpoint)
         headers = {"Authorization": f"Bearer {self.api_token}"}
         response = requests.get(url=url, headers=headers)
-        self.__validate_response_code(response.status_code)
+
+        status_code = response.status_code
+        if status_code < 200 or status_code >= 300:
+            try:
+                response_detail = response.json()["detail"]
+            except (json.decoder.JSONDecodeError, KeyError):
+                response_detail = response.text
+
+            self.raise_response_exception(status_code=status_code, detail=response_detail)
+
         return response
 
     def get_json(self, endpoint: str) -> t.Union[t.Dict, t.List]:
+        """
+        Make a GET request to backend service and return JSON response
+
+        :param endpoint: Endpoint string without a leading slash
+
+        :raises: HTTPError401, HTTPError403, HTTPError500, HTTPBaseError
+
+        :return: JSON response
+        """
         return self.get(endpoint=endpoint).json()
 
     async def async_post(
@@ -67,6 +105,10 @@ class _BaseService:
         :param file: Byte file to attach to request
         :param data: Dictionary to include to HTTP POST request body
         :param headers: Dictionary to include to HTTP POST request Headers
+
+        :raises: HTTPError401, HTTPError403, HTTPError500, HTTPBaseError
+
+        :return: JSON response
         """
         url = self._get_endpoint_url(endpoint=endpoint)
         _data = {}
@@ -78,7 +120,7 @@ class _BaseService:
             _headers.update(**headers)
 
         form_data = aiohttp.FormData()
-        form_data.add_field("myfile", file, filename="adata.h5ad")
+        form_data.add_field("file", file, filename="adata.h5ad")
 
         for key, value in data.items():
             form_data.add_field(key, value)
@@ -87,9 +129,18 @@ class _BaseService:
         conn = aiohttp.TCPConnector(ssl=ssl_context)
 
         async with aiohttp.ClientSession(connector=conn) as session:
-            async with session.post(url, data=form_data, headers=_headers) as resp:
-                self.__validate_response_code(resp.status)
-                return await resp.json()
+            async with session.post(url, data=form_data, headers=_headers) as response:
+                status_code = response.status
+                if status_code < 200 or status_code >= 300:
+                    try:
+                        response_body = await response.json()
+                        response_detail = response_body["detail"]
+                    except (json.decoder.JSONDecodeError, KeyError):
+                        response_detail = await response.text()
+
+                    self.raise_response_exception(status_code=status_code, detail=response_detail)
+
+                return await response.json()
 
 
 class CASAPIService(_BaseService):
@@ -97,7 +148,7 @@ class CASAPIService(_BaseService):
     Class with all the API methods of Cellarium Cloud CAS infrastructure.
     """
 
-    BACKEND_URL = "https://cas-api-1-2-dev-vi7nxpvk7a-uc.a.run.app"
+    BACKEND_URL = "https://cas-api-1-3-xdev-vi7nxpvk7a-uc.a.run.app"
 
     def validate_token(self) -> None:
         """

@@ -158,9 +158,9 @@ class CASClient:
                     include_dev_metadata=include_dev_metadata,
                 )
 
-            except exceptions.HTTPError500:
+            except exceptions.HTTPError500 as e:
                 self._print(
-                    f"Error occurred in CAS backend (HTTPError500), "
+                    f"{str(e)}, "
                     f"resubmitting chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, {chunk_end_i:5.0f}) to CAS ..."
                 )
                 pass
