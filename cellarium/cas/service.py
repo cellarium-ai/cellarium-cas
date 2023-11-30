@@ -11,6 +11,8 @@ from cellarium.cas import endpoints, exceptions
 
 nest_asyncio.apply()
 
+AIOHTTP_TIMEOUT_SECONDS = 1200
+
 
 class _BaseService:
     BACKEND_URL: str
@@ -127,8 +129,10 @@ class _BaseService:
 
         ssl_context = ssl.create_default_context(cafile=certifi.where())
         conn = aiohttp.TCPConnector(ssl=ssl_context)
+        # Define your custom timeout
+        timeout = aiohttp.ClientTimeout(total=AIOHTTP_TIMEOUT_SECONDS)
 
-        async with aiohttp.ClientSession(connector=conn) as session:
+        async with aiohttp.ClientSession(connector=conn, timeout=timeout) as session:
             async with session.post(url, data=form_data, headers=_headers) as response:
                 status_code = response.status
                 if status_code < 200 or status_code >= 300:
