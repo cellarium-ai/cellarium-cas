@@ -12,7 +12,7 @@ import anndata
 
 from cellarium.cas import _read_data, data_preparation, exceptions, service
 
-NUM_ATTEMPTS_PER_CHUNK_DEFAULT = 3
+NUM_ATTEMPTS_PER_CHUNK_DEFAULT = 5
 
 
 class CASClient:
@@ -149,6 +149,10 @@ class CASClient:
         :param include_dev_metadata: Boolean indicating whether to include a breakdown of the number of cells by dataset
         """
         number_of_cells = chunk_end_i - chunk_start_i
+
+        retry_delay = 5
+        max_retry_delay = 32
+
         for _ in range(self.num_attempts_per_chunk):
             try:
                 results[chunk_index] = await self.cas_api_service.async_annotate_anndata_chunk(
@@ -158,18 +162,24 @@ class CASClient:
                     include_dev_metadata=include_dev_metadata,
                 )
 
-            except exceptions.HTTPError500 as e:
+            except (exceptions.HTTPError5XX, exceptions.HTTPClientError) as e:
+                self._print(str(e))
                 self._print(
-                    f"{str(e)}, "
-                    f"resubmitting chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, {chunk_end_i:5.0f}) to CAS ..."
+                    f"Resubmitting chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, {chunk_end_i:5.0f}) to CAS ..."
                 )
-                pass
+                await asyncio.sleep(retry_delay)
+                retry_delay = min(retry_delay * 2, max_retry_delay)
+                continue
             except exceptions.HTTPError401:
                 self._print("Unauthorized token. Please check your API token or request a new one.")
                 break
+            except Exception as e:
+                self._print(f"Unexpected error: {e.__class__.__name__}; Message: {str(e)}")
+                break
             else:
                 self._print(
-                    f"Received the annotations for cell chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, {chunk_end_i:5.0f}) ..."
+                    f"Received the annotations for cell chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, "
+                    f"{chunk_end_i:5.0f}) ..."
                 )
                 break
 

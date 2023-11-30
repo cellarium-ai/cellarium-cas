@@ -13,7 +13,7 @@ class HTTPError(CASBaseError):
     pass
 
 
-class HTTPError500(HTTPError):
+class HTTPError5XX(HTTPError):
     pass
 
 
@@ -22,6 +22,10 @@ class HTTPError403(HTTPError):
 
 
 class HTTPError401(HTTPError):
+    pass
+
+
+class HTTPClientError(HTTPError):
     pass
 
 

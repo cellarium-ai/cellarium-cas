@@ -1,3 +1,4 @@
+import asyncio
 import json
 import ssl
 import typing as t
@@ -6,13 +7,14 @@ import aiohttp
 import certifi
 import nest_asyncio
 import requests
+from aiohttp import client_exceptions
 
 from cellarium.cas import endpoints, exceptions
 
 nest_asyncio.apply()
 
-AIOHTTP_TOTAL_TIMEOUT_SECONDS = 1500
-AIOHTTP_READ_TIMEOUT_SECONDS = 1100
+AIOHTTP_TOTAL_TIMEOUT_SECONDS = 220
+AIOHTTP_READ_TIMEOUT_SECONDS = 200
 
 
 class _BaseService:
@@ -52,8 +54,8 @@ class _BaseService:
             raise exceptions.HTTPError401(message)
         elif status_code == 403:
             raise exceptions.HTTPError403(message)
-        elif status_code == 500:
-            raise exceptions.HTTPError500(message)
+        elif status_code == 500 or status_code == 502 or status_code == 503 or status_code == 504:
+            raise exceptions.HTTPError5XX(message)
         else:
             raise exceptions.HTTPError(message)
 
@@ -94,58 +96,90 @@ class _BaseService:
         """
         return self.get(endpoint=endpoint).json()
 
+    async def _aiohttp_async_post(
+        self, url: str, form_data: t.Optional[aiohttp.FormData] = None, headers: t.Optional[t.Dict[str, t.Any]] = None
+    ):
+        """
+        Make an async POST request to backend service with timeout and SSL context, handle exceptions and return JSON.
+
+        Create custom SSL context with `certifi` package to avoid SSL errors. Use :class:`aiohttp.ClientTimeout` to set
+        timeout for the request. Handle exceptions and raise custom exceptions.
+
+        :param url: Endpoint URL
+        :param form_data: :class:`aiohttp.FormData` object
+        :param headers: Headers to include in the request
+
+        :raises: HTTPError401, HTTPError403, HTTPError500, HTTPBaseError, HTTPClientError
+
+        :return: JSON response
+        """
+        timeout = aiohttp.ClientTimeout(total=AIOHTTP_TOTAL_TIMEOUT_SECONDS, sock_read=AIOHTTP_READ_TIMEOUT_SECONDS)
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
+        connector = aiohttp.TCPConnector(ssl=ssl_context)
+
+        async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
+            try:
+                async with session.post(url, data=form_data, headers=headers) as response:
+                    status_code = response.status
+                    if status_code < 200 or status_code >= 300:
+                        try:
+                            response_body = await response.json()
+                            response_detail = response_body["detail"]
+                        except (json.decoder.JSONDecodeError, client_exceptions.ClientResponseError):
+                            response_detail = await response.text()
+                        except KeyError:
+                            print("Response body doesn't have a 'detail' key, returning full response body")
+                            response_detail = str(await response.json())
+
+                        self.raise_response_exception(status_code=status_code, detail=response_detail)
+                    try:
+                        return await response.json()
+                    except client_exceptions.ClientPayloadError as e:
+                        raise exceptions.HTTPClientError(f"Failed to parse response body: {e.__class__.__name__}: {e}")
+
+            except (client_exceptions.ServerTimeoutError, asyncio.TimeoutError) as e:
+                raise exceptions.HTTPClientError(f"Client Timeout Error: {e}")
+            except (client_exceptions.ClientConnectionError, client_exceptions.ClientResponseError) as e:
+                raise exceptions.HTTPClientError(f"Client Connection Error: {e.__class__.__name__}: {e}")
+            except client_exceptions.ClientError as e:
+                raise exceptions.HTTPClientError(f"Unknown Error: {e.__class__.__name__}: {e}")
+
     async def async_post(
         self,
         endpoint: str,
-        file,
+        file: t.ByteString,
         data: t.Optional[t.Dict] = None,
         headers: t.Optional[t.Dict] = None,
     ) -> t.Union[t.List, t.Dict]:
         """
-        Make an async multiform POST request to backend service
+        Make an async multiform POST request to backend service. Include adata file as a byte file in the request body,
+        and authorization token in the headers.
+
+        For details about custom settings for SSL context and timeout, refer to :meth:`_aiohttp_async_post` method.
 
         :param endpoint: Endpoint string without a leading slash
         :param file: Byte file to attach to request
         :param data: Dictionary to include to HTTP POST request body
         :param headers: Dictionary to include to HTTP POST request Headers
 
-        :raises: HTTPError401, HTTPError403, HTTPError500, HTTPBaseError
+        :raises: HTTPError401, HTTPError403, HTTPError500, HTTPBaseError, HTTPClientError
 
         :return: JSON response
         """
         url = self._get_endpoint_url(endpoint=endpoint)
-        _data = {}
+        _data = data if data is not None else {}
         _headers = {"Authorization": f"Bearer {self.api_token}"}
 
-        if data is not None:
-            _data.update(**data)
         if headers is not None:
-            _headers.update(**headers)
+            _headers.update(headers)
 
         form_data = aiohttp.FormData()
         form_data.add_field("file", file, filename="adata.h5ad")
 
-        for key, value in data.items():
+        for key, value in _data.items():
             form_data.add_field(key, value)
 
-        # Client Session arguments
-        ssl_context = ssl.create_default_context(cafile=certifi.where())
-        conn = aiohttp.TCPConnector(ssl=ssl_context)
-        timeout = aiohttp.ClientTimeout(total=AIOHTTP_TOTAL_TIMEOUT_SECONDS, sock_read=AIOHTTP_READ_TIMEOUT_SECONDS)
-
-        async with aiohttp.ClientSession(connector=conn, timeout=timeout) as session:
-            async with session.post(url, data=form_data, headers=_headers) as response:
-                status_code = response.status
-                if status_code < 200 or status_code >= 300:
-                    try:
-                        response_body = await response.json()
-                        response_detail = response_body["detail"]
-                    except (json.decoder.JSONDecodeError, KeyError):
-                        response_detail = await response.text()
-
-                    self.raise_response_exception(status_code=status_code, detail=response_detail)
-
-                return await response.json()
+        return await self._aiohttp_async_post(url=url, form_data=form_data, headers=_headers)
 
 
 class CASAPIService(_BaseService):
