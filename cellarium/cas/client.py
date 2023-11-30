@@ -12,7 +12,8 @@ import anndata
 
 from cellarium.cas import _read_data, data_preparation, exceptions, service
 
-NUM_ATTEMPTS_PER_CHUNK_DEFAULT = 5
+NUM_ATTEMPTS_PER_CHUNK_DEFAULT = 7
+MAX_NUM_REQUESTS_AT_A_TIME = 60
 
 
 class CASClient:
@@ -125,7 +126,7 @@ class CASClient:
             self._print(f"The input data matrix conforms with the '{feature_schema_name}' CAS schema.")
             return adata
 
-    async def _annotate_anndata_chunk(
+    async def _annotate_anndata_chunk_task(
         self,
         adata_bytes: bytes,
         results: t.List,
@@ -133,12 +134,15 @@ class CASClient:
         model_name: str,
         chunk_start_i: int,
         chunk_end_i: int,
+        semaphore: asyncio.Semaphore,
         include_dev_metadata: bool = False,
     ) -> None:
         """
-        A wrapper around POST request that handles HTTP 500 and HTTP 401 status responses
-        In case of HTTP 500 response resubmit task 2 times.
-        In case of HTTP 501 print a message
+        A wrapper around POST request that handles HTTP and client errors, and resubmits the task if necessary.
+
+        In case of HTTP 500, 503, 504 or ClientError print a message and resubmit the task.
+        In case of HTTP 401 print a message to check the token.
+        In case of any other error print a message.
 
         :param adata_bytes: Dumped bytes of `anndata.AnnData` chunk
         :param results: Results list that needs to be used to inplace the response from the server
@@ -146,44 +150,46 @@ class CASClient:
         :param chunk_index: Consequent number of the chunk (e.g. Chunk 1, Chunk 2)
         :param chunk_start_i: Index pointing to the main adata file start position of the current chunk
         :param chunk_end_i: Index pointing to the main adata file end position of the current chunk
+        :param semaphore: Semaphore object to limit the number of concurrent requests at a time
         :param include_dev_metadata: Boolean indicating whether to include a breakdown of the number of cells by dataset
         """
-        number_of_cells = chunk_end_i - chunk_start_i
+        async with semaphore:
+            number_of_cells = chunk_end_i - chunk_start_i
 
-        retry_delay = 5
-        max_retry_delay = 32
+            retry_delay = 5
+            max_retry_delay = 32
 
-        for _ in range(self.num_attempts_per_chunk):
-            try:
-                results[chunk_index] = await self.cas_api_service.async_annotate_anndata_chunk(
-                    adata_file_bytes=adata_bytes,
-                    number_of_cells=number_of_cells,
-                    model_name=model_name,
-                    include_dev_metadata=include_dev_metadata,
-                )
+            for _ in range(self.num_attempts_per_chunk):
+                try:
+                    results[chunk_index] = await self.cas_api_service.async_annotate_anndata_chunk(
+                        adata_file_bytes=adata_bytes,
+                        number_of_cells=number_of_cells,
+                        model_name=model_name,
+                        include_dev_metadata=include_dev_metadata,
+                    )
 
-            except (exceptions.HTTPError5XX, exceptions.HTTPClientError) as e:
-                self._print(str(e))
-                self._print(
-                    f"Resubmitting chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, {chunk_end_i:5.0f}) to CAS ..."
-                )
-                await asyncio.sleep(retry_delay)
-                retry_delay = min(retry_delay * 2, max_retry_delay)
-                continue
-            except exceptions.HTTPError401:
-                self._print("Unauthorized token. Please check your API token or request a new one.")
-                break
-            except Exception as e:
-                self._print(f"Unexpected error: {e.__class__.__name__}; Message: {str(e)}")
-                break
-            else:
-                self._print(
-                    f"Received the annotations for cell chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, "
-                    f"{chunk_end_i:5.0f}) ..."
-                )
-                break
+                except (exceptions.HTTPError5XX, exceptions.HTTPClientError) as e:
+                    self._print(str(e))
+                    self._print(
+                        f"Resubmitting chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, {chunk_end_i:5.0f}) to CAS ..."
+                    )
+                    await asyncio.sleep(retry_delay)
+                    retry_delay = min(retry_delay * 2, max_retry_delay)
+                    continue
+                except exceptions.HTTPError401:
+                    self._print("Unauthorized token. Please check your API token or request a new one.")
+                    break
+                except Exception as e:
+                    self._print(f"Unexpected error: {e.__class__.__name__}; Message: {str(e)}")
+                    break
+                else:
+                    self._print(
+                        f"Received the annotations for cell chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, "
+                        f"{chunk_end_i:5.0f}) ..."
+                    )
+                    break
 
-    async def _annotate_anndata_task(
+    async def _annotate_anndata(
         self,
         adata: "anndata.AnnData",
         model_name: str,
@@ -202,6 +208,7 @@ class CASClient:
         """
         i, j = 0, chunk_size
         tasks = []
+        semaphore = asyncio.Semaphore(MAX_NUM_REQUESTS_AT_A_TIME)
         number_of_chunks = self._get_number_of_chunks(adata, chunk_size=chunk_size)
         for chunk_index in range(number_of_chunks):
             chunk = adata[i:j, :]
@@ -217,13 +224,14 @@ class CASClient:
 
             os.remove(tmp_file_name)
             tasks.append(
-                self._annotate_anndata_chunk(
+                self._annotate_anndata_chunk_task(
                     adata_bytes=chunk_bytes,
                     results=results,
                     model_name=model_name,
                     chunk_index=chunk_index,
                     chunk_start_i=chunk_start_i,
                     chunk_end_i=chunk_end_i,
+                    semaphore=semaphore,
                     include_dev_metadata=include_dev_metadata,
                 )
             )
@@ -314,9 +322,9 @@ class CASClient:
 
         number_of_chunks = math.ceil(len(adata) / chunk_size)
         results = [[] for _ in range(number_of_chunks)]
-        loop = asyncio.get_event_loop()
-        task = loop.create_task(
-            self._annotate_anndata_task(
+
+        asyncio.run(
+            self._annotate_anndata(
                 adata=adata,
                 results=results,
                 chunk_size=chunk_size,
@@ -324,7 +332,6 @@ class CASClient:
                 include_dev_metadata=include_dev_metadata,
             )
         )
-        loop.run_until_complete(task)
 
         result = functools.reduce(operator.iconcat, results, [])
         result = self.__postprocess_annotations(result, adata)
