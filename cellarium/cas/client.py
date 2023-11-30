@@ -222,6 +222,37 @@ class CASClient:
 
         await asyncio.wait(tasks)
 
+    def __postprocess_annotations(
+        self, annotation_query_response: t.List[t.Dict[str, t.Any]], adata: "anndata.AnnData"
+    ) -> t.List[t.Dict[str, t.Any]]:
+        """
+        Postprocess annotations by matching the order of cells in the response with the order of cells in the input
+
+        :param annotation_query_response: List of dictionaries with annotations for each of the cells from input adata
+        :param adata: :class:`anndata.AnnData` instance to annotate
+
+        :return: A list of dictionaries with annotations for each of the cells from input adata, ordered by the input
+        """
+
+        processed_response = []
+        annotation_query_response_hash = {x["query_cell_id"]: x for x in annotation_query_response}
+
+        num_unannotated_cells = 0
+
+        for query_cell_id in adata.obs.index:
+            try:
+                query_annotation = annotation_query_response_hash[query_cell_id]
+            except KeyError:
+                query_annotation = {"query_cell_id": query_cell_id, "matches": []}
+                num_unannotated_cells += 1
+
+            processed_response.append(query_annotation)
+
+        if num_unannotated_cells > 0:
+            self._print(f"{num_unannotated_cells} cells were not annotated by CAS")
+
+        return processed_response
+
     def annotate_anndata(
         self,
         adata: "anndata.AnnData",
@@ -284,7 +315,10 @@ class CASClient:
             )
         )
         loop.run_until_complete(task)
+
         result = functools.reduce(operator.iconcat, results, [])
+        result = self.__postprocess_annotations(result, adata)
+
         self._print(f"Total wall clock time: {f'{time.time() - start:10.4f}'} seconds")
 
         if len(result) != len(adata):
