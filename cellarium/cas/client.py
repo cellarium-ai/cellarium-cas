@@ -293,7 +293,7 @@ class CASClient:
         start = time.time()
         cas_model = self._model_name_obj_map[cas_model_name]
         cas_model_name = cas_model["model_name"]
-        self._print(f"CAS v1.0 (Model ID: {cas_model_name})")
+        self._print(f"Cellarium CAS (Model ID: {cas_model_name})")
         self._print(f"Total number of input cells: {len(adata)}")
         adata = self._validate_and_sanitize_input_data(
             adata=adata,
