@@ -666,3 +666,16 @@ class CASClient:
             metadata_feature_names=metadata_feature_names,
         )
         return self.__postprocess_query_cells_by_ids_response(query_response=results)
+
+    def validate_model_name(self, model_name: str) -> None:
+        """
+        Validate if the model name provided is valid
+
+        :param model_name: Model name to check
+        :raises: ValueError if model name is not valid
+        """
+        if model_name not in self.allowed_models_list and model_name != "default":
+            raise ValueError(
+                f"Model name '{model_name}' is not in the list of allowed models. "
+                f"Please use one of the following: {self.allowed_models_list} or 'default'"
+            )
