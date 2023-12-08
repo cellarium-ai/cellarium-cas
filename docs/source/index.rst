@@ -13,6 +13,7 @@ Cellarium Cell Annotation Service
    modules/installation
    modules/usage
    modules/workflow
+   modules/changelog
 
 .. toctree::
    :maxdepth: 1

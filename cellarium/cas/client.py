@@ -12,7 +12,7 @@ import anndata
 from cellarium.cas import _io, data_preparation, exceptions, service
 
 NUM_ATTEMPTS_PER_CHUNK_DEFAULT = 7
-MAX_NUM_REQUESTS_AT_A_TIME = 60
+MAX_NUM_REQUESTS_AT_A_TIME = 10
 
 
 class CASClient:
@@ -385,7 +385,7 @@ class CASClient:
     def annotate_anndata(
         self,
         adata: "anndata.AnnData",
-        chunk_size=2000,
+        chunk_size=1000,
         cas_model_name: str = "default",
         count_matrix_name: str = "X",
         feature_ids_column_name: str = "index",
@@ -412,7 +412,7 @@ class CASClient:
             column. |br|
             `Default:` ``"index"``
         :param feature_names_column_name: Column name where to obtain feature names (symbols).
-        feature names wouldn't be mapped if value is ``None`` |br|
+            feature names wouldn't be mapped if value is ``None`` |br|
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
             column. |br|
             `Default:` ``None``
@@ -471,7 +471,7 @@ class CASClient:
             column. |br|
             `Default:` ``"index"``
         :param feature_names_column_name: Column name where to obtain feature names (symbols).
-        feature names wouldn't be mapped if value is ``None`` |br|
+            feature names wouldn't be mapped if value is ``None`` |br|
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
             column. |br|
             `Default:` ``None``
@@ -521,7 +521,7 @@ class CASClient:
             column. |br|
             `Default:` ``"index"``
         :param feature_names_column_name: Column name where to obtain feature names (symbols).
-        feature names wouldn't be mapped if value is ``None`` |br|
+            feature names wouldn't be mapped if value is ``None`` |br|
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
             column. |br|
             `Default:` ``None``
@@ -570,7 +570,7 @@ class CASClient:
             column. |br|
             `Default:` ``"index"``
         :param feature_names_column_name: Column name where to obtain feature names (symbols).
-        feature names wouldn't be mapped if value is ``None`` |br|
+            feature names wouldn't be mapped if value is ``None`` |br|
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
             column. |br|
             `Default:` ``None``
