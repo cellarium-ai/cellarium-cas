@@ -21,7 +21,6 @@ Added
 
 Changed
 ~~~~~~~
-
 - Reorganize :class:`CASClient` methods: factor out sharding logic
 - Update `MAX_NUM_REQUESTS_AT_A_TIME` to 10
 - Update default `chunk_size` in :meth:`annotate` methods to 1000
@@ -29,10 +28,16 @@ Changed
 - Update backend API url to `https://cas-api-1-4-1-dev-vi7nxpvk7a-uc.a.run.app`
 - Update `pyproject.toml` file to include scanpy optional dependencies
 
+Removed
+~~~~~~~
+- Remove docs generation from CI/CD pipeline
+
 File Structure Changes
 ~~~~~~~~~~~~~~~~~~~~~~
+- Add `CHANGELOG.rst` file
 - Add `requirements/scanpy.txt` file (optional requirements for scanpy related demos)
 - Add `cellarium/cas/scanpy_utils.py` (Not necessary for the client methods, but useful for the demo)
+- Remove `.github/actions/docs` folder (docs are now hosted on readthedocs)
 
 Notes
 ~~~~~

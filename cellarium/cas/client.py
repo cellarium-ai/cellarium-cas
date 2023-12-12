@@ -12,6 +12,8 @@ import anndata
 from cellarium.cas import _io, data_preparation, exceptions, service
 
 NUM_ATTEMPTS_PER_CHUNK_DEFAULT = 7
+CHUNK_SIZE_ANNOTATE_DEFAULT = 1000
+CHUNK_SIZE_SEARCH_DEFAULT = 500
 MAX_NUM_REQUESTS_AT_A_TIME = 10
 
 
@@ -356,7 +358,7 @@ class CASClient:
             column. |br|
             `Default:` ``"index"``
         :param feature_names_column_name: Column name where to obtain feature names (symbols).
-        feature names wouldn't be mapped if value is ``None`` |br|
+            feature names wouldn't be mapped if value is ``None`` |br|
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
             column. |br|
             `Default:` ``None``
@@ -380,12 +382,13 @@ class CASClient:
             cas_model_name=cas_model_name,
             count_matrix_name=count_matrix_name,
             feature_ids_column_name=feature_ids_column_name,
+            feature_names_column_name=feature_names_column_name,
         )
 
     def annotate_anndata(
         self,
         adata: "anndata.AnnData",
-        chunk_size=1000,
+        chunk_size=CHUNK_SIZE_ANNOTATE_DEFAULT,
         cas_model_name: str = "default",
         count_matrix_name: str = "X",
         feature_ids_column_name: str = "index",
@@ -446,7 +449,7 @@ class CASClient:
     def annotate_anndata_file(
         self,
         filepath: str,
-        chunk_size=2000,
+        chunk_size=CHUNK_SIZE_ANNOTATE_DEFAULT,
         cas_model_name: str = "default",
         count_matrix_name: str = "X",
         feature_ids_column_name: str = "index",
@@ -496,7 +499,7 @@ class CASClient:
     def annotate_10x_h5_file(
         self,
         filepath: str,
-        chunk_size: int = 2000,
+        chunk_size: int = CHUNK_SIZE_ANNOTATE_DEFAULT,
         cas_model_name: str = "default",
         count_matrix_name: str = "X",
         feature_ids_column_name: str = "index",
@@ -543,7 +546,7 @@ class CASClient:
     def search_anndata(
         self,
         adata: anndata.AnnData,
-        chunk_size=500,
+        chunk_size=CHUNK_SIZE_SEARCH_DEFAULT,
         cas_model_name: str = "default",
         count_matrix_name: str = "X",
         feature_ids_column_name: str = "index",
@@ -602,7 +605,7 @@ class CASClient:
     def search_10x_h5_file(
         self,
         filepath: str,
-        chunk_size: int = 500,
+        chunk_size: int = CHUNK_SIZE_SEARCH_DEFAULT,
         cas_model_name: str = "default",
         count_matrix_name: str = "X",
         feature_ids_column_name: str = "index",
