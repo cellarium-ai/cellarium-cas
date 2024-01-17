@@ -184,35 +184,37 @@ class CASClient:
         :param chunk_size: Chunk size to split on
         """
         i, j = 0, chunk_size
-        tasks = []
+        minibatch_size = 10
         number_of_chunks = self._get_number_of_chunks(adata, chunk_size=chunk_size)
-        for chunk_index in range(number_of_chunks):
-            chunk = adata[i:j, :]
-            chunk_start_i = i
-            chunk_end_i = i + len(chunk)
-            self._print(
-                f"Submitting cell chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, {chunk_end_i:5.0f}) to CAS ..."
-            )
-            tmp_file_name = f"chunk_{chunk_index}.h5ad"
-            chunk.write(tmp_file_name, compression="gzip")
-            with open(tmp_file_name, "rb") as f:
-                chunk_bytes = f.read()
-
-            os.remove(tmp_file_name)
-            tasks.append(
-                self._annotate_anndata_chunk(
-                    adata_bytes=chunk_bytes,
-                    results=results,
-                    model_name=model_name,
-                    chunk_index=chunk_index,
-                    chunk_start_i=chunk_start_i,
-                    chunk_end_i=chunk_end_i,
+        for minibatch_start in  range(number_of_chunks)[::minibatch_size]:
+            tasks = []
+            for chunk_index in range(minibatch_start, min(minibatch_start+minibatch_size, number_of_chunks)):
+                chunk = adata[i:j, :]
+                chunk_start_i = i
+                chunk_end_i = i + len(chunk)
+                self._print(
+                    f"Submitting cell chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, {chunk_end_i:5.0f}) to CAS ..."
                 )
-            )
-            i = j
-            j += chunk_size
+                tmp_file_name = f"chunk_{chunk_index}.h5ad"
+                chunk.write(tmp_file_name, compression="gzip")
+                with open(tmp_file_name, "rb") as f:
+                    chunk_bytes = f.read()
 
-        await asyncio.wait(tasks)
+                os.remove(tmp_file_name)
+                tasks.append(
+                    self._annotate_anndata_chunk(
+                        adata_bytes=chunk_bytes,
+                        results=results,
+                        model_name=model_name,
+                        chunk_index=chunk_index,
+                        chunk_start_i=chunk_start_i,
+                        chunk_end_i=chunk_end_i,
+                    )
+                )
+                i = j
+                j += chunk_size
+
+            await asyncio.wait(tasks)
 
     def annotate_anndata(
         self,
