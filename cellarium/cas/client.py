@@ -186,9 +186,9 @@ class CASClient:
         i, j = 0, chunk_size
         minibatch_size = 10
         number_of_chunks = self._get_number_of_chunks(adata, chunk_size=chunk_size)
-        for minibatch_start in  range(number_of_chunks)[::minibatch_size]:
+        for minibatch_start in range(number_of_chunks)[::minibatch_size]:
             tasks = []
-            for chunk_index in range(minibatch_start, min(minibatch_start+minibatch_size, number_of_chunks)):
+            for chunk_index in range(minibatch_start, min(minibatch_start + minibatch_size, number_of_chunks)):
                 chunk = adata[i:j, :]
                 chunk_start_i = i
                 chunk_end_i = i + len(chunk)
