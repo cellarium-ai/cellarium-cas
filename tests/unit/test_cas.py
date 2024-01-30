@@ -5,7 +5,6 @@ The purpose of this case is to test whether the CAS client tool functions proper
 and annotates a test dataset using the default model.
 """
 
-
 import anndata
 import numpy as np
 
