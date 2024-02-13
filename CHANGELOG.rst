@@ -18,13 +18,13 @@ Added
 - Add model name validation method to :class:`clients.CASClient`
 - Add sync POST method (using requests) to :class:`services.CASAPIService`
 - Add `CHANGELOG.rst` file
-- Add settings module that chooses the correct settings file based on the environment according to current git version. Since now package will use development settings if it's tagged as a pre-release (alpha (a), beta (b), or release candidate (rc)), and production settings otherwise.
+- Add settings module that chooses the correct settings file based on the environment according to current git version. Since now package will use development settings if it's tagged as a pre-release (alpha, beta, or release candidate (rc)), and production settings otherwise.
 - Add version determination based on git tags
 
 Changed
 ~~~~~~~
 - Reorganize :class:`CASClient` methods: factor out sharding logic
-- Update `MAX_NUM_REQUESTS_AT_A_TIME` to 10
+- Update `MAX_NUM_REQUESTS_AT_A_TIME` to 25
 - Update default `chunk_size` in :meth:`annotate` methods to 1000
 - Make :meth:`__validate_and_sanitize_input_data` method public (now it's a :meth:`validate_and_sanitize_input_data`) in CASClient
 - Update backend API url to point to the new API endpoints depending on the environment
@@ -41,6 +41,7 @@ File Structure Changes
 - Add `cellarium/cas/scanpy_utils.py` (Not necessary for the client methods, but useful for the demo)
 - Add `cellarium/cas/settings` directory, including `__init__.py`, `base.py`, `development.py`, and `production.py` files
 - Add cas/version.py file
+- Add `cellarium/cas/constants.py` file
 - Remove `.github/actions/docs` folder (docs are now hosted on readthedocs)
 
 Notes

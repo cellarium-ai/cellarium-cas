@@ -421,6 +421,8 @@ class CASClient:
             by dataset
         :return: A list of dictionaries with annotations for each of the cells from input adata
         """
+        cas_model_name = self.default_model_name if cas_model_name == "default" else cas_model_name
+
         start = time.time()
         adata = self.__prepare_input_for_sharded_request(
             adata=adata,
@@ -429,7 +431,6 @@ class CASClient:
             feature_ids_column_name=feature_ids_column_name,
             feature_names_column_name=feature_names_column_name,
         )
-
         results = self.__async_sharded_request(
             adata=adata,
             chunk_size=chunk_size,
@@ -580,6 +581,8 @@ class CASClient:
         """
         if chunk_size > 500:
             raise ValueError("Chunk size greater than 500 not supported yet.")
+
+        cas_model_name = self.default_model_name if cas_model_name == "default" else cas_model_name
 
         start = time.time()
         adata = self.__prepare_input_for_sharded_request(
