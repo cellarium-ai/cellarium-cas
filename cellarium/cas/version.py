@@ -1,5 +1,6 @@
+import os
 import re
-from importlib.metadata import version
+from importlib.metadata import PackageNotFoundError, version
 
 
 def get_version() -> str:
@@ -8,7 +9,10 @@ def get_version() -> str:
 
     :return: The version of the application.
     """
-    return version("cellarium-cas")
+    try:
+        return version("cellarium-cas")
+    except PackageNotFoundError:
+        return os.environ.get("CAS_VERSION", "0.0.1")
 
 
 def _is_release_version(version_string) -> bool:
@@ -54,7 +58,6 @@ def get_version_environment() -> str:
     """
     app_version = get_version()
     if _is_pre_release_version(app_version) or app_version == "0.0.1":
-
         return "development"
     elif _is_release_version(app_version):
         return "production"
