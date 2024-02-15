@@ -9,14 +9,10 @@ import warnings
 
 import anndata
 
-from cellarium.cas import _io, data_preparation, exceptions, service
+from cellarium.cas import _io, data_preparation, exceptions, service, settings
 
-NUM_ATTEMPTS_PER_CHUNK_DEFAULT = 7
 CHUNK_SIZE_ANNOTATE_DEFAULT = 1000
 CHUNK_SIZE_SEARCH_DEFAULT = 500
-MAX_NUM_REQUESTS_AT_A_TIME = 10
-START_RETRY_DELAY = 5
-MAX_RETRY_DELAY = 32
 
 
 class CASClient:
@@ -41,7 +37,7 @@ class CASClient:
 
         self._print(s)
 
-    def __init__(self, api_token: str, num_attempts_per_chunk: int = NUM_ATTEMPTS_PER_CHUNK_DEFAULT) -> None:
+    def __init__(self, api_token: str, num_attempts_per_chunk: int = settings.NUM_ATTEMPTS_PER_CHUNK_DEFAULT) -> None:
         self.cas_api_service = service.CASAPIService(api_token=api_token)
 
         self._print("Connecting to the Cellarium Cloud backend...")
@@ -180,7 +176,7 @@ class CASClient:
 
         async def sharded_request_task(**callback_kwargs):
             async with semaphore:
-                retry_delay = START_RETRY_DELAY
+                retry_delay = settings.START_RETRY_DELAY
 
                 for _ in range(self.num_attempts_per_chunk):
                     try:
@@ -193,7 +189,7 @@ class CASClient:
                             f"{chunk_end_i:5.0f}) to CAS ..."
                         )
                         await asyncio.sleep(retry_delay)
-                        retry_delay = min(retry_delay * 2, MAX_RETRY_DELAY)
+                        retry_delay = min(retry_delay * 2, settings.MAX_RETRY_DELAY)
                         continue
                     except exceptions.HTTPError401:
                         self._print("Unauthorized token. Please check your API token or request a new one.")
@@ -220,7 +216,7 @@ class CASClient:
         async def sharded_request():
             i, j = 0, chunk_size
             tasks = []
-            semaphore = asyncio.Semaphore(MAX_NUM_REQUESTS_AT_A_TIME)
+            semaphore = asyncio.Semaphore(settings.MAX_NUM_REQUESTS_AT_A_TIME)
             number_of_chunks = self._get_number_of_chunks(adata, chunk_size=chunk_size)
             results = [[] for _ in range(number_of_chunks)]
 

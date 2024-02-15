@@ -9,12 +9,9 @@ import nest_asyncio
 import requests
 from aiohttp import client_exceptions
 
-from cellarium.cas import endpoints, exceptions
+from cellarium.cas import endpoints, exceptions, settings
 
 nest_asyncio.apply()
-
-AIOHTTP_TOTAL_TIMEOUT_SECONDS = 450
-AIOHTTP_READ_TIMEOUT_SECONDS = 430
 
 
 class _BaseService:
@@ -141,7 +138,9 @@ class _BaseService:
 
         :return: JSON response
         """
-        timeout = aiohttp.ClientTimeout(total=AIOHTTP_TOTAL_TIMEOUT_SECONDS, sock_read=AIOHTTP_READ_TIMEOUT_SECONDS)
+        timeout = aiohttp.ClientTimeout(
+            total=settings.AIOHTTP_TOTAL_TIMEOUT_SECONDS, sock_read=settings.AIOHTTP_READ_TIMEOUT_SECONDS
+        )
         ssl_context = ssl.create_default_context(cafile=certifi.where())
         connector = aiohttp.TCPConnector(ssl=ssl_context)
 
@@ -215,7 +214,7 @@ class CASAPIService(_BaseService):
     Class with all the API methods of Cellarium Cloud CAS infrastructure.
     """
 
-    BACKEND_URL = "https://cas-api-1-4-1a1-vi7nxpvk7a-uc.a.run.app"
+    BACKEND_URL = settings.CELLARIUM_CLOUD_BACKEND_URL
 
     def validate_token(self) -> None:
         """

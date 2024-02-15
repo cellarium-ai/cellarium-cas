@@ -7,8 +7,8 @@ The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`
 and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0.html>`_.
 
 
-1.4.1.dev - 2023-12-08
-----------------------
+1.4.1 - 2024-02-15
+------------------
 
 Added
 ~~~~~
@@ -18,6 +18,8 @@ Added
 - Add model name validation method to :class:`clients.CASClient`
 - Add sync POST method (using requests) to :class:`services.CASAPIService`
 - Add `CHANGELOG.rst` file
+- Add settings module that chooses the correct settings file based on the environment according to current git version. Since now package will use development settings if it's tagged as a pre-release (alpha (a), beta (b), or release candidate (rc)), and production settings otherwise.
+- Add version determination based on git tags
 
 Changed
 ~~~~~~~
@@ -25,7 +27,7 @@ Changed
 - Update `MAX_NUM_REQUESTS_AT_A_TIME` to 10
 - Update default `chunk_size` in :meth:`annotate` methods to 1000
 - Make :meth:`__validate_and_sanitize_input_data` method public (now it's a :meth:`validate_and_sanitize_input_data`) in CASClient
-- Update backend API url to `https://cas-api-1-4-1-dev-vi7nxpvk7a-uc.a.run.app`
+- Update backend API url to point to the new API endpoints depending on the environment
 - Update `pyproject.toml` file to include scanpy optional dependencies
 
 Removed
@@ -37,6 +39,8 @@ File Structure Changes
 - Add `CHANGELOG.rst` file
 - Add `requirements/scanpy.txt` file (optional requirements for scanpy related demos)
 - Add `cellarium/cas/scanpy_utils.py` (Not necessary for the client methods, but useful for the demo)
+- Add `cellarium/cas/settings` directory, including `__init__.py`, `base.py`, `development.py`, and `production.py` files
+- Add cas/version.py file
 - Remove `.github/actions/docs` folder (docs are now hosted on readthedocs)
 
 Notes
