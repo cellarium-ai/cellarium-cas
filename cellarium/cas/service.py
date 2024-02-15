@@ -9,7 +9,7 @@ import nest_asyncio
 import requests
 from aiohttp import client_exceptions
 
-from cellarium.cas import endpoints, exceptions
+from cellarium.cas import constants, endpoints, exceptions
 
 nest_asyncio.apply()
 
@@ -50,11 +50,15 @@ class _BaseService:
         :raises: HTTPError401, HTTPError403, HTTPError500, HTTPBaseError
         """
         message = f"Server returned status code {status_code}, Detail: {detail}"
-        if status_code == 401:
+        if status_code == constants.HTTP.STATUS_401_UNAUTHORIZED:
             raise exceptions.HTTPError401(message)
-        elif status_code == 403:
+        elif status_code == constants.HTTP.STATUS_403_FORBIDDEN:
             raise exceptions.HTTPError403(message)
-        elif status_code == 500 or status_code == 502 or status_code == 503 or status_code == 504:
+        elif (
+            constants.HTTP.STATUS_500_INTERNAL_SERVER_ERROR
+            <= status_code
+            <= constants.HTTP.STATUS_511_NETWORK_AUTHENTICATION_REQUIRED
+        ):
             raise exceptions.HTTPError5XX(message)
         else:
             raise exceptions.HTTPError(message)
@@ -68,7 +72,8 @@ class _BaseService:
         :raises: HTTPError401, HTTPError403, HTTPError500, HTTPBaseError
         """
         status_code = response.status_code
-        if status_code < 200 or status_code >= 300:
+        if not (constants.HTTP.STATUS_200_OK <= status_code <= constants.HTTP.STATUS_226_IM_USED):
+            # When response status code is not 2XX
             try:
                 response_detail = response.json()["detail"]
             except (json.decoder.JSONDecodeError, KeyError):

@@ -15,6 +15,8 @@ NUM_ATTEMPTS_PER_CHUNK_DEFAULT = 7
 CHUNK_SIZE_ANNOTATE_DEFAULT = 1000
 CHUNK_SIZE_SEARCH_DEFAULT = 500
 MAX_NUM_REQUESTS_AT_A_TIME = 10
+START_RETRY_DELAY = 5
+MAX_RETRY_DELAY = 32
 
 
 class CASClient:
@@ -178,8 +180,7 @@ class CASClient:
 
         async def sharded_request_task(**callback_kwargs):
             async with semaphore:
-                retry_delay = 5
-                max_retry_delay = 32
+                retry_delay = START_RETRY_DELAY
 
                 for _ in range(self.num_attempts_per_chunk):
                     try:
@@ -192,7 +193,7 @@ class CASClient:
                             f"{chunk_end_i:5.0f}) to CAS ..."
                         )
                         await asyncio.sleep(retry_delay)
-                        retry_delay = min(retry_delay * 2, max_retry_delay)
+                        retry_delay = min(retry_delay * 2, MAX_RETRY_DELAY)
                         continue
                     except exceptions.HTTPError401:
                         self._print("Unauthorized token. Please check your API token or request a new one.")
@@ -228,7 +229,8 @@ class CASClient:
                 chunk_start_i = i
                 chunk_end_i = i + len(chunk)
                 self._print(
-                    f"Submitting cell chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, {chunk_end_i:5.0f}) to CAS ..."
+                    f"Submitting cell chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, {chunk_end_i:5.0f}) "
+                    f"to CAS ..."
                 )
 
                 chunk_bytes = _io.adata_to_bytes(adata=chunk)

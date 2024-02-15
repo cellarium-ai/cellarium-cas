@@ -121,10 +121,12 @@ def sanitize(
         gene_id_to_gene_symbol_map = {
             gene_id: gene_symbol for gene_symbol, gene_id in zip(adata_feature_name_list, adata_feature_schema_list)
         }
+
         cas_feature_name_list = [
             gene_id_to_gene_symbol_map[gene_id] if gene_id in gene_id_to_gene_symbol_map else "N/A"
             for gene_id in cas_feature_schema_list
         ]
+
         var_df_data["feature_name"] = cas_feature_name_list
 
     var_df = pd.DataFrame(index=cas_feature_schema_list, data=var_df_data)
