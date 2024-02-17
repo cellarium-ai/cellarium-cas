@@ -11,7 +11,9 @@ from aiohttp import client_exceptions
 
 from cellarium.cas import constants, endpoints, exceptions, settings
 
-nest_asyncio.apply()
+if settings.is_interactive_environment():
+    print("Running in an interactive environment, applying nest_asyncio")
+    nest_asyncio.apply()
 
 
 class _BaseService:
