@@ -212,11 +212,12 @@ class CASClient:
         chunk_size: int,
         request_callback: t.Callable,
         request_callback_kwargs: t.Dict[str, t.Any],
+        num_requests_at_a_time: int = settings.MAX_NUM_REQUESTS_AT_A_TIME,
     ) -> t.List[t.Dict[str, t.Any]]:
         async def sharded_request():
             i, j = 0, chunk_size
             tasks = []
-            semaphore = asyncio.Semaphore(settings.MAX_NUM_REQUESTS_AT_A_TIME)
+            semaphore = asyncio.Semaphore(num_requests_at_a_time)
             number_of_chunks = self._get_number_of_chunks(adata, chunk_size=chunk_size)
             results = [[] for _ in range(number_of_chunks)]
 
@@ -392,6 +393,12 @@ class CASClient:
         feature_ids_column_name: str = "index",
         feature_names_column_name: t.Optional[str] = None,
         include_dev_metadata: bool = False,
+        num_requests_at_a_time: int = settings.MAX_NUM_REQUESTS_AT_A_TIME,
+        backend_chunk_size: int = 5,
+        retry_count: int = 4,
+        backoff_multiplier: float = 1.0,
+        backoff_min: float = 2.0,
+        backoff_max: float = 30.0,
     ) -> t.List[t.Dict[str, t.Any]]:
         """
         Send an instance of :class:`anndata.AnnData` to the Cellarium Cloud backend for annotations. The function
@@ -438,7 +445,13 @@ class CASClient:
             request_callback_kwargs={
                 "model_name": cas_model_name,
                 "include_dev_metadata": include_dev_metadata,
+                "chunk_size": backend_chunk_size,
+                "retry_count": retry_count,
+                "backoff_multiplier": backoff_multiplier,
+                "backoff_min": backoff_min,
+                "backoff_max": backoff_max,
             },
+            num_requests_at_a_time=num_requests_at_a_time,
         )
         result = self.__postprocess_annotations(results, adata)
         self._print(f"Total wall clock time: {f'{time.time() - start:10.4f}'} seconds")
@@ -454,6 +467,12 @@ class CASClient:
         feature_ids_column_name: str = "index",
         feature_names_column_name: t.Optional[str] = None,
         include_dev_metadata: bool = False,
+        num_requests_at_a_time: int = settings.MAX_NUM_REQUESTS_AT_A_TIME,
+        backend_chunk_size: int = 5,
+        retry_count: int = 4,
+        backoff_multiplier: float = 1.0,
+        backoff_min: float = 2.0,
+        backoff_max: float = 30.0,
     ) -> t.List[t.Dict[str, t.Any]]:
         """
         Read the 'h5ad' file into a :class:`anndata.AnnData` matrix and apply the :meth:`annotate_anndata` method to it.
@@ -493,6 +512,12 @@ class CASClient:
             feature_ids_column_name=feature_ids_column_name,
             feature_names_column_name=feature_names_column_name,
             include_dev_metadata=include_dev_metadata,
+            num_requests_at_a_time=num_requests_at_a_time,
+            backend_chunk_size=backend_chunk_size,
+            retry_count=retry_count,
+            backoff_multiplier=backoff_multiplier,
+            backoff_min=backoff_min,
+            backoff_max=backoff_max,
         )
 
     def annotate_10x_h5_file(
