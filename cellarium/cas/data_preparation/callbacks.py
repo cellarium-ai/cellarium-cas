@@ -8,7 +8,7 @@ if t.TYPE_CHECKING:
 TOTAL_MRNA_UMIS_COLUMN_NAME = "total_mrna_umis"
 
 
-def calculate_total_mrna_umis(adata: "anndata.AnnData") -> "anndata.AnnData":
+def calculate_total_mrna_umis(adata: "anndata.AnnData") -> None:
     """
     Calculate the total mRNA UMIs (Unique Molecular Identifiers) for each observation in the AnnData object and add them
     as a new column in the ``.obs`` attribute. It is recommended to use this callback before data sanitization to
@@ -21,23 +21,22 @@ def calculate_total_mrna_umis(adata: "anndata.AnnData") -> "anndata.AnnData":
 
     .. note::
        The function assumes that the ``.X`` attribute of the input AnnData is a count matrix where each element i,j
-       represents the count of unique transcripts (UMIs) for the ith observation and jth variable (gene).
+       represents the count of unique transcripts (UMIs) for the ith observation and jth variable (gene). The function
+       performs an inline operation on the input AnnData object, changing it in place.
 
     Example:
     ________
-        >>> adata_with_umis = calculate_total_mrna_umis(adata=adata)
-        >>> 'total_mrna_umis' in adata_with_umis.obs.columns
+        >>> calculate_total_mrna_umis(adata=adata)
+        >>> 'total_mrna_umis' in adata.obs.columns
         True.
     """
-    adata_r = adata.copy()
-    adata_r.obs[TOTAL_MRNA_UMIS_COLUMN_NAME] = np.array(adata.X.sum(axis=1)).flatten()
-    return adata_r
+    adata.obs[TOTAL_MRNA_UMIS_COLUMN_NAME] = np.array(adata.X.sum(axis=1)).flatten()
 
 
-_PRE_SANITIZE_CALLBACKS: t.List[t.Callable[["anndata.AnnData"], "anndata.AnnData"]] = [calculate_total_mrna_umis]
+_PRE_SANITIZE_CALLBACKS: t.List[t.Callable[["anndata.AnnData"], None]] = [calculate_total_mrna_umis]
 
 
-def pre_sanitize_callback(adata: "anndata.AnnData") -> "anndata.AnnData":
+def pre_sanitize_callback(adata: "anndata.AnnData") -> None:
     """
     Apply each necessary callback before data sanitization
 
@@ -46,5 +45,4 @@ def pre_sanitize_callback(adata: "anndata.AnnData") -> "anndata.AnnData":
     :return: A new :class:`anndata.AnnData` instance after callback modifications
     """
     for callback in _PRE_SANITIZE_CALLBACKS:
-        adata = callback(adata)
-    return adata
+        callback(adata)

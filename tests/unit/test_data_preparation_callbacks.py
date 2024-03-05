@@ -27,18 +27,14 @@ def test_calculate_total_mrna_umis():
     obs = pd.DataFrame(index=["cell1", "cell2", "cell3"])
     adata = anndata.AnnData(X=X, obs=obs)
 
-    result_adata = callbacks.calculate_total_mrna_umis(adata)
+    callbacks.calculate_total_mrna_umis(adata)
 
     assert (
-        callbacks.TOTAL_MRNA_UMIS_COLUMN_NAME in result_adata.obs.columns
+        callbacks.TOTAL_MRNA_UMIS_COLUMN_NAME in adata.obs.columns
     ), f"'{callbacks.TOTAL_MRNA_UMIS_COLUMN_NAME}' column not found in .obs"
 
     np.testing.assert_array_equal(
-        result_adata.obs[callbacks.TOTAL_MRNA_UMIS_COLUMN_NAME],
+        adata.obs[callbacks.TOTAL_MRNA_UMIS_COLUMN_NAME],
         [3, 1, 3],
         err_msg="Total mRNA UMI calculations are incorrect",
     )
-
-    # Check if the original AnnData object is unmodified (immutability test)
-    assert adata.shape == result_adata.shape, "Original AnnData object was modified"
-    assert "total_mrna_umis" not in adata.obs.columns, "Original AnnData object was modified"
