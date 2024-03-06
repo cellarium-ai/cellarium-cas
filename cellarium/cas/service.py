@@ -1,3 +1,5 @@
+import asyncio
+import json
 import ssl
 import typing as t
 
@@ -5,10 +7,13 @@ import aiohttp
 import certifi
 import nest_asyncio
 import requests
+from aiohttp import client_exceptions
 
-from cellarium.cas import endpoints, exceptions
+from cellarium.cas import constants, endpoints, exceptions, settings
 
-nest_asyncio.apply()
+if settings.is_interactive_environment():
+    print("Running in an interactive environment, applying nest_asyncio")
+    nest_asyncio.apply()
 
 
 class _BaseService:
@@ -35,61 +40,180 @@ class _BaseService:
         return f"{cls.BACKEND_URL}/{endpoint}"
 
     @staticmethod
-    def __validate_response_code(response_code: int):
-        if response_code == 401:
-            raise exceptions.HTTPError401
-        elif response_code == 403:
-            raise exceptions.HTTPError403
-        elif response_code == 500:
-            raise exceptions.HTTPError500
+    def raise_response_exception(status_code: int, detail: str) -> None:
+        """
+        Raise an exception based on the status code returned by the server, including the detail message
+
+        :param status_code: HTTP status code
+        :param detail: Detail message returned by the server
+        :raises: HTTPError401, HTTPError403, HTTPError500, HTTPBaseError
+        """
+        message = f"Server returned status code {status_code}, Detail: {detail}"
+        if status_code == constants.HTTP.STATUS_401_UNAUTHORIZED:
+            raise exceptions.HTTPError401(message)
+        elif status_code == constants.HTTP.STATUS_403_FORBIDDEN:
+            raise exceptions.HTTPError403(message)
+        elif (
+            constants.HTTP.STATUS_500_INTERNAL_SERVER_ERROR
+            <= status_code
+            <= constants.HTTP.STATUS_511_NETWORK_AUTHENTICATION_REQUIRED
+        ):
+            raise exceptions.HTTPError5XX(message)
+        else:
+            raise exceptions.HTTPError(message)
+
+    def __validate_requests_response(self, response: requests.Response) -> None:
+        """
+        Validate requests response and raise an exception if response status code is not 200
+
+        :param response: Response object
+
+        :raises: HTTPError401, HTTPError403, HTTPError500, HTTPBaseError
+        """
+        status_code = response.status_code
+        if not (constants.HTTP.STATUS_200_OK <= status_code <= constants.HTTP.STATUS_226_IM_USED):
+            # When response status code is not 2XX
+            try:
+                response_detail = response.json()["detail"]
+            except (json.decoder.JSONDecodeError, KeyError):
+                response_detail = response.text
+
+            self.raise_response_exception(status_code=status_code, detail=response_detail)
 
     def get(self, endpoint: str) -> requests.Response:
+        """
+        Make a GET request to backend service
+
+        :param endpoint: Endpoint string without a leading slash
+
+        :raises: HTTPError401, HTTPError403, HTTPError500, HTTPBaseError
+
+        :return: Response object
+        """
         url = self._get_endpoint_url(endpoint)
         headers = {"Authorization": f"Bearer {self.api_token}"}
         response = requests.get(url=url, headers=headers)
-        self.__validate_response_code(response.status_code)
+        self.__validate_requests_response(response=response)
+        return response
+
+    def post(self, endpoint: str, data: t.Optional[t.Dict] = None) -> requests.Response:
+        url = self._get_endpoint_url(endpoint)
+        headers = {"Authorization": f"Bearer {self.api_token}"}
+        response = requests.post(url=url, headers=headers, json=data)
+        self.__validate_requests_response(response=response)
         return response
 
     def get_json(self, endpoint: str) -> t.Union[t.Dict, t.List]:
+        """
+        Make a GET request to backend service and return JSON response
+
+        :param endpoint: Endpoint string without a leading slash
+
+        :raises: HTTPError401, HTTPError403, HTTPError500, HTTPBaseError
+
+        :return: JSON response
+        """
         return self.get(endpoint=endpoint).json()
+
+    def post_json(self, endpoint: str, data: t.Optional[t.Dict] = None) -> t.Union[t.Dict, t.List]:
+        """
+        Make a POST request to backend service and return JSON response
+
+        :param endpoint: Endpoint string without a leading slash
+        :param data: Dictionary to include to HTTP POST request body
+
+        :raises: HTTPError401, HTTPError403, HTTPError500, HTTPBaseError
+
+        :return: JSON response
+        """
+        return self.post(endpoint=endpoint, data=data).json()
+
+    async def _aiohttp_async_post(
+        self, url: str, form_data: t.Optional[aiohttp.FormData] = None, headers: t.Optional[t.Dict[str, t.Any]] = None
+    ):
+        """
+        Make an async POST request to backend service with timeout and SSL context, handle exceptions and return JSON.
+
+        Create custom SSL context with `certifi` package to avoid SSL errors. Use :class:`aiohttp.ClientTimeout` to set
+        timeout for the request. Handle exceptions and raise custom exceptions.
+
+        :param url: Endpoint URL
+        :param form_data: :class:`aiohttp.FormData` object
+        :param headers: Headers to include in the request
+
+        :raises: HTTPError401, HTTPError403, HTTPError500, HTTPBaseError, HTTPClientError
+
+        :return: JSON response
+        """
+        timeout = aiohttp.ClientTimeout(
+            total=settings.AIOHTTP_TOTAL_TIMEOUT_SECONDS, sock_read=settings.AIOHTTP_READ_TIMEOUT_SECONDS
+        )
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
+        connector = aiohttp.TCPConnector(ssl=ssl_context)
+
+        async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
+            try:
+                async with session.post(url, data=form_data, headers=headers) as response:
+                    status_code = response.status
+                    if status_code < 200 or status_code >= 300:
+                        try:
+                            response_body = await response.json()
+                            response_detail = response_body["detail"]
+                        except (json.decoder.JSONDecodeError, client_exceptions.ClientResponseError):
+                            response_detail = await response.text()
+                        except KeyError:
+                            print("Response body doesn't have a 'detail' key, returning full response body")
+                            response_detail = str(await response.json())
+
+                        self.raise_response_exception(status_code=status_code, detail=response_detail)
+                    try:
+                        return await response.json()
+                    except client_exceptions.ClientPayloadError as e:
+                        raise exceptions.HTTPClientError(f"Failed to parse response body: {e.__class__.__name__}: {e}")
+
+            except (client_exceptions.ServerTimeoutError, asyncio.TimeoutError) as e:
+                raise exceptions.HTTPClientError(f"Client Timeout Error: {e}")
+            except (client_exceptions.ClientConnectionError, client_exceptions.ClientResponseError) as e:
+                raise exceptions.HTTPClientError(f"Client Connection Error: {e.__class__.__name__}: {e}")
+            except client_exceptions.ClientError as e:
+                raise exceptions.HTTPClientError(f"Unknown Error: {e.__class__.__name__}: {e}")
 
     async def async_post(
         self,
         endpoint: str,
-        file,
+        file: t.ByteString,
         data: t.Optional[t.Dict] = None,
         headers: t.Optional[t.Dict] = None,
     ) -> t.Union[t.List, t.Dict]:
         """
-        Make an async multiform POST request to backend service
+        Make an async multiform POST request to backend service. Include adata file as a byte file in the request body,
+        and authorization token in the headers.
+
+        For details about custom settings for SSL context and timeout, refer to :meth:`_aiohttp_async_post` method.
 
         :param endpoint: Endpoint string without a leading slash
         :param file: Byte file to attach to request
         :param data: Dictionary to include to HTTP POST request body
         :param headers: Dictionary to include to HTTP POST request Headers
+
+        :raises: HTTPError401, HTTPError403, HTTPError500, HTTPBaseError, HTTPClientError
+
+        :return: JSON response
         """
         url = self._get_endpoint_url(endpoint=endpoint)
-        _data = {}
+        _data = data if data is not None else {}
         _headers = {"Authorization": f"Bearer {self.api_token}"}
 
-        if data is not None:
-            _data.update(**data)
         if headers is not None:
-            _headers.update(**headers)
+            _headers.update(headers)
 
         form_data = aiohttp.FormData()
-        form_data.add_field("myfile", file, filename="adata.h5ad")
+        form_data.add_field("file", file, filename="adata.h5ad")
 
-        for key, value in data.items():
+        for key, value in _data.items():
             form_data.add_field(key, value)
 
-        ssl_context = ssl.create_default_context(cafile=certifi.where())
-        conn = aiohttp.TCPConnector(ssl=ssl_context)
-
-        async with aiohttp.ClientSession(connector=conn) as session:
-            async with session.post(url, data=form_data, headers=_headers) as resp:
-                self.__validate_response_code(resp.status)
-                return await resp.json()
+        return await self._aiohttp_async_post(url=url, form_data=form_data, headers=_headers)
 
 
 class CASAPIService(_BaseService):
@@ -97,14 +221,15 @@ class CASAPIService(_BaseService):
     Class with all the API methods of Cellarium Cloud CAS infrastructure.
     """
 
-    BACKEND_URL = "https://cas-api-june-release-vi7nxpvk7a-uc.a.run.app"
+    BACKEND_URL = settings.CELLARIUM_CLOUD_BACKEND_URL
 
     def validate_token(self) -> None:
         """
         Validate user given API token.
         Would raise 401 Unauthorized if token is invalid.
 
-        Refer to API Docs: {BACKEND_URL}/docs#/default/validate_token_validate_token_get
+        Refer to API Docs:
+        {BACKEND_URL}/api/docs#/cellarium-general/validate_token_api_cellarium_general_validate_token_get
 
         :return: Void
         """
@@ -114,7 +239,8 @@ class CASAPIService(_BaseService):
         """
         Retrieve General Application Info. This Includes default schema, version, model information, etc.
 
-        Refer to API Docs: {BACKEND_URL}/docs#/default/application_info_application_info_get
+        Refer to API Docs:
+        {BACKEND_URL}/api/docs#/cellarium-general/application_info_api_cellarium_general_application_info_get
 
         :return: Dictionary with application info
         """
@@ -124,7 +250,8 @@ class CASAPIService(_BaseService):
         """
         Retrieve a list of feature schemas that exist in Cellarium Cloud CAS
 
-        Refer to API Docs: {BACKEND_URL}/docs#/default/get_feature_schemas_feature_schemas_get
+        Refer to API Docs:
+        {BACKEND_URL}/api/docs#/cellarium-general/get_feature_schemas_api_cellarium_general_feature_schemas_get
 
         :return: List of feature schema names
         """
@@ -134,7 +261,8 @@ class CASAPIService(_BaseService):
         """
         Retrieve feature schema by name
 
-        Refer to API Docs: {BACKEND_URL}/docs#/default/get_feature_schema_by_feature_schema__schema_name__get
+        Refer to API Docs:
+        {BACKEND_URL}/api/docs#/cellarium-general/get_feature_schema_by_api_cellarium_general_feature_schema__schema_name__get
 
         :param name: Name of feature schema
         :return: List of feature ids
@@ -145,24 +273,69 @@ class CASAPIService(_BaseService):
         """
         Retrieve list of all models that are in CAS
 
-        Refer to API Docs: {BACKEND_URL}/docs#/default/list_models_list_models_get
+        Refer to API Docs:
+        {BACKEND_URL}/api/docs#/cellarium-general/get_model_list_api_cellarium_general_list_models_get
 
         :return: List of models
         """
         return self.get_json(endpoint=endpoints.LIST_MODELS)
 
+    def query_cells_by_ids(
+        self, model_name: str, cell_ids: t.List[int], metadata_feature_names: t.List[str]
+    ) -> t.List[t.Dict[str, t.Any]]:
+        """
+        Retrieve cells by their ids from Cellarium Cloud database.
+
+        Refer to API Docs:
+        {BACKEND_URL}/api/docs#/cell-analysis/get_cells_by_ids_api_cellarium_cas_query_cells_by_ids_post
+
+        :param model_name: Name of the model to use. Model name is required to locate the correct database.
+        :param cell_ids: List of cell ids from Cellarium Cloud database to query by.
+        :param metadata_feature_names: List of metadata feature names to include in the response.
+
+        :return: List of cells with metadata.
+        """
+        request_data = {
+            "model_name": model_name,
+            "cas_cell_ids": cell_ids,
+            "metadata_feature_names": metadata_feature_names,
+        }
+        return self.post_json(endpoint=endpoints.QUERY_CELLS_BY_IDS, data=request_data)
+
     async def async_annotate_anndata_chunk(
-        self, adata_file_bytes: t.ByteString, number_of_cells: int, model_name: str
+        self, adata_bytes: t.ByteString, model_name: str, include_dev_metadata: bool
     ) -> t.List[t.Dict[str, t.Any]]:
         """
         Request Cellarium Cloud infrastructure to annotate an input anndata file
 
-        Refer tp API Docs: {BACKEND_URL}/docs#/default/annotate_annotate_post
+        Refer to API Docs: {BACKEND_URL}/api/docs#/cell-analysis/annotate_api_cellarium_cas_annotate_post
 
-        :param adata_file_bytes: Validated anndata file
-        :param number_of_cells: Number of cells being processed in this dataset
+        :param adata_bytes: Validated anndata file
         :param model_name: Name of the model to use.
+        :param include_dev_metadata: Whether to include dev metadata in the response.
         :return: A list of dictionaries with annotations.
         """
-        request_data = {"number_of_cells": str(number_of_cells), "model_name": model_name}
-        return await self.async_post(endpoints.ANNOTATE, file=adata_file_bytes, data=request_data)
+        request_data = {
+            "model_name": model_name,
+            "include_dev_metadata": str(include_dev_metadata),
+        }
+        return await self.async_post(endpoints.ANNOTATE, file=adata_bytes, data=request_data)
+
+    async def async_nearest_neighbor_search(
+        self, adata_bytes: t.ByteString, model_name: str
+    ) -> t.List[t.Dict[str, t.Any]]:
+        """
+        Request Cellarium Cloud infrastructure to search for nearest neighbors in an input anndata file
+
+        Refer tp API Docs:
+        {BACKEND_URL}/api/docs#/cell-analysis/nearest_neighbor_search_api_cellarium_cas_nearest_neighbor_search_post
+
+        :param adata_bytes: Validated anndata file
+        :param model_name: Name of the model to use.
+
+        :return: A list of dictionaries with annotations (query_id and cas_cell_id, distance).
+        """
+        request_data = {
+            "model_name": model_name,
+        }
+        return await self.async_post(endpoints.NEAREST_NEIGHBOR_SEARCH, file=adata_bytes, data=request_data)

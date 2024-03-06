@@ -6,6 +6,14 @@ import pandas as pd
 import scipy.sparse as sp
 
 from cellarium.cas import exceptions
+from cellarium.cas.data_preparation import callbacks
+
+
+def _get_adata_var_index_or_by_column(adata: anndata.AnnData, var_column_name: str) -> t.List[str]:
+    if var_column_name == "index":
+        return adata.var.index.tolist()
+
+    return adata.var[var_column_name].values.tolist()
 
 
 def validate(
@@ -22,15 +30,13 @@ def validate(
     :param cas_feature_schema_list: List of features to be validated with
     :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. Default `index`.
     """
-    assert feature_ids_column_name == "index" or feature_ids_column_name in adata.var.columns.values, (
-        "`feature_ids_column_name` should have a value of either 'index' "
-        "or be present as a column in the `adata.var` object."
-    )
+    if feature_ids_column_name != "index" and feature_ids_column_name not in adata.var.columns.values:
+        raise ValueError(
+            "`feature_ids_column_name` should have a value of either 'index' "
+            "or be present as a column in the `adata.var` object."
+        )
 
-    if feature_ids_column_name == "index":
-        adata_feature_schema_list = adata.var.index.tolist()
-    else:
-        adata_feature_schema_list = adata.var[feature_ids_column_name].values.tolist()
+    adata_feature_schema_list = _get_adata_var_index_or_by_column(adata=adata, var_column_name=feature_ids_column_name)
 
     cas_feature_schema_set = set(cas_feature_schema_list)
     adata_feature_schema_set = set(adata_feature_schema_list)
@@ -49,6 +55,7 @@ def sanitize(
     cas_feature_schema_list: t.List[str],
     count_matrix_name: str,
     feature_ids_column_name: str,
+    feature_names_column_name: t.Optional[str] = None,
 ) -> anndata.AnnData:
     """
     Cellarium CAS sanitizing script. Returns a new `anndata.AnnData` instance, based on the feature expression
@@ -58,20 +65,29 @@ def sanitize(
     :param cas_feature_schema_list: List of Ensembl feature ids to rely on.
     :param count_matrix_name: Where to obtain a feature expression count matrix from. Choice of: 'X', 'raw.X'
     :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. Default `index`.
+    :param feature_names_column_name: Column name where to obtain feature names. If not provided, no feature names
+        should be mapped |br|
+    `Default`: ``None``
     :return: `anndata.AnnData` instance that is ready to use with CAS
     """
-    assert feature_ids_column_name == "index" or feature_ids_column_name in adata.var.columns.values, (
-        "`feature_ids_column_name` should have a value of either 'index' "
-        "or be present as a column in the `adata.var` object."
-    )
-    assert (
-        count_matrix_name == "X" or count_matrix_name == "raw.X"
-    ), "`count_matrix_name` should have a value of either 'X' or 'raw.X'."
+    if feature_ids_column_name != "index" and feature_ids_column_name not in adata.var.columns.values:
+        raise ValueError(
+            "`feature_ids_column_name` should have a value of either 'index' "
+            "or be present as a column in the `adata.var` object."
+        )
+    if feature_names_column_name not in {"index", None} and feature_names_column_name not in adata.var.columns.values:
+        raise ValueError(
+            "`feature_ids_name_column_name` should have a value of either 'index' "
+            "or be present as a column in the `adata.var` object."
+        )
+    if count_matrix_name not in {"X", "raw.X"}:
+        raise ValueError("`count_matrix_name` should have a value of either 'X' or 'raw.X'.")
 
-    if feature_ids_column_name == "index":
-        adata_feature_schema_list = adata.var.index.tolist()
-    else:
-        adata_feature_schema_list = adata.var[feature_ids_column_name].values.tolist()
+    callbacks.pre_sanitize_callback(adata=adata)
+
+    adata_feature_schema_list = _get_adata_var_index_or_by_column(adata=adata, var_column_name=feature_ids_column_name)
+    original_obs_ids = adata.obs.index.values
+
     cas_feature_schema_set = set(cas_feature_schema_list)
     adata_feature_schema_set = set(adata_feature_schema_list)
     feature_id_intersection = adata_feature_schema_set.intersection(cas_feature_schema_set)
@@ -97,11 +113,28 @@ def sanitize(
 
     # Create `obs` index
     obs = adata.obs.copy()
-    obs.index = pd.Index([str(x) for x in np.arange(adata.shape[0])])
+    obs.index = original_obs_ids
 
+    var_df_data = {}
+    if feature_names_column_name is not None:
+        adata_feature_name_list = _get_adata_var_index_or_by_column(
+            adata=adata, var_column_name=feature_names_column_name
+        )
+        gene_id_to_gene_symbol_map = {
+            gene_id: gene_symbol for gene_symbol, gene_id in zip(adata_feature_name_list, adata_feature_schema_list)
+        }
+
+        cas_feature_name_list = [
+            gene_id_to_gene_symbol_map[gene_id] if gene_id in gene_id_to_gene_symbol_map else "N/A"
+            for gene_id in cas_feature_schema_list
+        ]
+
+        var_df_data["feature_name"] = cas_feature_name_list
+
+    var_df = pd.DataFrame(index=cas_feature_schema_list, data=var_df_data)
     return anndata.AnnData(
         result_matrix.tocsr(),
         obs=obs,
         obsm=adata.obsm,
-        var=pd.DataFrame(index=cas_feature_schema_list),
+        var=var_df,
     )
