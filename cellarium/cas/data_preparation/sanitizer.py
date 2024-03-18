@@ -83,7 +83,7 @@ def sanitize(
     if count_matrix_name not in {"X", "raw.X"}:
         raise ValueError("`count_matrix_name` should have a value of either 'X' or 'raw.X'.")
 
-    callbacks.pre_sanitize_callback(adata=adata)
+    callbacks.pre_sanitize_callback(adata=adata, count_matrix_name=count_matrix_name)
 
     adata_feature_schema_list = _get_adata_var_index_or_by_column(adata=adata, var_column_name=feature_ids_column_name)
     original_obs_ids = adata.obs.index.values
