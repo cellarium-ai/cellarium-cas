@@ -9,7 +9,7 @@ import warnings
 
 import anndata
 
-from cellarium.cas import _io, data_preparation, exceptions, service, settings
+from cellarium.cas import _io, constants, data_preparation, exceptions, service, settings
 
 CHUNK_SIZE_ANNOTATE_DEFAULT = 1000
 CHUNK_SIZE_SEARCH_DEFAULT = 500
@@ -74,7 +74,7 @@ class CASClient:
         self,
         adata: anndata.AnnData,
         cas_model_name: str,
-        count_matrix_name: str,
+        count_matrix_name: constants.CountMatrixInput,
         feature_ids_column_name: str,
         feature_names_column_name: t.Optional[str] = None,
     ) -> anndata.AnnData:
@@ -139,7 +139,7 @@ class CASClient:
             return data_preparation.sanitize(
                 adata=adata,
                 cas_feature_schema_list=cas_feature_schema_list,
-                count_matrix_name=count_matrix_name,
+                count_matrix_input=count_matrix_name,
                 feature_ids_column_name=feature_ids_column_name,
                 feature_names_column_name=feature_names_column_name,
             )
@@ -335,7 +335,7 @@ class CASClient:
         self,
         adata: anndata.AnnData,
         cas_model_name: str = "default",
-        count_matrix_name: str = "X",
+        count_matrix_input: constants.CountMatrixInput = constants.CountMatrixInput.X,
         feature_ids_column_name: str = "index",
         feature_names_column_name: t.Optional[str] = None,
     ) -> anndata.AnnData:
@@ -347,10 +347,9 @@ class CASClient:
             `Allowed Values:` Model name from the :attr:`allowed_models_list` list or ``"default"``
             keyword, which refers to the default selected model in the Cellarium backend. |br|
             `Default:` ``"default"``
-        :param count_matrix_name:  Where to obtain a feature expression count matrix from. |br|
-            `Allowed Values:` Choice of either ``"X"``  or ``"raw.X"`` in order to use ``adata.X`` or ``adata.raw.X``
-            |br|
-            `Default:` ``"X"``
+        :param count_matrix_input:  Where to obtain a feature expression count matrix from. |br|
+            `Allowed Values: Choices from enum :class:`cellarium.cas.constants.CountMatrixInput` |br|
+            `Default:` ``"CountMatrixInput.X"``
         :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. |br|
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
             column. |br|
@@ -378,7 +377,7 @@ class CASClient:
         return self.validate_and_sanitize_input_data(
             adata=adata,
             cas_model_name=cas_model_name,
-            count_matrix_name=count_matrix_name,
+            count_matrix_name=count_matrix_input,
             feature_ids_column_name=feature_ids_column_name,
             feature_names_column_name=feature_names_column_name,
         )
@@ -388,7 +387,7 @@ class CASClient:
         adata: "anndata.AnnData",
         chunk_size=CHUNK_SIZE_ANNOTATE_DEFAULT,
         cas_model_name: str = "default",
-        count_matrix_name: str = "X",
+        count_matrix_input: constants.CountMatrixInput = constants.CountMatrixInput.X,
         feature_ids_column_name: str = "index",
         feature_names_column_name: t.Optional[str] = None,
         include_dev_metadata: bool = False,
@@ -404,10 +403,9 @@ class CASClient:
             `Allowed Values:` Model name from the :attr:`allowed_models_list` list or ``"default"``
             keyword, which refers to the default selected model in the Cellarium backend. |br|
             `Default:` ``"default"``
-        :param count_matrix_name:  Where to obtain a feature expression count matrix from. |br|
-            `Allowed Values:` Choice of either ``"X"``  or ``"raw.X"`` in order to use ``adata.X`` or ``adata.raw.X``
-            |br|
-            `Default:` ``"X"``
+        :param count_matrix_input:  Where to obtain a feature expression count matrix from. |br|
+            `Allowed Values: Choices from enum :class:`cellarium.cas.constants.CountMatrixInput` |br|
+            `Default:` ``"CountMatrixInput.X"``
         :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. |br|
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
             column. |br|
@@ -427,7 +425,7 @@ class CASClient:
         adata = self.__prepare_input_for_sharded_request(
             adata=adata,
             cas_model_name=cas_model_name,
-            count_matrix_name=count_matrix_name,
+            count_matrix_input=count_matrix_input,
             feature_ids_column_name=feature_ids_column_name,
             feature_names_column_name=feature_names_column_name,
         )
@@ -450,7 +448,7 @@ class CASClient:
         filepath: str,
         chunk_size=CHUNK_SIZE_ANNOTATE_DEFAULT,
         cas_model_name: str = "default",
-        count_matrix_name: str = "X",
+        count_matrix_input: constants.CountMatrixInput = constants.CountMatrixInput.X,
         feature_ids_column_name: str = "index",
         feature_names_column_name: t.Optional[str] = None,
         include_dev_metadata: bool = False,
@@ -464,10 +462,9 @@ class CASClient:
             `Allowed Values:` Model name from the :attr:`allowed_models_list` list or ``"default"``
             keyword, which refers to the default selected model in the Cellarium backend. |br|
             `Default:` ``"default"``
-        :param count_matrix_name:  Where to obtain a feature expression count matrix from. |br|
-            `Allowed Values:` Choice of either ``"X"``  or ``"raw.X"`` in order to use ``adata.X`` or ``adata.raw.X``
-            |br|
-            `Default:` ``"X"``
+        :param count_matrix_input:  Where to obtain a feature expression count matrix from. |br|
+            `Allowed Values: Choices from enum :class:`cellarium.cas.constants.CountMatrixInput` |br|
+            `Default:` ``"CountMatrixInput.X"``
         :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. |br|
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
             column. |br|
@@ -489,7 +486,7 @@ class CASClient:
             adata=adata,
             chunk_size=chunk_size,
             cas_model_name=cas_model_name,
-            count_matrix_name=count_matrix_name,
+            count_matrix_input=count_matrix_input,
             feature_ids_column_name=feature_ids_column_name,
             feature_names_column_name=feature_names_column_name,
             include_dev_metadata=include_dev_metadata,
@@ -500,7 +497,7 @@ class CASClient:
         filepath: str,
         chunk_size: int = CHUNK_SIZE_ANNOTATE_DEFAULT,
         cas_model_name: str = "default",
-        count_matrix_name: str = "X",
+        count_matrix_input: constants.CountMatrixInput = constants.CountMatrixInput.X,
         feature_ids_column_name: str = "index",
         feature_names_column_name: t.Optional[str] = None,
         include_dev_metadata: bool = False,
@@ -514,10 +511,9 @@ class CASClient:
             `Allowed Values:` Model name from the :attr:`allowed_models_list` list or ``"default"``
             keyword, which refers to the default selected model in the Cellarium backend. |br|
             `Default:` ``"default"``
-        :param count_matrix_name:  Where to obtain a feature expression count matrix from. |br|
-            `Allowed Values:` Choice of either ``"X"``  or ``"raw.X"`` in order to use ``adata.X`` or ``adata.raw.X``
-            |br|
-            `Default:` ``"X"``
+        :param count_matrix_input:  Where to obtain a feature expression count matrix from. |br|
+            `Allowed Values: Choices from enum :class:`cellarium.cas.constants.CountMatrixInput` |br|
+            `Default:` ``"CountMatrixInput.X"``
         :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. |br|
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
             column. |br|
@@ -536,7 +532,7 @@ class CASClient:
             adata=adata,
             chunk_size=chunk_size,
             cas_model_name=cas_model_name,
-            count_matrix_name=count_matrix_name,
+            count_matrix_input=count_matrix_input,
             feature_ids_column_name=feature_ids_column_name,
             feature_names_column_name=feature_names_column_name,
             include_dev_metadata=include_dev_metadata,
@@ -547,7 +543,7 @@ class CASClient:
         adata: anndata.AnnData,
         chunk_size=CHUNK_SIZE_SEARCH_DEFAULT,
         cas_model_name: str = "default",
-        count_matrix_name: str = "X",
+        count_matrix_input: constants.CountMatrixInput = constants.CountMatrixInput.X,
         feature_ids_column_name: str = "index",
         feature_names_column_name: t.Optional[str] = None,
     ) -> t.List[t.Dict[str, t.Any]]:
@@ -563,10 +559,9 @@ class CASClient:
             `Allowed Values:` Model name from the :attr:`allowed_models_list` list or ``"default"``
             keyword, which refers to the default selected model in the Cellarium backend. |br|
             `Default:` ``"default"``
-        :param count_matrix_name:  Where to obtain a feature expression count matrix from. |br|
-            `Allowed Values:` Choice of either ``"X"``  or ``"raw.X"`` in order to use ``adata.X`` or ``adata.raw.X``
-            |br|
-            `Default:` ``"X"``
+        :param count_matrix_input:  Where to obtain a feature expression count matrix from. |br|
+            `Allowed Values: Choices from enum :class:`cellarium.cas.constants.CountMatrixInput` |br|
+            `Default:` ``"CountMatrixInput.X"``
         :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. |br|
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
             column. |br|
@@ -588,7 +583,7 @@ class CASClient:
         adata = self.__prepare_input_for_sharded_request(
             adata=adata,
             cas_model_name=cas_model_name,
-            count_matrix_name=count_matrix_name,
+            count_matrix_input=count_matrix_input,
             feature_ids_column_name=feature_ids_column_name,
             feature_names_column_name=feature_names_column_name,
         )
@@ -608,7 +603,7 @@ class CASClient:
         filepath: str,
         chunk_size: int = CHUNK_SIZE_SEARCH_DEFAULT,
         cas_model_name: str = "default",
-        count_matrix_name: str = "X",
+        count_matrix_input: constants.CountMatrixInput = constants.CountMatrixInput.X,
         feature_ids_column_name: str = "index",
         feature_names_column_name: t.Optional[str] = None,
     ) -> t.List[t.Dict[str, t.Any]]:
@@ -621,10 +616,9 @@ class CASClient:
             `Allowed Values:` Model name from the :attr:`allowed_models_list` list or ``"default"``
             keyword, which refers to the default selected model in the Cellarium backend. |br|
             `Default:` ``"default"``
-        :param count_matrix_name:  Where to obtain a feature expression count matrix from. |br|
-            `Allowed Values:` Choice of either ``"X"``  or ``"raw.X"`` in order to use ``adata.X`` or ``adata.raw.X``
-            |br|
-            `Default:` ``"X"``
+        :param count_matrix_input:  Where to obtain a feature expression count matrix from. |br|
+            `Allowed Values: Choices from enum :class:`cellarium.cas.constants.CountMatrixInput` |br|
+            `Default:` ``"CountMatrixInput.X"``
         :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. |br|
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
             column. |br|
@@ -643,7 +637,7 @@ class CASClient:
             adata=adata,
             chunk_size=chunk_size,
             cas_model_name=cas_model_name,
-            count_matrix_name=count_matrix_name,
+            count_matrix_input=count_matrix_input,
             feature_ids_column_name=feature_ids_column_name,
             feature_names_column_name=feature_names_column_name,
         )
@@ -652,8 +646,8 @@ class CASClient:
         self, cell_ids: t.List[int], model_name: str, metadata_feature_names: t.List[str] = None
     ) -> t.List[t.Dict[str, t.Any]]:
         """
-        Query cells by their ids from a single anndata file with Cellarium CAS. Input file should be validated and sanitized
-        according to the model schema.
+        Query cells by their ids from a single anndata file with Cellarium CAS. Input file should be validated and
+        sanitized according to the model schema.
 
         :param cell_ids: List of cell ids to query
         :param model_name: Model name to use for annotation. |br|

@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 
-from cellarium.cas import exceptions
+from cellarium.cas import constants, exceptions
 from cellarium.cas.data_preparation import callbacks
 
 
@@ -53,7 +53,7 @@ def validate(
 def sanitize(
     adata: anndata.AnnData,
     cas_feature_schema_list: t.List[str],
-    count_matrix_name: str,
+    count_matrix_input: constants.CountMatrixInput,
     feature_ids_column_name: str,
     feature_names_column_name: t.Optional[str] = None,
 ) -> anndata.AnnData:
@@ -63,7 +63,7 @@ def sanitize(
 
     :param adata: Instance to sanitize
     :param cas_feature_schema_list: List of Ensembl feature ids to rely on.
-    :param count_matrix_name: Where to obtain a feature expression count matrix from. Choice of: 'X', 'raw.X'
+    :param count_matrix_input: Where to obtain a feature expression count matrix from. Choice of: 'X', 'raw.X'
     :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. Default `index`.
     :param feature_names_column_name: Column name where to obtain feature names. If not provided, no feature names
         should be mapped |br|
@@ -80,10 +80,8 @@ def sanitize(
             "`feature_ids_name_column_name` should have a value of either 'index' "
             "or be present as a column in the `adata.var` object."
         )
-    if count_matrix_name not in {"X", "raw.X"}:
-        raise ValueError("`count_matrix_name` should have a value of either 'X' or 'raw.X'.")
 
-    callbacks.pre_sanitize_callback(adata=adata, count_matrix_name=count_matrix_name)
+    callbacks.pre_sanitize_callback(adata=adata, count_matrix_input=count_matrix_input)
 
     adata_feature_schema_list = _get_adata_var_index_or_by_column(adata=adata, var_column_name=feature_ids_column_name)
     original_obs_ids = adata.obs.index.values
@@ -99,7 +97,7 @@ def sanitize(
 
     n_cells = adata.shape[0]
     n_features = len(cas_feature_schema_list)
-    input_matrix = adata.X if count_matrix_name == "X" else adata.raw.X
+    input_matrix = adata.X if count_matrix_input == constants.CountMatrixInput.X else adata.raw.X
 
     # Translate the columns from one matrix to another, convert to COO format to make this efficient.
     col_trans = np.zeros(n_features, dtype=int)

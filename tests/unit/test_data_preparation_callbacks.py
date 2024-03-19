@@ -2,6 +2,7 @@ import anndata
 import numpy as np
 import pandas as pd
 
+from cellarium.cas import constants
 from cellarium.cas.data_preparation import callbacks
 
 
@@ -27,7 +28,7 @@ def test_calculate_total_mrna_umis_X():
     obs = pd.DataFrame(index=["cell1", "cell2", "cell3"])
     adata = anndata.AnnData(X=X, obs=obs)
 
-    callbacks.calculate_total_mrna_umis(adata, count_matrix_name="X")
+    callbacks.calculate_total_mrna_umis(adata, count_matrix_input=constants.CountMatrixInput.X)
 
     assert (
         callbacks.TOTAL_MRNA_UMIS_COLUMN_NAME in adata.obs.columns
@@ -62,11 +63,11 @@ def test_calculate_total_mrna_umis_raw_X():
 
     obs = pd.DataFrame(index=["cell1", "cell2", "cell3"])
     adata = anndata.AnnData(X=X, obs=obs)
-    # We need to have a anndata file that has normalized values in `X` and raw values in `raw.X`
+    # We need to have an anndata file that has normalized values in `X` and raw values in `raw.X`
     adata.raw = adata
     adata.X = 10_000 * adata.X / (adata.X.sum(axis=1) + 0.000001)  # Using Normalize Total for matrix X
 
-    callbacks.calculate_total_mrna_umis(adata, count_matrix_name="raw.X")
+    callbacks.calculate_total_mrna_umis(adata, count_matrix_input=constants.CountMatrixInput.RAW_X)
 
     assert (
         callbacks.TOTAL_MRNA_UMIS_COLUMN_NAME in adata.obs.columns
