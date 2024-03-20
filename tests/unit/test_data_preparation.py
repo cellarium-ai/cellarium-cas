@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 
-from cellarium.cas import data_preparation, exceptions
+from cellarium.cas import constants, data_preparation, exceptions
 
 np_random_state = np.random.RandomState(0)
 
@@ -259,7 +259,7 @@ class TestdataPreparation(unittest.TestCase):
         adata_new = data_preparation.sanitize(
             adata=adata,
             cas_feature_schema_list=cas_feature_schema_list,
-            count_matrix_name="X",
+            count_matrix_input=constants.CountMatrixInput.X,
             feature_ids_column_name="index",
         )
         intersect_features = list(set(cas_feature_schema_list).intersection(set(adata_feature_schema_list)))
