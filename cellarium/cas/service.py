@@ -265,6 +265,7 @@ class CASAPIService(_BaseService):
         {BACKEND_URL}/api/docs#/cellarium-general/get_feature_schema_by_api_cellarium_general_feature_schema__schema_name__get
 
         :param name: Name of feature schema
+
         :return: List of feature ids
         """
         return self.get_json(endpoint=endpoints.GET_SCHEMA_BY_NAME.format(schema_name=name))
@@ -302,24 +303,52 @@ class CASAPIService(_BaseService):
         }
         return self.post_json(endpoint=endpoints.QUERY_CELLS_BY_IDS, data=request_data)
 
-    async def async_annotate_anndata_chunk(
-        self, adata_bytes: t.ByteString, model_name: str, include_dev_metadata: bool
+    async def async_annotate_cell_type_summary_statistics_strategy(
+        self, adata_bytes: t.ByteString, model_name: str, include_extended_output: bool
     ) -> t.List[t.Dict[str, t.Any]]:
         """
-        Request Cellarium Cloud infrastructure to annotate an input anndata file
+        Request Cellarium Cloud infrastructure to annotate an input anndata file using cell type count statistics
 
         Refer to API Docs: {BACKEND_URL}/api/docs#/cell-analysis/annotate_api_cellarium_cas_annotate_post
 
         :param adata_bytes: Validated anndata file
         :param model_name: Name of the model to use.
-        :param include_dev_metadata: Whether to include dev metadata in the response.
+        :param include_extended_output: Whether to include dev metadata in the response.
+
         :return: A list of dictionaries with annotations.
         """
         request_data = {
             "model_name": model_name,
-            "include_dev_metadata": str(include_dev_metadata),
+            "include_extended_output": str(include_extended_output),
         }
-        return await self.async_post(endpoints.ANNOTATE, file=adata_bytes, data=request_data)
+        return await self.async_post(
+            endpoints.ANNOTATE_CELL_TYPE_SUMMARY_STATS_STRATEGY, file=adata_bytes, data=request_data
+        )
+
+    async def async_annotate_cell_type_ontology_aware_strategy_anndata(
+        self, adata_bytes: t.ByteString, model_name: str, prune_threshold: float, weighting_prefactor: float
+    ) -> t.List[t.Dict[str, t.Any]]:
+        """
+        Request Cellarium Cloud infrastructure to annotate an input anndata file using ontology-aware strategy
+
+        Refer to API Docs:
+        {BACKEND_URL}/api/docs#/cell-operations/annotate_ontology_aware_strategy_api_cellarium_cell_operations_annotate_ontology_aware_strategy_post
+
+        :param adata_bytes: Validated anndata file
+        :param model_name: Name of the model to use.
+        :param prune_threshold: Whether to normalize consensus result.
+        :param weighting_prefactor: Weighting prefactor for the ontology-aware strategy.
+
+        :return: A list of dictionaries with annotations.
+        """
+        request_data = {
+            "model_name": model_name,
+            "prune_threshold": str(prune_threshold),
+            "weighting_prefactor": str(weighting_prefactor),
+        }
+        return await self.async_post(
+            endpoints.ANNOTATE_CELL_TYPE_ONTOLOGY_AWARE_STRATEGY, file=adata_bytes, data=request_data
+        )
 
     async def async_nearest_neighbor_search(
         self, adata_bytes: t.ByteString, model_name: str

@@ -8,11 +8,14 @@ import typing as t
 import warnings
 
 import anndata
+from deprecated import deprecated
 
 from cellarium.cas import _io, constants, data_preparation, exceptions, service, settings
 
 CHUNK_SIZE_ANNOTATE_DEFAULT = 1000
 CHUNK_SIZE_SEARCH_DEFAULT = 500
+DEFAULT_PRUNE_THRESHOLD = 0.1
+DEFAULT_WEIGHTING_PREFACTOR = 1.0
 
 
 class CASClient:
@@ -84,8 +87,8 @@ class CASClient:
 
         :param adata: :class:`anndata.AnnData` instance to annotate
         :param cas_model_name: The model associated with the schema used for sanitizing. |br|
-            `Allowed Values:` Model name from the :attr:`allowed_models_list` list or ``"default"``
-            keyword, which refers to the default selected model in the Cellarium backend. |br|
+            `Allowed Values:` Model name from the :attr:`allowed_models_list` list keyword, which refers to the
+            default selected model in the Cellarium backend. |br|
         :param count_matrix_name:  Where to obtain a feature expression count matrix from. |br|
             `Allowed Values:` Choice of either ``"X"``  or ``"raw.X"`` in order to use ``adata.X`` or ``adata.raw.X``|br|
         :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. |br|
@@ -147,7 +150,7 @@ class CASClient:
             self._print(f"The input data matrix conforms with the '{feature_schema_name}' CAS schema.")
             return adata
 
-    def __get_async_sharded_request_callback_task(
+    def __get_async_sharded_request_callback(
         self,
         results: t.List,
         chunk_index: int,
@@ -230,7 +233,7 @@ class CASClient:
                 )
 
                 chunk_bytes = _io.adata_to_bytes(adata=chunk)
-                async_sharded_request_task = self.__get_async_sharded_request_callback_task(
+                async_sharded_request_callback = self.__get_async_sharded_request_callback(
                     results=results,
                     chunk_index=chunk_index,
                     chunk_start_i=chunk_start_i,
@@ -238,7 +241,10 @@ class CASClient:
                     semaphore=semaphore,
                     service_request_callback=request_callback,
                 )
-                tasks.append(async_sharded_request_task(adata_bytes=chunk_bytes, **request_callback_kwargs))
+                async_sharded_request_task = asyncio.create_task(
+                    async_sharded_request_callback(adata_bytes=chunk_bytes, **request_callback_kwargs)
+                )
+                tasks.append(async_sharded_request_task)
                 i = j
                 j += chunk_size
 
@@ -334,19 +340,15 @@ class CASClient:
     def __prepare_input_for_sharded_request(
         self,
         adata: anndata.AnnData,
-        cas_model_name: str = "default",
         count_matrix_input: constants.CountMatrixInput = constants.CountMatrixInput.X,
         feature_ids_column_name: str = "index",
+        cas_model_name: t.Optional[str] = None,
         feature_names_column_name: t.Optional[str] = None,
     ) -> anndata.AnnData:
         """
         Prepare input data for sharded request. Validates model name and input data, and sanitizes the input data
 
         :param adata: :class:`anndata.AnnData` instance to annotate
-        :param cas_model_name: Model name to use for annotation. |br|
-            `Allowed Values:` Model name from the :attr:`allowed_models_list` list or ``"default"``
-            keyword, which refers to the default selected model in the Cellarium backend. |br|
-            `Default:` ``"default"``
         :param count_matrix_input:  Where to obtain a feature expression count matrix from. |br|
             `Allowed Values: Choices from enum :class:`cellarium.cas.constants.CountMatrixInput` |br|
             `Default:` ``"CountMatrixInput.X"``
@@ -354,6 +356,10 @@ class CASClient:
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
             column. |br|
             `Default:` ``"index"``
+        :param cas_model_name: Model name to use for annotation. |br|
+            `Allowed Values:` Model name from the :attr:`allowed_models_list` list or ``None``, which refers to the
+            default selected model in the Cellarium backend. |br|
+            `Default:` ``None``
         :param feature_names_column_name: Column name where to obtain feature names (symbols).
             feature names wouldn't be mapped if value is ``None`` |br|
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
@@ -362,12 +368,12 @@ class CASClient:
 
         :return: A list of dictionaries with annotations for each of the cells from input adata
         """
-        if cas_model_name not in self.allowed_models_list and cas_model_name != "default":
+        if cas_model_name not in self.allowed_models_list and cas_model_name is not None:
             raise ValueError(
                 f"Model name '{cas_model_name}' is not in the list of allowed models. "
-                f"Please use one of the following: {self.allowed_models_list} or 'default'"
+                f"Please use one of the following: {self.allowed_models_list} or `None` for the default model."
             )
-        cas_model_name = self.default_model_name if cas_model_name == "default" else cas_model_name
+        cas_model_name = self.default_model_name if cas_model_name is None else cas_model_name
         cas_model = self._model_name_obj_map[cas_model_name]
         cas_model_name = cas_model["model_name"]
 
@@ -382,6 +388,7 @@ class CASClient:
             feature_names_column_name=feature_names_column_name,
         )
 
+    @deprecated(version="1.4.3", reason="Use :meth:`annotate_matrix_cell_type_summary_statistics_strategy` instead")
     def annotate_anndata(
         self,
         adata: "anndata.AnnData",
@@ -417,6 +424,7 @@ class CASClient:
             `Default:` ``None``
         :param include_dev_metadata: Boolean indicating whether to include a breakdown of the number of cells
             by dataset
+
         :return: A list of dictionaries with annotations for each of the cells from input adata
         """
         cas_model_name = self.default_model_name if cas_model_name == "default" else cas_model_name
@@ -432,17 +440,17 @@ class CASClient:
         results = self.__async_sharded_request(
             adata=adata,
             chunk_size=chunk_size,
-            request_callback=self.cas_api_service.async_annotate_anndata_chunk,
+            request_callback=self.cas_api_service.async_annotate_cell_type_summary_statistics_strategy,
             request_callback_kwargs={
                 "model_name": cas_model_name,
-                "include_dev_metadata": include_dev_metadata,
+                "include_extended_output": include_dev_metadata,
             },
         )
         result = self.__postprocess_annotations(results, adata)
         self._print(f"Total wall clock time: {f'{time.time() - start:10.4f}'} seconds")
-        self._print("Finished!")
         return result
 
+    @deprecated(version="1.4.3", reason="Use :meth:`annotate_matrix_cell_type_statistics_strategy` instead")
     def annotate_anndata_file(
         self,
         filepath: str,
@@ -476,6 +484,7 @@ class CASClient:
             `Default:` ``None``
         :param include_dev_metadata: Boolean indicating whether to include a breakdown of the number of cells
             per dataset
+
         :return: A list of dictionaries with annotations for each of the cells from input adata
         """
         with warnings.catch_warnings():
@@ -492,6 +501,7 @@ class CASClient:
             include_dev_metadata=include_dev_metadata,
         )
 
+    @deprecated(version="1.4.3", reason="Use :meth:`annotate_matrix_with_cell_type_statistics_strategy` instead")
     def annotate_10x_h5_file(
         self,
         filepath: str,
@@ -538,6 +548,142 @@ class CASClient:
             include_dev_metadata=include_dev_metadata,
         )
 
+    def annotate_matrix_cell_type_summary_statistics_strategy(
+        self,
+        matrix: t.Union[str, anndata.AnnData],
+        chunk_size=CHUNK_SIZE_ANNOTATE_DEFAULT,
+        count_matrix_input: constants.CountMatrixInput = constants.CountMatrixInput.X,
+        feature_ids_column_name: str = "index",
+        include_extended_statistics: bool = True,
+        cas_model_name: t.Optional[str] = None,
+        feature_names_column_name: t.Optional[str] = None,
+    ) -> t.List[t.Dict[str, t.Any]]:
+        """
+        Send an instance of :class:`anndata.AnnData` to the Cellarium Cloud backend for annotations. The function
+        splits the ``adata`` into smaller chunks and asynchronously sends them to the backend API service. Each chunk is
+        of equal size, except for the last one, which may be smaller. The backend processes these chunks in parallel.
+
+        :param matrix: Either path to a file (must be either `.h5` or `.h5ad`) or an :class:`anndata.AnnData` instance
+            to annotate
+        :param chunk_size: Size of chunks to split on
+        :param count_matrix_input:  Where to obtain a feature expression count matrix from. |br|
+            `Allowed Values: Choices from enum :class:`cellarium.cas.constants.CountMatrixInput` |br|
+            `Default:` ``"CountMatrixInput.X"``
+        :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. |br|
+            `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
+            column. |br|
+            `Default:` ``"index"``
+        :param include_extended_statistics: Boolean indicating whether to include a breakdown of the number of cells
+            by dataset
+        :param cas_model_name: Model name to use for annotation. |br|
+            `Allowed Values:` Model name from the :attr:`allowed_models_list` list or ``None``, which refers to the
+            default selected model in the Cellarium backend. |br|
+            `Default:` ``None``
+        :param feature_names_column_name: Column name where to obtain feature names (symbols).
+            feature names wouldn't be mapped if value is ``None`` |br|
+            `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
+            column. |br|
+            `Default:` ``None``
+
+        :return: A list of dictionaries with annotations for each of the cells from input adata
+        """
+        if isinstance(matrix, str):
+            matrix = _io.read_h5_or_h5ad(filename=matrix)
+
+        cas_model_name = self.default_model_name if cas_model_name is None else cas_model_name
+
+        start = time.time()
+        matrix = self.__prepare_input_for_sharded_request(
+            adata=matrix,
+            cas_model_name=cas_model_name,
+            count_matrix_input=count_matrix_input,
+            feature_ids_column_name=feature_ids_column_name,
+            feature_names_column_name=feature_names_column_name,
+        )
+        results = self.__async_sharded_request(
+            adata=matrix,
+            chunk_size=chunk_size,
+            request_callback=self.cas_api_service.async_annotate_cell_type_summary_statistics_strategy,
+            request_callback_kwargs={
+                "model_name": cas_model_name,
+                "include_extended_output": include_extended_statistics,
+            },
+        )
+        result = self.__postprocess_annotations(results, matrix)
+        self._print(f"Total wall clock time: {f'{time.time() - start:10.4f}'} seconds")
+        return result
+
+    def annotate_matrix_cell_type_ontology_aware_strategy(
+        self,
+        matrix: t.Union[str, anndata.AnnData],
+        chunk_size=CHUNK_SIZE_ANNOTATE_DEFAULT,
+        count_matrix_input: constants.CountMatrixInput = constants.CountMatrixInput.X,
+        feature_ids_column_name: str = "index",
+        cas_model_name: t.Optional[str] = None,
+        feature_names_column_name: t.Optional[str] = None,
+        prune_threshold: float = DEFAULT_PRUNE_THRESHOLD,
+        weighting_prefactor: float = DEFAULT_WEIGHTING_PREFACTOR,
+    ) -> t.List[t.Dict[str, t.Any]]:
+        """
+        Send an instance of :class:`anndata.AnnData` to the Cellarium Cloud backend for annotations using ontology
+        aware strategy . The function splits the ``adata`` into smaller chunks and asynchronously sends them to the
+        backend API service. Each chunk is of equal size, except for the last one, which may be smaller. The backend
+        processes these chunks in parallel.
+
+        :param matrix: Either path to a file (must be either `.h5` or `.h5ad`) or an :class:`anndata.AnnData` instance
+            to annotate
+        :param chunk_size: Size of chunks to split on
+        :param count_matrix_input:  Where to obtain a feature expression count matrix from. |br|
+            `Allowed Values: Choices from enum :class:`cellarium.cas.constants.CountMatrixInput` |br|
+            `Default:` ``"CountMatrixInput.X"``
+        :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. |br|
+            `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
+            column. |br|
+            `Default:` ``"index"``
+        :param cas_model_name: Model name to use for annotation. |br|
+            `Allowed Values:` Model name from the :attr:`allowed_models_list` list or ``None``, which refers to the
+            default selected model in the Cellarium backend. |br|
+            `Default:` ``None``
+        :param feature_names_column_name: Column name where to obtain feature names (symbols).
+            feature names wouldn't be mapped if value is ``None`` |br|
+            `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
+            column. |br|
+            `Default:` ``None``
+        :param prune_threshold: Threshold score for pruning the ontology graph in the output
+        :param weighting_prefactor: Weighting prefactor for the weight calculation. A larger absolute value of the
+            weighting_prefactor results in a steeper decay (weights drop off more quickly as distance increases),
+            whereas a smaller absolute value results in a slower decay
+
+        :return: A list of dictionaries with annotations for each of the cells from input adata
+        """
+        if isinstance(matrix, str):
+            matrix = _io.read_h5_or_h5ad(filename=matrix)
+
+        cas_model_name = self.default_model_name if cas_model_name is None else cas_model_name
+
+        start = time.time()
+        matrix = self.__prepare_input_for_sharded_request(
+            adata=matrix,
+            cas_model_name=cas_model_name,
+            count_matrix_input=count_matrix_input,
+            feature_ids_column_name=feature_ids_column_name,
+            feature_names_column_name=feature_names_column_name,
+        )
+        results = self.__async_sharded_request(
+            adata=matrix,
+            chunk_size=chunk_size,
+            request_callback=self.cas_api_service.async_annotate_cell_type_ontology_aware_strategy_anndata,
+            request_callback_kwargs={
+                "model_name": cas_model_name,
+                "prune_threshold": prune_threshold,
+                "weighting_prefactor": weighting_prefactor,
+            },
+        )
+        result = self.__postprocess_annotations(results, matrix)
+        self._print(f"Total wall clock time: {f'{time.time() - start:10.4f}'} seconds")
+        return result
+
+    @deprecated(version="1.4.3", reason="Use :meth:`search_matrix` instead")
     def search_anndata(
         self,
         adata: anndata.AnnData,
@@ -574,7 +720,7 @@ class CASClient:
 
         :return: A list of dictionaries with annotations for each of the cells from input adata
         """
-        if chunk_size > 500:
+        if chunk_size > settings.MAX_CHUNK_SIZE_SEARCH_METHOD:
             raise ValueError("Chunk size greater than 500 not supported yet.")
 
         cas_model_name = self.default_model_name if cas_model_name == "default" else cas_model_name
@@ -595,9 +741,9 @@ class CASClient:
         )
         result = self.__postprocess_nearest_neighbor_search_response(results, adata)
         self._print(f"Total wall clock time: {f'{time.time() - start:10.4f}'} seconds")
-        self._print("Finished!")
         return result
 
+    @deprecated(version="1.4.3", reason="Use :meth:`search_matrix` instead")
     def search_10x_h5_file(
         self,
         filepath: str,
@@ -642,8 +788,71 @@ class CASClient:
             feature_names_column_name=feature_names_column_name,
         )
 
+    def search_matrix(
+        self,
+        matrix: t.Union[str, anndata.AnnData],
+        chunk_size: int = CHUNK_SIZE_SEARCH_DEFAULT,
+        count_matrix_input: constants.CountMatrixInput = constants.CountMatrixInput.X,
+        feature_ids_column_name: str = "index",
+        cas_model_name: t.Optional[str] = None,
+        feature_names_column_name: t.Optional[str] = None,
+    ) -> t.List[t.Dict[str, t.Any]]:
+        """
+        Send an instance of :class:`anndata.AnnData` to the Cellarium Cloud backend for nearest neighbor search. The
+        function splits the ``adata`` into smaller chunks and asynchronously sends them to the backend API service.
+        Each chunk is of equal size, except for the last one, which may be smaller. The backend processes
+        these chunks in parallel.
+
+        :param matrix: Either path to a file (must be either `.h5` or `.h5ad`) or an :class:`anndata.AnnData` instance
+            to annotate
+        :param chunk_size: Size of chunks to split on
+        :param count_matrix_input:  Where to obtain a feature expression count matrix from. |br|
+            `Allowed Values: Choices from enum :class:`cellarium.cas.constants.CountMatrixInput` |br|
+            `Default:` ``"CountMatrixInput.X"``
+        :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. |br|
+            `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
+            column. |br|
+            `Default:` ``"index"``
+        :param cas_model_name: Model name to use for annotation. |br|
+            `Allowed Values:` Model name from the :attr:`allowed_models_list` list or ``None``, which refers to the
+            default selected model in the Cellarium backend. |br|
+            `Default:` ``None``
+        :param feature_names_column_name: Column name where to obtain feature names (symbols).
+            feature names wouldn't be mapped if value is ``None`` |br|
+            `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
+            column. |br|
+            `Default:` ``None``
+
+        :return: A list of dictionaries with annotations for each of the cells from input adata
+        """
+        if isinstance(matrix, str):
+            matrix = _io.read_h5_or_h5ad(filename=matrix)
+
+        if chunk_size > settings.MAX_CHUNK_SIZE_SEARCH_METHOD:
+            raise ValueError(f"Chunk size greater than `{settings.MAX_CHUNK_SIZE_SEARCH_METHOD}` not supported yet.")
+
+        cas_model_name = self.default_model_name if cas_model_name is None else cas_model_name
+
+        start = time.time()
+        matrix = self.__prepare_input_for_sharded_request(
+            adata=matrix,
+            cas_model_name=cas_model_name,
+            count_matrix_input=count_matrix_input,
+            feature_ids_column_name=feature_ids_column_name,
+            feature_names_column_name=feature_names_column_name,
+        )
+        results = self.__async_sharded_request(
+            adata=matrix,
+            chunk_size=chunk_size,
+            request_callback=self.cas_api_service.async_nearest_neighbor_search,
+            request_callback_kwargs={"model_name": cas_model_name},
+        )
+        result = self.__postprocess_nearest_neighbor_search_response(results, matrix)
+        self._print(f"Total wall clock time: {f'{time.time() - start:10.4f}'} seconds")
+        return result
+
     def query_cells_by_ids(
-        self, cell_ids: t.List[int], model_name: str, metadata_feature_names: t.List[str] = None
+        self, cell_ids: t.List[int], model_name: t.Optional[str], metadata_feature_names: t.List[str] = None
     ) -> t.List[t.Dict[str, t.Any]]:
         """
         Query cells by their ids from a single anndata file with Cellarium CAS. Input file should be validated and
@@ -651,13 +860,14 @@ class CASClient:
 
         :param cell_ids: List of cell ids to query
         :param model_name: Model name to use for annotation. |br|
-            `Allowed Values:` Model name from the :attr:`allowed_models_list` list or ``"default"``
+            `Allowed Values:` Model name from the :attr:`allowed_models_list` list or ``None``
             keyword, which refers to the default selected model in the Cellarium backend. |br|
-            `Default:` ``"default"``
+            `Default:` ``None``
         :param metadata_feature_names: List of metadata feature names to include in the response. |br|
 
         :return: List of cells with metadata
         """
+        model_name = self.default_model_name if model_name is None else model_name
         results = self.cas_api_service.query_cells_by_ids(
             cell_ids=cell_ids,
             model_name=model_name,
@@ -665,15 +875,15 @@ class CASClient:
         )
         return self.__postprocess_query_cells_by_ids_response(query_response=results)
 
-    def validate_model_name(self, model_name: str) -> None:
+    def validate_model_name(self, model_name: t.Optional[str] = None) -> None:
         """
         Validate if the model name provided is valid
 
         :param model_name: Model name to check
         :raises: ValueError if model name is not valid
         """
-        if model_name not in self.allowed_models_list and model_name != "default":
+        if model_name not in self.allowed_models_list and model_name is not None:
             raise ValueError(
                 f"Model name '{model_name}' is not in the list of allowed models. "
-                f"Please use one of the following: {self.allowed_models_list} or 'default'"
+                f"Please use one of the following: {self.allowed_models_list} or `None` for the default model."
             )
