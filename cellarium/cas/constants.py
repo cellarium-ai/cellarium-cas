@@ -1,3 +1,6 @@
+from enum import Enum
+
+
 class HTTP:
     """
     HTTP status codes constants
@@ -21,3 +24,8 @@ class HTTP:
     STATUS_503_SERVICE_UNAVAILABLE = 503
     STATUS_504_GATEWAY_TIMEOUT = 504
     STATUS_511_NETWORK_AUTHENTICATION_REQUIRED = 511
+
+
+class CountMatrixInput(Enum):
+    X: str = "X"
+    RAW_X: str = "raw.X"

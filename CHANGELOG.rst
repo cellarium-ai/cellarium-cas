@@ -6,6 +6,34 @@ All notable changes to Cellarium CAS client will be documented in this file.
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_,
 and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0.html>`_.
 
+1.4.4 - 2024-05-02
+------------------
+
+Added
+~~~~~
+- Add :meth:`annotate_matrix_cell_type_summary_statistics_strategy` method to :class:`CASClient`
+- Add :meth:`annotate_matrix_cell_type_ontology_aware_strategy` method to :class:`CASClient`
+
+Changed
+~~~~~~~
+- Deprecate :meth:`annotate_anndata`, :meth:`annotate_anndata_file`, :meth:`annotate_10x_h5_file`, :meth:`search_anndata`, and :meth:`search_10x_h5_file`,  methods in :class:`CASClient`
+
+File Structure Changes
+~~~~~~~~~~~~~~~~~~~~~~
+- No changes in file structure
+
+1.4.3 - 2024-03-18
+------------------
+
+Added
+~~~~~
+- Fix total mrna umis for normalized data
+
+Changed
+~~~~~~~
+- Handle different matrix types in the data preparation callbacks
+- Update unit tests for the data preparation callbacks
+
 1.4.2 - 2024-03-12
 ------------------
 
@@ -36,7 +64,7 @@ Changed
 - Make :meth:`__validate_and_sanitize_input_data` method public (now it's a :meth:`validate_and_sanitize_input_data`) in CASClient
 - Update backend API url to point to the new API endpoints depending on the environment
 - Update `pyproject.toml` file to include scanpy optional dependencies
-- Restructure data_preparation into a module.
+- Restructure data_preparation into a module
 
 Removed
 ~~~~~~~

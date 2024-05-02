@@ -145,6 +145,29 @@ def read_10x_h5(
     return adata
 
 
+def read_h5_or_h5ad(filename: str) -> anndata.AnnData:
+    """
+    Read an `h5` or `h5ad` file and return an AnnData object.
+
+    :param filename: Path to the h5 or h5ad file.
+    :return: An AnnData object.
+
+    Usage example:
+
+    .. code-block:: python
+
+        import anndata
+
+        adata = read_h5_or_h5ad("path/to/file.h5ad")
+    """
+    if filename.endswith(".h5"):
+        return read_10x_h5(filename)
+    elif filename.endswith(".h5ad"):
+        return anndata.read_h5ad(filename)
+    else:
+        raise ValueError("File should be either a `h5` or `h5ad` file.")
+
+
 def adata_to_bytes(adata: "anndata.AnnData", compression: str = "gzip") -> bytes:
     """
     Convert an :class:`anndata.AnnData` object to a byte object.

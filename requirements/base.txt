@@ -5,3 +5,4 @@ pandas>=1.3,<2.1
 numpy>=1.21,<1.26
 nest_asyncio~=1.5
 certifi==2023.7.22
+Deprecated~=1.2
