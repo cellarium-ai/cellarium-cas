@@ -3,6 +3,7 @@ import datetime
 import functools
 import math
 import operator
+import sys
 import time
 import typing as t
 import warnings
@@ -155,6 +156,16 @@ class CASClient:
             self._print(f"The input data matrix conforms with the '{feature_schema_name}' CAS schema.")
             return adata
 
+    def print_user_quota(self) -> None:
+        """
+        Print the user's quota information
+        """
+        user_quota = self.cas_api_service.get_user_quota()
+        self._print(
+            f"User quota: {user_quota['quota']}, Remaining quota: {user_quota['remaining_quota']}, "
+            f"Reset date: {user_quota['quota_reset_date']}"
+        )
+
     def __get_async_sharded_request_callback(
         self,
         results: t.List,
@@ -201,6 +212,9 @@ class CASClient:
                         continue
                     except exceptions.HTTPError401:
                         self._print("Unauthorized token. Please check your API token or request a new one.")
+                        break
+                    except exceptions.HTTPError403 as e:
+                        self._print(str(e))
                         break
                     except Exception as e:
                         self._print(f"Unexpected error: {e.__class__.__name__}; Message: {str(e)}")
@@ -342,6 +356,19 @@ class CASClient:
 
         return processed_response
 
+    def __validate_cells_under_quota(self, cell_count: int) -> None:
+        """
+        Validate the number of cells in the input data does not exceed remaining user quota
+
+        :param cell_count: Number of cells in the input data
+        """
+        user_quota = self.cas_api_service.get_user_quota()
+        if cell_count > user_quota["remaining_quota"]:
+            raise exceptions.QuotaExceededError(
+                f"Number of cells in the input data ({cell_count}) exceeds the user's remaining quota ({user_quota['remaining_quota']}).  "
+                f"The user's quota will be reset to {user_quota['quota']} on {user_quota['quota_reset_date']}."
+            )
+
     def __prepare_input_for_sharded_request(
         self,
         adata: anndata.AnnData,
@@ -384,6 +411,12 @@ class CASClient:
 
         self._print(f"Cellarium CAS (Model ID: {cas_model_name})")
         self._print(f"Total number of input cells: {len(adata)}")
+
+        try:
+            self.__validate_cells_under_quota(cell_count=len(adata))
+        except exceptions.QuotaExceededError as e:
+            self._print(str(e))
+            sys.exit(1)
 
         return self.validate_and_sanitize_input_data(
             adata=adata,

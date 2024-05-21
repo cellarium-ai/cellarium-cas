@@ -282,6 +282,17 @@ class CASAPIService(_BaseService):
         """
         return self.get_json(endpoint=endpoints.LIST_MODELS)
 
+    def get_user_quota(self) -> t.Dict[str, t.Any]:
+        """
+        Retrieve user quota information
+
+        Refer to API Docs:
+        {BACKEND_URL}/api/docs
+
+        :return: User quota information
+        """
+        return self.get_json(endpoint=endpoints.GET_USER_QUOTA)
+
     def query_cells_by_ids(
         self, model_name: str, cell_ids: t.List[int], metadata_feature_names: t.List[str]
     ) -> t.List[t.Dict[str, t.Any]]:
