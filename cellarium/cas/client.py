@@ -412,11 +412,7 @@ class CASClient:
         self._print(f"Cellarium CAS (Model ID: {cas_model_name})")
         self._print(f"Total number of input cells: {len(adata)}")
 
-        try:
-            self.__validate_cells_under_quota(cell_count=len(adata))
-        except exceptions.QuotaExceededError as e:
-            self._print(str(e))
-            sys.exit(1)
+        self.__validate_cells_under_quota(cell_count=len(adata))
 
         return self.validate_and_sanitize_input_data(
             adata=adata,
