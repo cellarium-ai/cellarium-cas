@@ -134,3 +134,6 @@ cellarium/data/
 .DS_Store
 .pre-commit-config.yaml
 .idea
+
+# IDE
+.vscode/
