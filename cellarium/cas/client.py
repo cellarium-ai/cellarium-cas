@@ -40,8 +40,13 @@ class CASClient:
 
         self._print(s)
 
-    def __init__(self, api_token: str, num_attempts_per_chunk: int = settings.NUM_ATTEMPTS_PER_CHUNK_DEFAULT) -> None:
-        self.cas_api_service = service.CASAPIService(api_token=api_token)
+    def __init__(
+        self,
+        api_token: str,
+        api_url: str = settings.CELLARIUM_CLOUD_BACKEND_URL,
+        num_attempts_per_chunk: int = settings.NUM_ATTEMPTS_PER_CHUNK_DEFAULT,
+    ) -> None:
+        self.cas_api_service = service.CASAPIService(api_token=api_token, api_url=api_url)
 
         self._print("Connecting to the Cellarium Cloud backend...")
         self.cas_api_service.validate_token()
