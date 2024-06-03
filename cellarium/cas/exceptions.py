@@ -17,6 +17,10 @@ class HTTPError5XX(HTTPError):
     pass
 
 
+class HTTPError404(HTTPError):
+    pass
+
+
 class HTTPError403(HTTPError):
     pass
 

@@ -12,7 +12,10 @@ To use Cellarium CAS, create a client instance with your API token:
 from cellarium.cas import CASClient
 
 api_token = "a_very_long_string_with_some_symbols"
-cas = CASClient(api_token=api_token)
+cas = CASClient(
+  api_token=api_token,
+  api_url=<optional url to connect to a non-standard CAS server>
+)
 ```
 
 ## Annotation

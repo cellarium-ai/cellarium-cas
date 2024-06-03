@@ -7,6 +7,7 @@ and annotates a test dataset using the default model.
 
 import anndata
 import numpy as np
+import pytest
 
 from cellarium.cas import CASClient
 from tests.unit import constants
@@ -14,13 +15,15 @@ from tests.unit import constants
 np_random_state = np.random.RandomState(0)
 
 
-def test_cell_annotation(test_api_token: str):
+@pytest.mark.skip(reason="Need to fix integration test environment.")
+def test_cell_annotation(test_api_token: str, test_api_url: str):
     """
     Test the cell annotation functionality of the CASClient by reading a sample dataset and using the
     annotate_anndata method. It verifies that the number of annotations matches the original cell count.
 
     Parameters:
     - test_api_token (str): The API token used to authenticate with the CASClient.
+    - test_api_url (str): The API url of the CAS backend that the CASClient connects to.
 
     Raises:
     - AssertionError: If the number of annotations doesn't match the original cell count in the dataset.
@@ -28,7 +31,7 @@ def test_cell_annotation(test_api_token: str):
     Notes:
     - Ensure that TEST_ADATA_PATH is correctly defined and points to a valid dataset file.
     """
-    cas = CASClient(api_token=test_api_token)
+    cas = CASClient(api_token=test_api_token, api_url=test_api_url)
     adata = anndata.read_h5ad(constants.TEST_ADATA_PATH)
     result = cas.annotate_anndata(adata=adata, chunk_size=50)
     assert len(result) == len(adata), "Result length does not correspond to original number of cells"

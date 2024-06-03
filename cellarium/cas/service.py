@@ -17,27 +17,27 @@ if settings.is_interactive_environment():
 
 
 class _BaseService:
-    BACKEND_URL: str
 
-    def __init__(self, api_token: str, *args, **kwargs):
+    def __init__(self, api_token: str, api_url: str = settings.CELLARIUM_CLOUD_BACKEND_URL, *args, **kwargs):
         """
         Base class for communicating with a Cellarium Cloud API service
         It leverages async request library `aiohttp` to asynchronously execute HTTP requests.
 
         :param api_token: A token that could be authenticated by Cellarium Cloud Backend API service
+        :param api_url: URL of the Cellarium Cloud Backend API service
         """
         self.api_token = api_token
+        self.api_url = api_url
         super().__init__(*args, **kwargs)
 
-    @classmethod
-    def _get_endpoint_url(cls, endpoint: str) -> str:
+    def _get_endpoint_url(self, endpoint: str) -> str:
         """
         Configure a specific method endpoint from backend url and endpoint
 
         :param endpoint: Endpoint string without a leading slash
-        :return: Full url with backend domains/subdomains and endpoint joint
+        :return: Full url with backend domains/subdomains and endpoint joined
         """
-        return f"{cls.BACKEND_URL}/{endpoint}"
+        return f"{self.api_url}/{endpoint}"
 
     @staticmethod
     def raise_response_exception(status_code: int, detail: str) -> None:
@@ -53,6 +53,9 @@ class _BaseService:
             raise exceptions.HTTPError401(message)
         elif status_code == constants.HTTP.STATUS_403_FORBIDDEN:
             raise exceptions.HTTPError403(message)
+        elif status_code == constants.HTTP.STATUS_NOT_FOUND:
+            raise exceptions.HTTPError404(message)
+
         elif (
             constants.HTTP.STATUS_500_INTERNAL_SERVER_ERROR
             <= status_code
@@ -221,15 +224,13 @@ class CASAPIService(_BaseService):
     Class with all the API methods of Cellarium Cloud CAS infrastructure.
     """
 
-    BACKEND_URL = settings.CELLARIUM_CLOUD_BACKEND_URL
-
     def validate_token(self) -> None:
         """
         Validate user given API token.
         Would raise 401 Unauthorized if token is invalid.
 
         Refer to API Docs:
-        {BACKEND_URL}/api/docs#/cellarium-general/validate_token_api_cellarium_general_validate_token_get
+        {api_url}/api/docs#/cellarium-general/validate_token_api_cellarium_general_validate_token_get
 
         :return: Void
         """
@@ -240,7 +241,7 @@ class CASAPIService(_BaseService):
         Retrieve General Application Info. This Includes default schema, version, model information, etc.
 
         Refer to API Docs:
-        {BACKEND_URL}/api/docs#/cellarium-general/application_info_api_cellarium_general_application_info_get
+        {api_url}/api/docs#/cellarium-general/application_info_api_cellarium_general_application_info_get
 
         :return: Dictionary with application info
         """
@@ -251,7 +252,7 @@ class CASAPIService(_BaseService):
         Retrieve a list of feature schemas that exist in Cellarium Cloud CAS
 
         Refer to API Docs:
-        {BACKEND_URL}/api/docs#/cellarium-general/get_feature_schemas_api_cellarium_general_feature_schemas_get
+        {api_url}/api/docs#/cellarium-general/get_feature_schemas_api_cellarium_general_feature_schemas_get
 
         :return: List of feature schema names
         """
@@ -262,7 +263,7 @@ class CASAPIService(_BaseService):
         Retrieve feature schema by name
 
         Refer to API Docs:
-        {BACKEND_URL}/api/docs#/cellarium-general/get_feature_schema_by_api_cellarium_general_feature_schema__schema_name__get
+        {api_url}/api/docs#/cellarium-general/get_feature_schema_by_api_cellarium_general_feature_schema__schema_name__get
 
         :param name: Name of feature schema
 
@@ -275,7 +276,7 @@ class CASAPIService(_BaseService):
         Retrieve list of all models that are in CAS
 
         Refer to API Docs:
-        {BACKEND_URL}/api/docs#/cellarium-general/get_model_list_api_cellarium_general_list_models_get
+        {api_url}/api/docs#/cellarium-general/get_model_list_api_cellarium_general_list_models_get
 
         :return: List of models
         """
@@ -288,7 +289,7 @@ class CASAPIService(_BaseService):
         Retrieve cells by their ids from Cellarium Cloud database.
 
         Refer to API Docs:
-        {BACKEND_URL}/api/docs#/cell-analysis/get_cells_by_ids_api_cellarium_cas_query_cells_by_ids_post
+        {api_url}/api/docs#/cell-analysis/get_cells_by_ids_api_cellarium_cas_query_cells_by_ids_post
 
         :param model_name: Name of the model to use. Model name is required to locate the correct database.
         :param cell_ids: List of cell ids from Cellarium Cloud database to query by.
@@ -309,7 +310,7 @@ class CASAPIService(_BaseService):
         """
         Request Cellarium Cloud infrastructure to annotate an input anndata file using cell type count statistics
 
-        Refer to API Docs: {BACKEND_URL}/api/docs#/cell-analysis/annotate_api_cellarium_cas_annotate_post
+        Refer to API Docs: {api_url}/api/docs#/cell-analysis/annotate_api_cellarium_cas_annotate_post
 
         :param adata_bytes: Validated anndata file
         :param model_name: Name of the model to use.
@@ -332,7 +333,7 @@ class CASAPIService(_BaseService):
         Request Cellarium Cloud infrastructure to annotate an input anndata file using ontology-aware strategy
 
         Refer to API Docs:
-        {BACKEND_URL}/api/docs#/cell-operations/annotate_ontology_aware_strategy_api_cellarium_cell_operations_annotate_ontology_aware_strategy_post
+        {api_url}/api/docs#/cell-operations/annotate_ontology_aware_strategy_api_cellarium_cell_operations_annotate_ontology_aware_strategy_post
 
         :param adata_bytes: Validated anndata file
         :param model_name: Name of the model to use.
@@ -357,7 +358,7 @@ class CASAPIService(_BaseService):
         Request Cellarium Cloud infrastructure to search for nearest neighbors in an input anndata file
 
         Refer tp API Docs:
-        {BACKEND_URL}/api/docs#/cell-analysis/nearest_neighbor_search_api_cellarium_cas_nearest_neighbor_search_post
+        {api_url}/api/docs#/cell-analysis/nearest_neighbor_search_api_cellarium_cas_nearest_neighbor_search_post
 
         :param adata_bytes: Validated anndata file
         :param model_name: Name of the model to use.
