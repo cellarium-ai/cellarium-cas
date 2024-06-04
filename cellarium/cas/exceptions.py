@@ -37,3 +37,7 @@ class HTTPClientError(HTTPError):
 class DataValidationError(CASBaseError):
     missing_features: int
     extra_features: int
+
+
+class QuotaExceededError(CASBaseError):
+    pass
