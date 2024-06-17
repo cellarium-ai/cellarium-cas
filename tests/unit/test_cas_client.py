@@ -24,7 +24,7 @@ NP_RANDOM_STATE = np.random.RandomState(0)
 
 class TestCasClient:
     def setup_method(self) -> None:
-        # This is tracks all async post mocks that are created where the key is the url and the value is the
+        # This tracks all async post mocks that are created where the key is the url and the value is the
         # session mock object. Used for verifying that the calls were made.
         self.async_post_mocks: t.Dict[str, aiohttp.ClientSession] = {}
         # Create a new event loop for each test since this is an async-heavy test and this avoid unexpected behavior
@@ -78,7 +78,7 @@ class TestCasClient:
         cas_client = CASClient(api_token=TEST_TOKEN, api_url=TEST_URL)
 
         response = cas_client.annotate_matrix_cell_type_summary_statistics_strategy(
-            matrix=self._mock_matrix(num_cells=num_cells), chunk_size=100
+            matrix=self._mock_anndata_matrix(num_cells=num_cells), chunk_size=100
         )
 
         assert len(response) == num_cells
@@ -107,7 +107,7 @@ class TestCasClient:
 
         # This should cause 10 chunks to be sent
         response = cas_client.annotate_matrix_cell_type_summary_statistics_strategy(
-            matrix=self._mock_matrix(num_cells=num_cells), chunk_size=10
+            matrix=self._mock_anndata_matrix(num_cells=num_cells), chunk_size=10
         )
 
         assert len(response) == num_cells
@@ -136,12 +136,12 @@ class TestCasClient:
 
         # This should cause 10 chunks to be sent
         response1 = cas_client.annotate_matrix_cell_type_summary_statistics_strategy(
-            matrix=self._mock_matrix(num_cells=num_cells), chunk_size=10
+            matrix=self._mock_anndata_matrix(num_cells=num_cells), chunk_size=10
         )
         assert len(response1) == num_cells
 
         response2 = cas_client.annotate_matrix_cell_type_summary_statistics_strategy(
-            matrix=self._mock_matrix(num_cells=num_cells), chunk_size=10
+            matrix=self._mock_anndata_matrix(num_cells=num_cells), chunk_size=10
         )
         assert len(response2) == num_cells
 
@@ -238,7 +238,7 @@ class TestCasClient:
             ],
         )
 
-    def _mock_matrix(self, num_features: int = 3, num_cells: int = 3) -> anndata.AnnData:
+    def _mock_anndata_matrix(self, num_features: int = 3, num_cells: int = 3) -> anndata.AnnData:
         d = NP_RANDOM_STATE.randint(0, 500, size=(num_cells, num_features))
         X = sp.csr_matrix(d)
         obs = pd.DataFrame(index=[f"cell{i}" for i in range(num_cells)])

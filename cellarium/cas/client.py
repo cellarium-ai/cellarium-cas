@@ -101,7 +101,7 @@ class CASClient:
                         f"""
 We're happy that you are using the Cell Annotation Service!
 We'd love to hear about your experience and how we can improve.\n
-[Please click here to provide feedback and get extra quota!]({self.cas_api_service.get_feedback_answer_link()})\n
+[Please click here to provide feedback and increase your weekly quota!]({self.cas_api_service.get_feedback_answer_link()})\n
 If you'd like to opt out, you can run the following command in a cell:\n
 ```
 [cas client].feedback_opt_out()
@@ -116,7 +116,7 @@ where `[cas client]` is the name of the CAS client instance.
     def feedback_opt_out(self):
         self.should_show_feedback = False
         self.user_info = self.cas_api_service.feedback_opt_out()
-        self._print("Feedback opt-out successful")
+        self._print("Successfully opted out. You will no longer receive requests to provide feedback.")
 
     def validate_and_sanitize_input_data(
         self,
