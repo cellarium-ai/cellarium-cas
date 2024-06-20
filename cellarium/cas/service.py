@@ -295,7 +295,7 @@ class CASAPIService(_BaseService):
 
     def feedback_opt_out(self) -> t.Dict[str, str]:
         """
-        Opt out of future feedback requests/
+        Opt out of future feedback requests.
 
         Refer to API Docs:
         {api_url}/api/docs#/cellarium-general/feedback/opt-out
