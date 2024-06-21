@@ -5,11 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "cellarium-cas"
 authors = [
-    { name="Cellarium AI", email="info@cellarium.ai" }
+    { name="Cellarium CAS", email="cas-support@broadinstitute.org" }
 ]
 description = "Cellarium Cell Annotation Service client tool"
 requires-python = ">=3.7"
-license = {file = "LICENSE.md"}
+license = {file = "LICENSE"}
 classifiers = [
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
@@ -26,7 +26,7 @@ include = ["cellarium.*"]
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements/base.txt"]}
 optional-dependencies = {docs = { file = ["requirements/docs.txt"] }, test = { file = ["requirements/test.txt"]}, scanpy = { file = ["requirements/scanpy.txt"]}}
-readme = {file = ["README.md"]}
+readme = {file = ["README.md"], content-type = "text/markdown"}
 
 [project.urls]
 "Homepage" = "https://cellarium.ai"
