@@ -1,0 +1,35 @@
+name: Build and publish to PyPI 
+description: Build the CAS client and deploy it to PyPI
+inputs:
+  python-version:
+    required: true
+    description: "Python version to build the package with"
+    default: "3.7"
+  pypi-type:
+    required: true
+    description: "The type of PyPI deployment to perform: test or prod"
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements/base.txt
+        pip install build
+
+      shell: bash
+
+    - name: Build Package
+      run: python -m build
+      shell: bash
+
+    - name: Publish Package Distributions to Appropriate PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        repository-url: ${{ inputs.pypi-type == 'test' && 'https://test.pypi.org/legacy/' || '' }}
+    
