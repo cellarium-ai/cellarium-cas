@@ -11,6 +11,15 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Verify git environment
+      run: |
+        if [ "${{ github.ref_type }}" == "tag" ]; then
+          echo "Building and publishing package for tag ${{ github.ref }}."
+        else
+          echo "::error::This action can only be run on a tag."
+          exit 1
+        fi
+      shell: bash
     - name: Setup Python
       uses: actions/setup-python@v5
       with:
