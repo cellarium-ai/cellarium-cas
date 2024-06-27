@@ -7,15 +7,13 @@ and annotates a test dataset using the default model.
 
 import anndata
 import numpy as np
-import pytest
 
 from cellarium.cas import CASClient
-from tests.unit import constants
+from tests.integration import constants
 
 np_random_state = np.random.RandomState(0)
 
 
-@pytest.mark.skip(reason="Need to fix integration test environment.")
 def test_cell_annotation(test_api_token: str, test_api_url: str):
     """
     Test the cell annotation functionality of the CASClient by reading a sample dataset and using the
