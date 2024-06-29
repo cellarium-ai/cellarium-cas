@@ -212,10 +212,13 @@ def reduce_cas_cell_type_summary_statistics_response_by_wnn(
         cas_cell_type_summary_statistics_response (dict): Cell type summary statistics response from CAS.
         n_neighbors (int, optional): Number of neighbors to consider. Defaults to 10.
         wnn_strategy (str, optional): WNN strategy. Defaults to "connectivities".
-        connectivities_key (str, optional): Key for connectivities in `adata.uns['neighbors']`. Defaults to "connectivities".
+        connectivities_key (str, optional): Key for connectivities in `adata.uns['neighbors']`.
+          Defaults to "connectivities".
         self_connectivity (float, optional): Self-connectivity value. Defaults to 1.0.
-        min_n_cells_per_type (int, optional): Minimum number of cells per cell type. Defaults to 10.
-        output_unreliable_type (str, optional): Output value for unreliable cell types. Defaults to "Unknown or Unconfident".
+        min_n_cells_per_type (int, optional): Minimum number of cells per cell type.
+          Defaults to 10.
+        output_unreliable_type (str, optional): Output value for unreliable cell types.
+          Defaults to "Unknown or Unconfident".
         output_cell_type_obs_column (str, optional): Output column name for cell type. Defaults to "cas_cell_type".
         output_cell_type_confidence_score_obs_column (str, optional): Output column name for cell type confidence score. Defaults to "cas_cell_type_confidence_score".
 

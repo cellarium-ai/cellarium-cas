@@ -3,12 +3,12 @@ import numpy as np
 import pandas as pd
 
 from cellarium.cas import constants
-from cellarium.cas.data_preparation import callbacks
+from cellarium.cas.preprocessing import callbacks
 
 
 def test_calculate_total_mrna_umis_X():
     """
-    Test :func:`data_preparation.callbacks.calculate_total_mrna_umis` function.
+    Test :func:`preprocessing.callbacks.calculate_total_mrna_umis` function.
 
     Assert the function indeed creates a ``"total_mrna_umis"`` obs column, check the values correspond to the sum
     over the axis, and insure the input :class:`anndata.AnnData` instance remains unchanged.
@@ -43,7 +43,7 @@ def test_calculate_total_mrna_umis_X():
 
 def test_calculate_total_mrna_umis_raw_X():
     """
-    Test :func:`data_preparation.callbacks.calculate_total_mrna_umis` function when X has normalized data
+    Test :func:`preprocessing.callbacks.calculate_total_mrna_umis` function when X has normalized data
     and ``count_matrix_name="raw.X"``.
 
     Assert the function indeed creates a ``"total_mrna_umis"`` obs column, check the values correspond to the sum

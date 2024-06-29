@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 
-from cellarium.cas import constants, data_preparation, exceptions
+from cellarium.cas import constants, preprocessing, exceptions
 
 np_random_state = np.random.RandomState(0)
 
@@ -120,7 +120,7 @@ class TestdataPreparation(unittest.TestCase):
             var=pd.DataFrame(index=adata_feature_schema_list),
         )
         try:
-            data_preparation.validate(
+            preprocessing.validate(
                 adata=adata,
                 cas_feature_schema_list=cas_feature_schema_list,
                 feature_ids_column_name="index",
@@ -157,7 +157,7 @@ class TestdataPreparation(unittest.TestCase):
             var=pd.DataFrame(index=adata_feature_schema_list),
         )
         try:
-            data_preparation.validate(
+            preprocessing.validate(
                 adata=adata,
                 cas_feature_schema_list=cas_feature_schema_list,
                 feature_ids_column_name="index",
@@ -198,7 +198,7 @@ class TestdataPreparation(unittest.TestCase):
             var=pd.DataFrame(index=adata_feature_schema_list),
         )
         try:
-            data_preparation.validate(
+            preprocessing.validate(
                 adata=adata,
                 cas_feature_schema_list=cas_feature_schema_list,
                 feature_ids_column_name="index",
@@ -230,7 +230,7 @@ class TestdataPreparation(unittest.TestCase):
             var=pd.DataFrame(index=adata_feature_schema_list),
         )
         try:
-            data_preparation.validate(
+            preprocessing.validate(
                 adata=adata,
                 cas_feature_schema_list=cas_feature_schema_list,
                 feature_ids_column_name="index",
@@ -256,7 +256,7 @@ class TestdataPreparation(unittest.TestCase):
             obs=pd.DataFrame(index=np.arange(0, self.INPUT_DATASET_LENGTH)),
             var=pd.DataFrame(index=adata_feature_schema_list),
         )
-        adata_new = data_preparation.sanitize(
+        adata_new = preprocessing.sanitize(
             adata=adata,
             cas_feature_schema_list=cas_feature_schema_list,
             count_matrix_input=constants.CountMatrixInput.X,

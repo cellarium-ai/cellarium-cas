@@ -10,7 +10,7 @@ import warnings
 import anndata
 from deprecated import deprecated
 
-from cellarium.cas import _io, constants, data_preparation, exceptions, service, settings
+from cellarium.cas import _io, constants, preprocessing, exceptions, service, settings
 
 CHUNK_SIZE_ANNOTATE_DEFAULT = 1000
 CHUNK_SIZE_SEARCH_DEFAULT = 500
