@@ -6,7 +6,7 @@ import pandas as pd
 import scipy.sparse as sp
 
 from cellarium.cas import constants, exceptions
-from cellarium.cas.data_preparation import callbacks
+from cellarium.cas.preprocessing import callbacks
 
 
 def _get_adata_var_index_or_by_column(adata: anndata.AnnData, var_column_name: str) -> t.List[str]:
