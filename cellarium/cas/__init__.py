@@ -1,4 +1,24 @@
-from cellarium.cas.client import CASClient  # noqa
-from cellarium.cas.version import get_version  # noqa
+from . import (
+    postprocessing,
+    preprocessing,
+    visualization,
+    settings,
+    constants,
+    exceptions,
+    service,
+    version,
+)
 
-__version__ = get_version()
+__version__ = version.get_version()
+
+__all__ = [
+    "preprocessing",
+    "postprocessing",
+    "visualization",
+    "settings",
+    "constants",
+    "exceptions",
+    "service",
+    "settings",
+    "version",
+]
