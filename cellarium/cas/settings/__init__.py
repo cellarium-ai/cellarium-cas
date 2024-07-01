@@ -1,5 +1,5 @@
-from .base import *  # noqa
 from ..version import get_version_environment
+from .base import *  # noqa
 
 VERSION_ENVIRONMENT = get_version_environment()
 

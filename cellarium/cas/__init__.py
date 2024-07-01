@@ -1,13 +1,4 @@
-from . import (
-    postprocessing,
-    preprocessing,
-    visualization,
-    settings,
-    constants,
-    exceptions,
-    service,
-    version,
-)
+from . import constants, exceptions, postprocessing, preprocessing, service, settings, version, visualization
 
 __version__ = version.get_version()
 

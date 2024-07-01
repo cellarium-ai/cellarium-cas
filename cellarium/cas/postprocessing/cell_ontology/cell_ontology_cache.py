@@ -1,8 +1,10 @@
-from functools import cached_property, cache
-from scipy import sparse as sp
-import owlready2
+import logging
+from functools import cache, cached_property
+from logging import log
+
 import networkx as nx
-from logging import log, INFO
+import owlready2
+from scipy import sparse as sp
 
 from cellarium.cas._io import suppress_stderr
 
@@ -50,7 +52,7 @@ class CellOntologyCache:
         """
 
         with suppress_stderr():
-            log(INFO, f"Loading cell ontology OWL from:\n{cl_owl_path}")
+            log(logging.INFO, f"Loading cell ontology OWL from:\n{cl_owl_path}")
             cl = owlready2.get_ontology(cl_owl_path).load()
 
         # only keep CL classes with a singleton label

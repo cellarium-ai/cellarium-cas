@@ -1,14 +1,12 @@
 from __future__ import annotations
 
+import typing as t
 from collections import defaultdict
 from operator import itemgetter
-import typing as t
 
-from anndata import AnnData
 import numpy as np
-
+from anndata import AnnData
 from tqdm.notebook import tqdm
-
 
 ALLOWED_WNN_STRATEGIES = {"connectivities"}
 

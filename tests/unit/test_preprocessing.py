@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 
-from cellarium.cas import constants, preprocessing, exceptions
+from cellarium.cas import constants, exceptions, preprocessing
 
 np_random_state = np.random.RandomState(0)
 

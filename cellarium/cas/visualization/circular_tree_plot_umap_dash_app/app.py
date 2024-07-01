@@ -1,33 +1,27 @@
+import logging
 import os
 import tempfile
-import numpy as np
 from collections import OrderedDict
+from logging import log
 from typing import Sequence, Tuple
 
-from Bio import Phylo
+import numpy as np
+import plotly.graph_objects as go
 from anndata import AnnData
+from Bio import Phylo
 from dash import Dash, dcc, html
 from dash.dependencies import Input, Output
 from plotly.express.colors import sample_colorscale
-import plotly.graph_objects as go
 
-from logging import log, INFO
-
-from cellarium.cas.postprocessing import (
-    get_obs_indices_for_cluster,
-    get_aggregated_cas_ontology_aware_scores,
-    generate_phyloxml_from_scored_cell_ontology_tree,
-    convert_aggregated_cell_ontology_scores_to_rooted_tree,
-    insert_cas_ontology_aware_response_into_adata,
-    CellOntologyScoresAggregationDomain,
-    CellOntologyScoresAggregationOp,
-)
-
-from cellarium.cas.postprocessing import CAS_CL_SCORES_ANNDATA_OBSM_KEY
-from cellarium.cas.postprocessing.cell_ontology import CellOntologyCache, CL_CELL_ROOT_NODE
+from cellarium.cas.postprocessing import (CAS_CL_SCORES_ANNDATA_OBSM_KEY, CellOntologyScoresAggregationDomain,
+                                          CellOntologyScoresAggregationOp,
+                                          convert_aggregated_cell_ontology_scores_to_rooted_tree,
+                                          generate_phyloxml_from_scored_cell_ontology_tree,
+                                          get_aggregated_cas_ontology_aware_scores, get_obs_indices_for_cluster,
+                                          insert_cas_ontology_aware_response_into_adata)
+from cellarium.cas.postprocessing.cell_ontology import CL_CELL_ROOT_NODE, CellOntologyCache
 from cellarium.cas.visualization._components.circular_tree_plot import CircularTreePlot
 from cellarium.cas.visualization.dash_utils import find_and_kill_process
-
 
 # cell type ontology terms (and all descendents) to hide from the visualization
 DEFAULT_HIDDEN_CL_NAMES_SET = {}
@@ -169,7 +163,7 @@ class CASCircularTreePlotUMAPDashApp:
         self._setup_callbacks()
 
     def run(self, port: int = 8050, **kwargs):
-        log(INFO, "Starting Dash application...")
+        log(logging.INFO, "Starting Dash application...")
         try:
             self.app.run_server(
                 port=port, jupyter_mode="inline", jupyter_width="100%", jupyter_height=self.height + 50, **kwargs
@@ -186,9 +180,11 @@ class CASCircularTreePlotUMAPDashApp:
         # reduce scores over the provided cells
         aggregated_scores = get_aggregated_cas_ontology_aware_scores(
             self.adata,
-            obs_indices=self.cell_domain_map[self.selected_cell_domain_key]
-            if obs_indices_override is None
-            else obs_indices_override,
+            obs_indices=(
+                self.cell_domain_map[self.selected_cell_domain_key]
+                if obs_indices_override is None
+                else obs_indices_override
+            ),
             aggregation_op=self.aggregation_op,
             aggregation_domain=self.aggregation_domain,
             threshold=self.score_threshold,

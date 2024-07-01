@@ -1,4 +1,3 @@
-from .cell_ontology_cache import CellOntologyCache, CL_CELL_ROOT_NODE
-
+from .cell_ontology_cache import CL_CELL_ROOT_NODE, CellOntologyCache
 
 __all__ = ["CellOntologyCache", "CL_CELL_ROOT_NODE"]

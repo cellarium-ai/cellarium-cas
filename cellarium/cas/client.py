@@ -12,7 +12,7 @@ import anndata
 from anndata import ImplicitModificationWarning
 from deprecated import deprecated
 
-from . import _io, constants, preprocessing, exceptions, service, settings
+from . import _io, constants, exceptions, preprocessing, service, settings
 
 
 @contextmanager

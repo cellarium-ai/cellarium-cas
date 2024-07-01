@@ -1,17 +1,15 @@
-from typing import Sequence
+from collections import OrderedDict, defaultdict
 from dataclasses import dataclass
-from collections import OrderedDict
-from operator import itemgetter
-from collections import defaultdict
 from enum import Enum
+from operator import itemgetter
+from typing import Sequence
 
-import scipy.sparse as sp
 import numpy as np
-
+import scipy.sparse as sp
 from anndata import AnnData
 
+from .cell_ontology.cell_ontology_cache import CL_CELL_ROOT_NODE, CellOntologyCache
 from .common import get_obs_indices_for_cluster
-from .cell_ontology.cell_ontology_cache import CellOntologyCache, CL_CELL_ROOT_NODE
 
 # AnnData-related constants
 CAS_CL_SCORES_ANNDATA_OBSM_KEY = "cas_cl_scores"

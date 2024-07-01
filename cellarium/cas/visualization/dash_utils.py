@@ -1,5 +1,5 @@
-import subprocess
 import platform
+import subprocess
 
 
 def find_and_kill_process(port: int, verbose: bool = False):

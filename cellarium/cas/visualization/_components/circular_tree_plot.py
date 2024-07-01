@@ -1,15 +1,12 @@
-import numpy as np
-from typing import Tuple, List, Dict
 from functools import cached_property
-from Bio import Phylo
+from typing import Dict, List, Tuple
+
+import numpy as np
 import plotly.graph_objs as go
+from Bio import Phylo
 
-from cellarium.cas.postprocessing.ontology_aware import (
-    CAS_SCORE_PROPERTY_REF,
-    CAS_FRACTION_PROPERTY_REF,
-    CAS_CL_LABEL_PROPERTY_REF,
-)
-
+from cellarium.cas.postprocessing.ontology_aware import (CAS_CL_LABEL_PROPERTY_REF, CAS_FRACTION_PROPERTY_REF,
+                                                         CAS_SCORE_PROPERTY_REF)
 
 DEFAULT_SCORE_COLORSCALE = [
     [0.0, "rgb(214, 47, 38)"],
