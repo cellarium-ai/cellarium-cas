@@ -10,7 +10,11 @@ dev - 2024-06-29
 ----------------
 
 - Renamed data_preparation to preprocessing
-
+- Moved all preprocessing related code to preprocessing submodule
+- Added a postprocessing submodule
+- Added a visualization submodule
+- Added circular tree plot visualization (Dash App)
+- Renamed `scanp` optional dependencies to `vis` (for all visualization related dependencies)
 
 1.4.5 - 2024-06-03
 ------------------

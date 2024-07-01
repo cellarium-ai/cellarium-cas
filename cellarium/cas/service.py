@@ -17,7 +17,6 @@ if settings.is_interactive_environment():
 
 
 class _BaseService:
-
     def __init__(self, api_token: str, api_url: str = settings.CELLARIUM_CLOUD_BACKEND_URL, *args, **kwargs):
         """
         Base class for communicating with a Cellarium Cloud API service

@@ -1,12 +1,17 @@
 from typing import Sequence
 from dataclasses import dataclass
 from collections import OrderedDict
+from operator import itemgetter
+from collections import defaultdict
 from enum import Enum
+
 import scipy.sparse as sp
 import numpy as np
+
 from anndata import AnnData
 
-from cellarium.cas.postprocessing.cell_ontology.cell_ontology_cache import CellOntologyCache, CL_CELL_ROOT_NODE
+from .common import get_obs_indices_for_cluster
+from .cell_ontology.cell_ontology_cache import CellOntologyCache, CL_CELL_ROOT_NODE
 
 # AnnData-related constants
 CAS_CL_SCORES_ANNDATA_OBSM_KEY = "cas_cl_scores"
@@ -281,3 +286,110 @@ def generate_phyloxml_from_scored_cell_ontology_tree(
 
     phyloxml_string = phyloxml_header + _get_subtree_phyloxml_string(tree_dict, root_node_name, 1) + phyloxml_footer
     return phyloxml_string
+
+
+def get_most_granular_top_k_calls(
+    aggregated_scores: AggregatedCellOntologyScores, cl: CellOntologyCache, min_acceptable_score: float, top_k: int = 1
+) -> list[tuple]:
+    depth_list = list(map(cl.get_longest_path_lengths_from_target(CL_CELL_ROOT_NODE).get, aggregated_scores.cl_names))
+    sorted_score_and_depth_list = sorted(
+        list(
+            (score, depth, cl_name)
+            for score, depth, cl_name in zip(
+                aggregated_scores.aggregated_scores_c, depth_list, aggregated_scores.cl_names
+            )
+            if score >= min_acceptable_score
+        ),
+        key=itemgetter(1),
+        reverse=True,
+    )
+    trunc_list = sorted_score_and_depth_list[:top_k]
+    # pad with root node if necessary
+    for _ in range(len(trunc_list) - top_k):
+        trunc_list.append((1.0, 0, CL_CELL_ROOT_NODE))
+    return trunc_list
+
+
+def compute_most_granular_top_k_calls_single(
+    adata: AnnData,
+    cl: CellOntologyCache,
+    min_acceptable_score: float,
+    top_k: int = 3,
+    obs_prefix: str = "cas_cell_type",
+):
+    top_k_calls_dict = defaultdict(list)
+    scores_array_nc = adata.obsm[CAS_CL_SCORES_ANNDATA_OBSM_KEY].toarray()
+
+    # make a wrapped aggregated scores dataclass for the single cell in question
+    aggregated_scores = AggregatedCellOntologyScores(
+        aggregation_op=CellOntologyScoresAggregationOp.MEAN,
+        aggregation_domain=CellOntologyScoresAggregationDomain.ALL_CELLS,
+        threshold=0.0,
+        aggregated_scores_c=np.zeros(
+            (
+                len(
+                    cl.cl_names,
+                )
+            )
+        ),
+        fraction_over_threshold_c=np.ones(
+            (
+                len(
+                    cl.cl_names,
+                )
+            )
+        ),
+        cl_labels=cl.cl_labels,
+        cl_names=cl.cl_names,
+    )
+
+    for i_cell in range(adata.n_obs):
+        aggregated_scores.aggregated_scores_c = scores_array_nc[i_cell]
+        top_k_output = get_most_granular_top_k_calls(aggregated_scores, cl, min_acceptable_score, top_k)
+        for k in range(top_k):
+            top_k_calls_dict[f"{obs_prefix}_score_{k + 1}"].append(top_k_output[k][0])
+            top_k_calls_dict[f"{obs_prefix}_name_{k + 1}"].append(top_k_output[k][2])
+            top_k_calls_dict[f"{obs_prefix}_label_{k + 1}"].append(cl.cl_names_to_labels_map[top_k_output[k][2]])
+
+    for k, v in top_k_calls_dict.items():
+        adata.obs[k] = v
+
+
+def compute_most_granular_top_k_calls_cluster(
+    adata: AnnData,
+    cl: CellOntologyCache,
+    min_acceptable_score: float,
+    cluster_label_obs_column: str,
+    aggregation_op: CellOntologyScoresAggregationOp = CellOntologyScoresAggregationOp.MEAN,
+    aggregation_domain: CellOntologyScoresAggregationDomain = CellOntologyScoresAggregationDomain.ALL_CELLS,
+    aggregation_score_threshod: float = 1e-4,
+    top_k: int = 3,
+    obs_prefix: str = "cas_cell_type",
+):
+    top_k_calls_dict = dict()
+    for k in range(top_k):
+        top_k_calls_dict[f"{obs_prefix}_score_{k + 1}"] = [None] * adata.n_obs
+        top_k_calls_dict[f"{obs_prefix}_name_{k + 1}"] = [None] * adata.n_obs
+        top_k_calls_dict[f"{obs_prefix}_label_{k + 1}"] = [None] * adata.n_obs
+
+    def _update_list(target_list, indices, value):
+        for idx in indices:
+            target_list[idx] = value
+
+    for cluster_label in adata.obs[cluster_label_obs_column].cat.categories:
+        obs_indices = get_obs_indices_for_cluster(adata, cluster_label_obs_column, cluster_label)
+        aggregated_scores = get_aggregated_cas_ontology_aware_scores(
+            adata, obs_indices, aggregation_op, aggregation_domain, aggregation_score_threshod
+        )
+        top_k_output = get_most_granular_top_k_calls(aggregated_scores, cl, min_acceptable_score, top_k)
+        for k in range(top_k):
+            _update_list(top_k_calls_dict[f"{obs_prefix}_score_{k + 1}"], obs_indices, top_k_output[k][0])
+            _update_list(top_k_calls_dict[f"{obs_prefix}_name_{k + 1}"], obs_indices, top_k_output[k][2])
+            _update_list(
+                top_k_calls_dict[f"{obs_prefix}_label_{k + 1}"],
+                obs_indices,
+                cl.cl_names_to_labels_map[top_k_output[k][2]],
+            )
+
+    for k, v in top_k_calls_dict.items():
+        adata.obs[k] = v

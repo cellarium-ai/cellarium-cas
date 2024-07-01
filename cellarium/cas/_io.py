@@ -1,6 +1,9 @@
+import os
+import sys
 import tempfile
 import typing as t
 import warnings
+from contextlib import contextmanager
 
 import anndata
 import h5py
@@ -191,3 +194,14 @@ def adata_to_bytes(adata: "anndata.AnnData", compression: str = "gzip") -> bytes
         adata.write(temp_file.name, compression=compression)
         temp_file.seek(0)
         return temp_file.read()
+
+
+@contextmanager
+def suppress_stderr():
+    original_stderr = sys.stderr
+    sys.stderr = open(os.devnull, "w")
+    try:
+        yield
+    finally:
+        sys.stderr.close()
+        sys.stderr = original_stderr

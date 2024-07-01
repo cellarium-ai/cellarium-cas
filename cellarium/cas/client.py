@@ -6,11 +6,21 @@ import operator
 import time
 import typing as t
 import warnings
+from contextlib import contextmanager
 
 import anndata
+from anndata import ImplicitModificationWarning
 from deprecated import deprecated
 
 from . import _io, constants, preprocessing, exceptions, service, settings
+
+
+@contextmanager
+def suppress_implicit_modification_warning():
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", ImplicitModificationWarning)
+        yield
+
 
 CHUNK_SIZE_ANNOTATE_DEFAULT = 1000
 CHUNK_SIZE_SEARCH_DEFAULT = 500
@@ -227,6 +237,7 @@ class CASClient:
 
         return sharded_request_task
 
+    @suppress_implicit_modification_warning()
     def __async_sharded_request(
         self,
         adata: anndata.AnnData,

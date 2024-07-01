@@ -11,6 +11,8 @@ from dash.dependencies import Input, Output
 from plotly.express.colors import sample_colorscale
 import plotly.graph_objects as go
 
+from logging import log, INFO
+
 from cellarium.cas.postprocessing import (
     get_obs_indices_for_cluster,
     get_aggregated_cas_ontology_aware_scores,
@@ -22,7 +24,7 @@ from cellarium.cas.postprocessing import (
 )
 
 from cellarium.cas.postprocessing import CAS_CL_SCORES_ANNDATA_OBSM_KEY
-from cellarium.cas.postprocessing.cell_ontology import CellOntologyCache
+from cellarium.cas.postprocessing.cell_ontology import CellOntologyCache, CL_CELL_ROOT_NODE
 from cellarium.cas.visualization._components.circular_tree_plot import CircularTreePlot
 
 # cell type ontology terms (and all descendents) to hide from the visualization
@@ -156,7 +158,8 @@ class CASCircularTreePlotUMAPDashApp:
         self._setup_callbacks()
 
     def run(self, **kwargs):
-        self.app.run_server(jupyter_mode="inline", jupyter_width="80%", jupyter_height=self.height + 50, **kwargs)
+        log(INFO, "Starting Dash application...")
+        self.app.run_server(jupyter_mode="inline", jupyter_width="100%", jupyter_height=self.height + 50, **kwargs)
 
     def _instantiate_circular_tree_plot(
         self, obs_indices_override: Sequence | None = None, title_override: str | None = None
@@ -174,9 +177,9 @@ class CASCircularTreePlotUMAPDashApp:
 
         # generate a Phylo tree
         rooted_tree = convert_aggregated_cell_ontology_scores_to_rooted_tree(
-            reduced_scores=aggregated_scores,
+            aggregated_scores=aggregated_scores,
             cl=self.cl,
-            root_cl_name=self.cl.CL_CELL_ROOT_NODE,
+            root_cl_name=CL_CELL_ROOT_NODE,
             min_fraction=self.min_cell_fraction,
             hidden_cl_names_set=self.hidden_cl_names_set,
         )
@@ -434,16 +437,16 @@ class CASCircularTreePlotUMAPDashApp:
         )
         def _update_umap_scatter_plot_based_on_circular_tree_plot(clickData):
             if clickData is None or "points" not in clickData:
-                return
+                return self._umap_scatter_plot_figure
 
             point = clickData["points"][0]
             if "pointIndex" not in point:
-                return
+                return self._umap_scatter_plot_figure
 
             node_index = point["pointIndex"]
             cl_name = self.circular_tree_plot.clade_index_to_cl_name_map.get(node_index)
             if cl_name is None:
-                return
+                return self._umap_scatter_plot_figure
 
             scores = self._get_scores_for_cl_name(cl_name)
             opacity = self._get_scatter_plot_opacity_from_scores(scores)
@@ -491,12 +494,12 @@ class CASCircularTreePlotUMAPDashApp:
         )
         def _update_circular_tree_plot_based_on_umap_scatter_plot(clickData):
             if clickData is None or "points" not in clickData:
-                return
+                return self._circular_tree_plot_figure
 
             point = clickData["points"][0]
 
             if "pointIndex" not in point:
-                return
+                return self._circular_tree_plot_figure
 
             node_index = point["pointIndex"]
             self._initialize_circular_tree_plot([node_index], f"cell index {node_index}")

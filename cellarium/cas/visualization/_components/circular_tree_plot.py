@@ -36,7 +36,7 @@ class CircularTreePlot:
         start_angle: float = 0.0,
         end_angle: float = 360.0,
         start_leaf: str = "first",
-        min_node_radius: float = 2.0,
+        min_node_radius: float = 6.0,
         max_node_radius: float = 16.0,
         linecolor: str = "rgb(20,20,20)",
         score_colorscale: list = DEFAULT_SCORE_COLORSCALE,

@@ -2,6 +2,9 @@ from functools import cached_property, cache
 from scipy import sparse as sp
 import owlready2
 import networkx as nx
+from logging import log, INFO
+
+from cellarium.cas._io import suppress_stderr
 
 # Used in CZ CELLxGENE schema v3:
 # https://github.com/chanzuckerberg/single-cell-curation/blob/main/schema/3.0.0/schema.md
@@ -15,90 +18,89 @@ CL_CELL_ROOT_NODE = "CL_0000255"
 
 
 class CellOntologyCache:
-    """A cache for the Cell Ontology (CL) that provides various utilities."""
+    """
+    A class representing a cache for the Cell Ontology (CL).
 
-    class CellOntologyCache:
+    Args:
+        cl_owl_path (str): The path to the Cell Ontology OWL file. Defaults to DEFAULT_CL_OWL_PATH.
+
+    Attributes:
+        cl_classes (list): A list of Cell Ontology classes with a singleton label.
+        cl_names (list): A list of names of Cell Ontology classes.
+        cl_labels (list): A list of labels of Cell Ontology classes.
+        cl_classes_set (set): A set of Cell Ontology classes.
+        cl_names_to_labels_map (dict): A mapping of Cell Ontology class names to labels.
+        cl_labels_to_names_map (dict): A mapping of Cell Ontology class labels to names.
+        cl_names_to_idx_map (dict): A mapping of Cell Ontology class names to indices.
+        cl_idx_to_names_map (dict): A mapping of indices to Cell Ontology class names.
+        cl_graph (nx.DiGraph): A networkx graph representing the Cell Ontology.
+
+    """
+
+    def __init__(self, cl_owl_path: str = DEFAULT_CL_OWL_PATH):
         """
-        A class representing a cache for the Cell Ontology (CL).
+        Initialize the CellOntologyCache object.
 
-        Args:
-            cl_owl_path (str): The path to the Cell Ontology OWL file. Defaults to DEFAULT_CL_OWL_PATH.
+        Loads the Cell Ontology from the specified OWL file, filters out classes with a singleton label,
+        and builds a networkx graph representing the Cell Ontology.
 
-        Attributes:
-            cl_classes (list): A list of Cell Ontology classes with a singleton label.
-            cl_names (list): A list of names of Cell Ontology classes.
-            cl_labels (list): A list of labels of Cell Ontology classes.
-            cl_classes_set (set): A set of Cell Ontology classes.
-            cl_names_to_labels_map (dict): A mapping of Cell Ontology class names to labels.
-            cl_labels_to_names_map (dict): A mapping of Cell Ontology class labels to names.
-            cl_names_to_idx_map (dict): A mapping of Cell Ontology class names to indices.
-            cl_idx_to_names_map (dict): A mapping of indices to Cell Ontology class names.
-            cl_graph (nx.DiGraph): A networkx graph representing the Cell Ontology.
+        :param cl_owl_path: The path to the Cell Ontology OWL file. Defaults to DEFAULT_CL_OWL_PATH.
+        :type cl_owl_path: str
 
         """
 
-        def __init__(self, cl_owl_path: str = DEFAULT_CL_OWL_PATH):
-            """
-            Initialize the CellOntologyCache object.
-
-            Loads the Cell Ontology from the specified OWL file, filters out classes with a singleton label,
-            and builds a networkx graph representing the Cell Ontology.
-
-            :param cl_owl_path: The path to the Cell Ontology OWL file. Defaults to DEFAULT_CL_OWL_PATH.
-            :type cl_owl_path: str
-
-            """
-
+        with suppress_stderr():
+            log(INFO, f"Loading cell ontology OWL from:\n{cl_owl_path}")
             cl = owlready2.get_ontology(cl_owl_path).load()
 
-            # only keep CL classes with a singleton label
-            cl_classes = list(
-                _class for _class in cl.classes() if _class.name.startswith(CL_PREFIX) and len(_class.label) == 1
-            )
+        # only keep CL classes with a singleton label
+        cl_classes = list(
+            _class for _class in cl.classes() if _class.name.startswith(CL_PREFIX) and len(_class.label) == 1
+        )
 
-            cl_names = [_class.name for _class in cl_classes]
-            cl_labels = [_class.label[0] for _class in cl_classes]
-            assert len(set(cl_names)) == len(cl_classes)
-            assert len(set(cl_labels)) == len(cl_classes)
+        cl_names = [_class.name for _class in cl_classes]
+        cl_labels = [_class.label[0] for _class in cl_classes]
+        assert len(set(cl_names)) == len(cl_classes)
+        assert len(set(cl_labels)) == len(cl_classes)
 
-            cl_classes_set = set(cl_classes)
-            cl_names_to_labels_map = {cl_name: cl_label for cl_name, cl_label in zip(cl_names, cl_labels)}
-            cl_labels_to_names_map = {cl_label: cl_name for cl_name, cl_label in zip(cl_names, cl_labels)}
-            cl_names_to_idx_map = {cl_name: idx for idx, cl_name in enumerate(cl_names)}
-            cl_idx_to_names_map = {idx: cl_name for idx, cl_name in enumerate(cl_names)}
+        cl_classes_set = set(cl_classes)
+        cl_names_to_labels_map = {cl_name: cl_label for cl_name, cl_label in zip(cl_names, cl_labels)}
+        cl_labels_to_names_map = {cl_label: cl_name for cl_name, cl_label in zip(cl_names, cl_labels)}
+        cl_names_to_idx_map = {cl_name: idx for idx, cl_name in enumerate(cl_names)}
+        cl_idx_to_names_map = {idx: cl_name for idx, cl_name in enumerate(cl_names)}
 
-            # build a networkx graph from CL
-            cl_graph = nx.DiGraph(name="CL graph")
+        # build a networkx graph from CL
+        cl_graph = nx.DiGraph(name="CL graph")
 
-            for cl_class in cl_classes:
-                cl_graph.add_node(cl_class.name)
+        for cl_class in cl_classes:
+            cl_graph.add_node(cl_class.name)
 
-            for self_cl_class in cl_classes:
-                for parent_cl_class in cl.get_parents_of(self_cl_class):
-                    if parent_cl_class not in cl_classes_set:
-                        continue
-                    cl_graph.add_edge(parent_cl_class.name, self_cl_class.name)
-                for child_cl_class in cl.get_children_of(self_cl_class):
-                    if child_cl_class not in cl_classes_set:
-                        continue
-                    cl_graph.add_edge(self_cl_class.name, child_cl_class.name)
+        for self_cl_class in cl_classes:
+            for parent_cl_class in cl.get_parents_of(self_cl_class):
+                if parent_cl_class not in cl_classes_set:
+                    continue
+                cl_graph.add_edge(parent_cl_class.name, self_cl_class.name)
+            for child_cl_class in cl.get_children_of(self_cl_class):
+                if child_cl_class not in cl_classes_set:
+                    continue
+                cl_graph.add_edge(self_cl_class.name, child_cl_class.name)
 
-            self.cl_classes = cl_classes
-            self.cl_names = cl_names
-            self.cl_labels = cl_labels
-            self.cl_classes_set = cl_classes_set
-            self.cl_names_to_labels_map = cl_names_to_labels_map
-            self.cl_labels_to_names_map = cl_labels_to_names_map
-            self.cl_names_to_idx_map = cl_names_to_idx_map
-            self.cl_idx_to_names_map = cl_idx_to_names_map
-            self.cl_graph = cl_graph
+        self.cl_classes = cl_classes
+        self.cl_names = cl_names
+        self.cl_labels = cl_labels
+        self.cl_classes_set = cl_classes_set
+        self.cl_names_to_labels_map = cl_names_to_labels_map
+        self.cl_labels_to_names_map = cl_labels_to_names_map
+        self.cl_names_to_idx_map = cl_names_to_idx_map
+        self.cl_idx_to_names_map = cl_idx_to_names_map
+        self.cl_graph = cl_graph
 
     @cached_property
     def cl_ancestors_csr_matrix(self) -> sp.csr_matrix:
         """Returns a sparse matrix representation of ancestors.
 
         .. note:
-          The matrix element (i, j) = 1 iff j is an ancetor of i.
+            The matrix element (i, j) = 1 iff j is an ancetor of i.
         """
         n_nodes = len(self.cl_graph.nodes)
 

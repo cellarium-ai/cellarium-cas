@@ -9,6 +9,7 @@ import numpy as np
 
 from tqdm.notebook import tqdm
 
+
 ALLOWED_WNN_STRATEGIES = {"connectivities"}
 
 
