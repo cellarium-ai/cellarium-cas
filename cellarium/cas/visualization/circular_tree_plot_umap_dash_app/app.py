@@ -92,42 +92,46 @@ class CASCircularTreePlotUMAPDashApp:
         cluster_label_obs_column: str | None = None,
         aggregation_op: CellOntologyScoresAggregationOp = CellOntologyScoresAggregationOp.MEAN,
         aggregation_domain: CellOntologyScoresAggregationDomain = CellOntologyScoresAggregationDomain.OVER_THRESHOLD,
-        score_threshold: float = 0.1,
-        min_cell_fraction: float = 0.05,
+        score_threshold: float = 0.05,
+        min_cell_fraction: float = 0.01,
+        umap_marker_size: float = 3.0,
         umap_padding: float = 0.15,
-        min_opacity: float = 0.1,
-        max_opacity: float = 1.0,
-        score_colorscale: str | list = "Viridis",
+        umap_min_opacity: float = 0.1,
+        umap_max_opacity: float = 1.0,
+        umap_inactive_cell_color: str = "rgb(180,180,180)",
+        umap_inactive_cell_opacity: float = 0.5,
+        umap_active_cell_color: str = "rgb(250,50,50)",
+        umap_default_cell_color: str = "rgb(180,180,180)",
+        umap_default_opacity: float = 0.9,
         circular_tree_plot_linecolor: str = "rgb(200,200,200)",
         circular_tree_start_angle: int = 180,
         circular_tree_end_angle: int = 360,
-        inactive_cell_color: str = "rgb(180,180,180)",
-        inactive_cell_opacity: float = 0.5,
-        active_cell_color: str = "rgb(250,50,50)",
-        default_cell_color: str = "rgb(180,180,180)",
-        height: int = 400,
+        figure_height: int = 400,
         hidden_cl_names_set: set[str] = DEFAULT_HIDDEN_CL_NAMES_SET,
         shown_cl_names_set: set[str] = DEFAULT_SHOWN_CL_NAMES_SET,
+        score_colorscale: str | list = "Viridis",
     ):
         self.adata = adata
         self.aggregation_op = aggregation_op
         self.aggregation_domain = aggregation_domain
         self.score_threshold = score_threshold
         self.min_cell_fraction = min_cell_fraction
-        self.min_opacity = min_opacity
-        self.max_opacity = max_opacity
-        self.score_colorscale = score_colorscale
+        self.umap_min_opacity = umap_min_opacity
+        self.umap_max_opacity = umap_max_opacity
+        self.umap_marker_size = umap_marker_size
         self.umap_padding = umap_padding
+        self.umap_inactive_cell_color = umap_inactive_cell_color
+        self.umap_inactive_cell_opacity = umap_inactive_cell_opacity
+        self.umap_active_cell_color = umap_active_cell_color
+        self.umap_default_cell_color = umap_default_cell_color
+        self.umap_default_opacity = umap_default_opacity
         self.circular_tree_plot_linecolor = circular_tree_plot_linecolor
         self.circular_tree_start_angle = circular_tree_start_angle
         self.circular_tree_end_angle = circular_tree_end_angle
-        self.inactive_cell_color = inactive_cell_color
-        self.inactive_cell_opacity = inactive_cell_opacity
-        self.active_cell_color = active_cell_color
-        self.default_cell_color = default_cell_color
-        self.height = height
+        self.height = figure_height
         self.hidden_cl_names_set = hidden_cl_names_set
         self.shown_cl_names_set = shown_cl_names_set
+        self.score_colorscale = score_colorscale
 
         assert "X_umap" in adata.obsm, "UMAP coordinates not found in adata.obsm['X_umap']"
 
@@ -228,7 +232,9 @@ class CASCircularTreePlotUMAPDashApp:
         min_score = np.min(scores)
         max_score = np.max(scores)
         normalized_scores = (scores - min_score) / (1e-6 + max_score - min_score)
-        return np.maximum(scores, self.min_opacity + (self.max_opacity - self.min_opacity) * normalized_scores)
+        return np.maximum(
+            scores, self.umap_min_opacity + (self.umap_max_opacity - self.umap_min_opacity) * normalized_scores
+        )
 
     def _create_layout(self):
         # Custom JavaScript for increasing scroll zoom sensitivity (doesn't seem to work)
@@ -356,12 +362,12 @@ class CASCircularTreePlotUMAPDashApp:
 
         fig = go.Figure()
 
-        color = self.default_cell_color
+        color = self.umap_default_cell_color
         if highlight_active:
             if self.selected_cell_domain_key != self.ALL_CELLS_DOMAIN_KEY:
-                color = [self.inactive_cell_color] * self.adata.n_obs
+                color = [self.umap_inactive_cell_color] * self.adata.n_obs
                 for i_obs in self.cell_domain_map[self.selected_cell_domain_key]:
-                    color[i_obs] = self.active_cell_color
+                    color[i_obs] = self.umap_active_cell_color
 
         fig.add_trace(
             go.Scatter(
@@ -370,8 +376,8 @@ class CASCircularTreePlotUMAPDashApp:
                 mode="markers",
                 marker=dict(
                     color=color,
-                    size=3,
-                    opacity=0.9,
+                    size=self.umap_marker_size,
+                    opacity=self.umap_default_opacity,
                 ),
             )
         )
@@ -454,8 +460,8 @@ class CASCircularTreePlotUMAPDashApp:
             selected_cells_set = set(self.cell_domain_map[self.selected_cell_domain_key])
             for i_obs in range(self.adata.n_obs):
                 if i_obs not in selected_cells_set:
-                    color[i_obs] = self.inactive_cell_color
-                    opacity[i_obs] = self.inactive_cell_opacity
+                    color[i_obs] = self.umap_inactive_cell_color
+                    opacity[i_obs] = self.umap_inactive_cell_opacity
 
             self._umap_scatter_plot_figure.update_traces(
                 marker=dict(
