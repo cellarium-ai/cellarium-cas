@@ -26,6 +26,8 @@ from cellarium.cas.postprocessing import (
 from cellarium.cas.postprocessing import CAS_CL_SCORES_ANNDATA_OBSM_KEY
 from cellarium.cas.postprocessing.cell_ontology import CellOntologyCache, CL_CELL_ROOT_NODE
 from cellarium.cas.visualization._components.circular_tree_plot import CircularTreePlot
+from cellarium.cas.visualization.dash_utils import find_and_kill_process
+
 
 # cell type ontology terms (and all descendents) to hide from the visualization
 DEFAULT_HIDDEN_CL_NAMES_SET = {}
@@ -78,6 +80,11 @@ DEFAULT_SHOWN_CL_NAMES_SET = {
     "CL_0005026",
     "CL_0000182",
     "CL_0000023",
+    "CL_0000679",
+    "CL_0000126",
+    "CL_0000540",
+    "CL_0000127",
+    "CL_0011005",
 }
 
 
@@ -161,9 +168,17 @@ class CASCircularTreePlotUMAPDashApp:
         self._setup_initialization()
         self._setup_callbacks()
 
-    def run(self, **kwargs):
+    def run(self, port: int = 8050, **kwargs):
         log(INFO, "Starting Dash application...")
-        self.app.run_server(jupyter_mode="inline", jupyter_width="100%", jupyter_height=self.height + 50, **kwargs)
+        try:
+            self.app.run_server(
+                port=port, jupyter_mode="inline", jupyter_width="100%", jupyter_height=self.height + 50, **kwargs
+            )
+        except OSError:  # Dash raises OSError if the port is already in use
+            find_and_kill_process(port)
+            self.app.run_server(
+                port=port, jupyter_mode="inline", jupyter_width="100%", jupyter_height=self.height + 50, **kwargs
+            )
 
     def _instantiate_circular_tree_plot(
         self, obs_indices_override: Sequence | None = None, title_override: str | None = None
