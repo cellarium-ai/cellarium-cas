@@ -5,8 +5,11 @@ import numpy as np
 import plotly.graph_objs as go
 from Bio import Phylo
 
-from cellarium.cas.postprocessing.ontology_aware import (CAS_CL_LABEL_PROPERTY_REF, CAS_FRACTION_PROPERTY_REF,
-                                                         CAS_SCORE_PROPERTY_REF)
+from cellarium.cas.postprocessing.ontology_aware import (
+    CAS_CL_LABEL_PROPERTY_REF,
+    CAS_FRACTION_PROPERTY_REF,
+    CAS_SCORE_PROPERTY_REF,
+)
 
 DEFAULT_SCORE_COLORSCALE = [
     [0.0, "rgb(214, 47, 38)"],
@@ -68,9 +71,14 @@ class CircularTreePlot:
         self.shown_cl_names_set = shown_cl_names_set
 
         # generate circular tree coordinate data
-        self.x_nodes, self.y_nodes, self.x_lines, self.y_lines, self.x_arcs, self.y_arcs = (
-            self._get_circular_tree_data()
-        )
+        (
+            self.x_nodes,
+            self.y_nodes,
+            self.x_lines,
+            self.y_lines,
+            self.x_arcs,
+            self.y_arcs,
+        ) = self._get_circular_tree_data()
 
         # generate assets for visualization
         self.tooltip_string_list = []

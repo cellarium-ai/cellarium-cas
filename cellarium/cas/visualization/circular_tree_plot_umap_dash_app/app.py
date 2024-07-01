@@ -13,12 +13,16 @@ from dash import Dash, dcc, html
 from dash.dependencies import Input, Output
 from plotly.express.colors import sample_colorscale
 
-from cellarium.cas.postprocessing import (CAS_CL_SCORES_ANNDATA_OBSM_KEY, CellOntologyScoresAggregationDomain,
-                                          CellOntologyScoresAggregationOp,
-                                          convert_aggregated_cell_ontology_scores_to_rooted_tree,
-                                          generate_phyloxml_from_scored_cell_ontology_tree,
-                                          get_aggregated_cas_ontology_aware_scores, get_obs_indices_for_cluster,
-                                          insert_cas_ontology_aware_response_into_adata)
+from cellarium.cas.postprocessing import (
+    CAS_CL_SCORES_ANNDATA_OBSM_KEY,
+    CellOntologyScoresAggregationDomain,
+    CellOntologyScoresAggregationOp,
+    convert_aggregated_cell_ontology_scores_to_rooted_tree,
+    generate_phyloxml_from_scored_cell_ontology_tree,
+    get_aggregated_cas_ontology_aware_scores,
+    get_obs_indices_for_cluster,
+    insert_cas_ontology_aware_response_into_adata,
+)
 from cellarium.cas.postprocessing.cell_ontology import CL_CELL_ROOT_NODE, CellOntologyCache
 from cellarium.cas.visualization._components.circular_tree_plot import CircularTreePlot
 from cellarium.cas.visualization.dash_utils import find_and_kill_process
@@ -165,14 +169,10 @@ class CASCircularTreePlotUMAPDashApp:
     def run(self, port: int = 8050, **kwargs):
         log(logging.INFO, "Starting Dash application...")
         try:
-            self.app.run_server(
-                port=port, jupyter_mode="inline", jupyter_width="100%", jupyter_height=self.height + 50, **kwargs
-            )
+            self.app.run_server(port=port, jupyter_mode="inline", jupyter_height=self.height + 50, **kwargs)
         except OSError:  # Dash raises OSError if the port is already in use
             find_and_kill_process(port)
-            self.app.run_server(
-                port=port, jupyter_mode="inline", jupyter_width="100%", jupyter_height=self.height + 50, **kwargs
-            )
+            self.app.run_server(port=port, jupyter_mode="inline", jupyter_height=self.height + 50, **kwargs)
 
     def _instantiate_circular_tree_plot(
         self, obs_indices_override: Sequence | None = None, title_override: str | None = None
@@ -308,7 +308,7 @@ class CASCircularTreePlotUMAPDashApp:
                         ),
                     ],
                     style={
-                        "width": "20%",
+                        "width": "300px",
                         "backgroundColor": "white",
                         "padding": "20px",
                         "boxSizing": "border-box",
