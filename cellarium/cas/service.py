@@ -12,7 +12,7 @@ import nest_asyncio
 import requests
 from aiohttp import client_exceptions
 
-from cellarium.cas import constants, endpoints, exceptions, settings
+from cellarium.cas import constants, endpoints, exceptions, settings, version
 
 if settings.is_interactive_environment():
     print("Running in an interactive environment, applying nest_asyncio")
@@ -315,6 +315,15 @@ class CASAPIService(_BaseService):
                 client_session_id=self.client_session_id, client_action_id=client_action_id.get()
             )
         )
+
+    def validate_version(self) -> None:
+        """
+        Validate client version with the server to see if it is compatible.
+        Would raise 400 Bad Request if version is not compatible.
+
+        :return: Void
+        """
+        self.post(endpoint=endpoints.VALIDATE_VERSION, data={"client_version": version.get_version()})
 
     def get_feature_schemas(self) -> t.List[str]:
         """

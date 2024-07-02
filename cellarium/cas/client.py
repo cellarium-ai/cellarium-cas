@@ -66,6 +66,8 @@ class CASClient:
         if "should_ask_for_feedback" in self.user_info:
             self.should_show_feedback = self.user_info["should_ask_for_feedback"]
 
+        self.cas_api_service.validate_version()
+
         # Retrieving General Info
         application_info = self.cas_api_service.get_application_info()
 
