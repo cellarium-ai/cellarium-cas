@@ -31,12 +31,13 @@ class CASClient:
         s = "Allowed model list in Cellarium CAS:\n"
         for model in models:
             model_name = model["model_name"]
+            description = model["description"]
             model_schema = model["schema_name"]
             embedding_dimension = model["embedding_dimension"]
             if model["is_default_model"]:
                 model_name += " (default)"
 
-            s += f"  - {model_name}\n    Schema: {model_schema}\n    Embedding dimension: {embedding_dimension}\n"
+            s += f"  - {model_name}\n    Description: {description}\n    Schema: {model_schema}\n    Embedding dimension: {embedding_dimension}\n"
 
         self._print(s)
 
