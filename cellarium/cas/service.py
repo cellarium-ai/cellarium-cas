@@ -17,15 +17,15 @@ if settings.is_interactive_environment():
 
 
 class _BaseService:
+    """
+    Base class for communicating with a Cellarium Cloud API service
+    It leverages async request library `aiohttp` to asynchronously execute HTTP requests.
+
+    :param api_token: A token that could be authenticated by Cellarium Cloud Backend API service
+    :param api_url: URL of the Cellarium Cloud Backend API service
+    """
 
     def __init__(self, api_token: str, api_url: str = settings.CELLARIUM_CLOUD_BACKEND_URL, *args, **kwargs):
-        """
-        Base class for communicating with a Cellarium Cloud API service
-        It leverages async request library `aiohttp` to asynchronously execute HTTP requests.
-
-        :param api_token: A token that could be authenticated by Cellarium Cloud Backend API service
-        :param api_url: URL of the Cellarium Cloud Backend API service
-        """
         self.api_token = api_token
         self.api_url = api_url
         super().__init__(*args, **kwargs)

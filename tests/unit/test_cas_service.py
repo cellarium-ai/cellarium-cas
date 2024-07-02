@@ -1,3 +1,5 @@
+import typing as t
+
 import aiohttp
 import pytest
 import requests
@@ -96,7 +98,7 @@ class TestCasService:
         with pytest.raises(exceptions.HTTPError403, match="Unauthorized"):
             self.cas_service.get_feature_schema_by(name="schema1")
 
-    def _mock_response(self, url: str, token: str, status_code: int, response_body: dict | list):
+    def _mock_response(self, url: str, token: str, status_code: int, response_body: t.Union[dict, list]):
         response = mock(aiohttp.ClientResponse)
         response.status_code = status_code
         when(response).json().thenReturn(response_body)
