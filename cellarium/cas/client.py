@@ -3,19 +3,24 @@ import datetime
 import functools
 import math
 import operator
+import pkgutil
 import time
 import typing as t
 import warnings
+from uuid import UUID, uuid4
 
 import anndata
 from deprecated import deprecated
 
 from cellarium.cas import _io, constants, data_preparation, exceptions, service, settings
+from cellarium.cas.service import action_context_manager
 
 CHUNK_SIZE_ANNOTATE_DEFAULT = 1000
 CHUNK_SIZE_SEARCH_DEFAULT = 500
 DEFAULT_PRUNE_THRESHOLD = 0.1
 DEFAULT_WEIGHTING_PREFACTOR = 1.0
+
+FEEDBACK_TEMPLATE = pkgutil.get_data(__name__, "resources/feedback_template.html").decode("utf-8")
 
 
 class CASClient:
@@ -41,16 +46,25 @@ class CASClient:
 
         self._print(s)
 
+    @action_context_manager()
     def __init__(
         self,
         api_token: str,
         api_url: str = settings.CELLARIUM_CLOUD_BACKEND_URL,
         num_attempts_per_chunk: int = settings.NUM_ATTEMPTS_PER_CHUNK_DEFAULT,
     ) -> None:
-        self.cas_api_service = service.CASAPIService(api_token=api_token, api_url=api_url)
+        self.client_session_id: UUID = uuid4()
+        self.cas_api_service = service.CASAPIService(
+            api_token=api_token, api_url=api_url, client_session_id=self.client_session_id
+        )
 
-        self._print("Connecting to the Cellarium Cloud backend...")
-        self.cas_api_service.validate_token()
+        self._print(f"Connecting to the Cellarium Cloud backend with session {self.client_session_id}...")
+        self.user_info = self.cas_api_service.validate_token()
+        username = self.user_info["username"]
+        self._print(f"User is {username}")
+        self.should_show_feedback = True
+        if "should_ask_for_feedback" in self.user_info:
+            self.should_show_feedback = self.user_info["should_ask_for_feedback"]
 
         # Retrieving General Info
         application_info = self.cas_api_service.get_application_info()
@@ -78,6 +92,21 @@ class CASClient:
 
     def _print(self, str_to_print: str) -> None:
         print(f"* [{self._get_timestamp()}] {str_to_print}")
+
+    def _render_feedback_link(self):
+        try:
+            if settings.is_interactive_environment() and self.should_show_feedback:
+                # only import IPython if we are in an interactive environment
+                from IPython.display import HTML, display
+
+                display(HTML(FEEDBACK_TEMPLATE.format(link=self.cas_api_service.get_feedback_answer_link())))
+        except ModuleNotFoundError:
+            pass
+
+    def feedback_opt_out(self):
+        self.should_show_feedback = False
+        self.user_info = self.cas_api_service.feedback_opt_out()
+        self._print("Successfully opted out. You will no longer receive requests to provide feedback.")
 
     def validate_and_sanitize_input_data(
         self,
@@ -423,6 +452,7 @@ class CASClient:
         )
 
     @deprecated(version="1.4.3", reason="Use :meth:`annotate_matrix_cell_type_summary_statistics_strategy` instead")
+    @action_context_manager()
     def annotate_anndata(
         self,
         adata: "anndata.AnnData",
@@ -482,9 +512,11 @@ class CASClient:
         )
         result = self.__postprocess_annotations(results, adata)
         self._print(f"Total wall clock time: {f'{time.time() - start:10.4f}'} seconds")
+        self._render_feedback_link()
         return result
 
     @deprecated(version="1.4.3", reason="Use :meth:`annotate_matrix_cell_type_statistics_strategy` instead")
+    @action_context_manager()
     def annotate_anndata_file(
         self,
         filepath: str,
@@ -536,6 +568,7 @@ class CASClient:
         )
 
     @deprecated(version="1.4.3", reason="Use :meth:`annotate_matrix_with_cell_type_statistics_strategy` instead")
+    @action_context_manager()
     def annotate_10x_h5_file(
         self,
         filepath: str,
@@ -582,6 +615,7 @@ class CASClient:
             include_dev_metadata=include_dev_metadata,
         )
 
+    @action_context_manager()
     def annotate_matrix_cell_type_summary_statistics_strategy(
         self,
         matrix: t.Union[str, anndata.AnnData],
@@ -645,8 +679,10 @@ class CASClient:
         )
         result = self.__postprocess_annotations(results, matrix)
         self._print(f"Total wall clock time: {f'{time.time() - start:10.4f}'} seconds")
+        self._render_feedback_link()
         return result
 
+    @action_context_manager()
     def annotate_matrix_cell_type_ontology_aware_strategy(
         self,
         matrix: t.Union[str, anndata.AnnData],
@@ -715,9 +751,11 @@ class CASClient:
         )
         result = self.__postprocess_annotations(results, matrix)
         self._print(f"Total wall clock time: {f'{time.time() - start:10.4f}'} seconds")
+        self._render_feedback_link()
         return result
 
     @deprecated(version="1.4.3", reason="Use :meth:`search_matrix` instead")
+    @action_context_manager()
     def search_anndata(
         self,
         adata: anndata.AnnData,
@@ -778,6 +816,7 @@ class CASClient:
         return result
 
     @deprecated(version="1.4.3", reason="Use :meth:`search_matrix` instead")
+    @action_context_manager()
     def search_10x_h5_file(
         self,
         filepath: str,
@@ -822,6 +861,7 @@ class CASClient:
             feature_names_column_name=feature_names_column_name,
         )
 
+    @action_context_manager()
     def search_matrix(
         self,
         matrix: t.Union[str, anndata.AnnData],
@@ -883,8 +923,10 @@ class CASClient:
         )
         result = self.__postprocess_nearest_neighbor_search_response(results, matrix)
         self._print(f"Total wall clock time: {f'{time.time() - start:10.4f}'} seconds")
+        self._render_feedback_link()
         return result
 
+    @action_context_manager()
     def query_cells_by_ids(
         self, cell_ids: t.List[int], model_name: t.Optional[str], metadata_feature_names: t.List[str] = None
     ) -> t.List[t.Dict[str, t.Any]]:
@@ -907,7 +949,9 @@ class CASClient:
             model_name=model_name,
             metadata_feature_names=metadata_feature_names,
         )
-        return self.__postprocess_query_cells_by_ids_response(query_response=results)
+        cells = self.__postprocess_query_cells_by_ids_response(query_response=results)
+        self._render_feedback_link()
+        return cells
 
     def validate_model_name(self, model_name: t.Optional[str] = None) -> None:
         """

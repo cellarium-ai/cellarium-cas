@@ -2,6 +2,9 @@ import asyncio
 import json
 import ssl
 import typing as t
+from contextlib import ContextDecorator
+from contextvars import ContextVar
+from uuid import UUID, uuid4
 
 import aiohttp
 import certifi
@@ -15,6 +18,25 @@ if settings.is_interactive_environment():
     print("Running in an interactive environment, applying nest_asyncio")
     nest_asyncio.apply()
 
+# Context variable to track the action id for the current context
+client_action_id = ContextVar("action_id", default=None)
+
+
+class action_context_manager(ContextDecorator):
+    """
+    Handle the lifecycle of an action id for the current context.
+
+    Add the `@action_context_manager` decorator around methods in the client methods that should
+    have a common action id.
+    """
+
+    def __enter__(self):
+        self.t = client_action_id.set(uuid4())
+        return self
+
+    def __exit__(self, *exc):
+        client_action_id.reset(self.t)
+
 
 class _BaseService:
     """
@@ -23,11 +45,20 @@ class _BaseService:
 
     :param api_token: A token that could be authenticated by Cellarium Cloud Backend API service
     :param api_url: URL of the Cellarium Cloud Backend API service
+    :param client_session_id: A unique identifier for the current client session
     """
 
-    def __init__(self, api_token: str, api_url: str = settings.CELLARIUM_CLOUD_BACKEND_URL, *args, **kwargs):
+    def __init__(
+        self,
+        api_token: str,
+        api_url: str = settings.CELLARIUM_CLOUD_BACKEND_URL,
+        client_session_id: UUID = None,
+        *args,
+        **kwargs,
+    ):
         self.api_token = api_token
         self.api_url = api_url
+        self.client_session_id = client_session_id
         super().__init__(*args, **kwargs)
 
     def _get_endpoint_url(self, endpoint: str) -> str:
@@ -38,6 +69,20 @@ class _BaseService:
         :return: Full url with backend domains/subdomains and endpoint joined
         """
         return f"{self.api_url}/{endpoint}"
+
+    def _get_headers(self) -> t.Dict[str, str]:
+        """
+        Get the headers to include in the request
+
+        :return: Headers dictionary
+        """
+        headers = {constants.Headers.authorization: f"Bearer {self.api_token}"}
+        if self.client_session_id:
+            headers[constants.Headers.client_session_id] = str(self.client_session_id)
+        action_id = client_action_id.get()
+        if action_id:
+            headers[constants.Headers.client_action_id] = str(action_id)
+        return headers
 
     @staticmethod
     def raise_response_exception(status_code: int, detail: str) -> None:
@@ -94,14 +139,14 @@ class _BaseService:
         :return: Response object
         """
         url = self._get_endpoint_url(endpoint)
-        headers = {"Authorization": f"Bearer {self.api_token}"}
+        headers = self._get_headers()
         response = requests.get(url=url, headers=headers)
         self.__validate_requests_response(response=response)
         return response
 
     def post(self, endpoint: str, data: t.Optional[t.Dict] = None) -> requests.Response:
         url = self._get_endpoint_url(endpoint)
-        headers = {"Authorization": f"Bearer {self.api_token}"}
+        headers = self._get_headers()
         response = requests.post(url=url, headers=headers, json=data)
         self.__validate_requests_response(response=response)
         return response
@@ -205,7 +250,7 @@ class _BaseService:
         """
         url = self._get_endpoint_url(endpoint=endpoint)
         _data = data if data is not None else {}
-        _headers = {"Authorization": f"Bearer {self.api_token}"}
+        _headers = self._get_headers()
 
         if headers is not None:
             _headers.update(headers)
@@ -224,7 +269,7 @@ class CASAPIService(_BaseService):
     Class with all the API methods of Cellarium Cloud CAS infrastructure.
     """
 
-    def validate_token(self) -> None:
+    def validate_token(self) -> t.Dict[str, str]:
         """
         Validate user given API token.
         Would raise 401 Unauthorized if token is invalid.
@@ -232,9 +277,9 @@ class CASAPIService(_BaseService):
         Refer to API Docs:
         {api_url}/api/docs#/cellarium-general/validate_token_api_cellarium_general_validate_token_get
 
-        :return: Void
+        :return: Dictionary with basic user information
         """
-        self.get(endpoint=endpoints.VALIDATE_TOKEN)
+        return self.get_json(endpoint=endpoints.VALIDATE_TOKEN)
 
     def get_application_info(self) -> t.Dict[str, str]:
         """
@@ -246,6 +291,30 @@ class CASAPIService(_BaseService):
         :return: Dictionary with application info
         """
         return self.get_json(endpoint=endpoints.APPLICATION_INFO)
+
+    def feedback_opt_out(self) -> t.Dict[str, str]:
+        """
+        Opt out of future feedback requests.
+
+        Refer to API Docs:
+        {api_url}/api/docs#/cellarium-general/feedback/opt-out
+        :return: Dictionary with basic user information
+        """
+        return self.post_json(endpoint=endpoints.FEEDBACK_OPT_OUT)
+
+    def get_feedback_answer_link(self) -> str:
+        """
+        Retrieve a link to answer feedback questions
+
+        Refer to API Docs:
+        {api_url}/api/docs#/cellarium-general/feedback/answer
+        :return: Link to answer feedback questions
+        """
+        return self._get_endpoint_url(
+            endpoints.FEEDBACK_ANSWER.format(
+                client_session_id=self.client_session_id, client_action_id=client_action_id.get()
+            )
+        )
 
     def get_feature_schemas(self) -> t.List[str]:
         """

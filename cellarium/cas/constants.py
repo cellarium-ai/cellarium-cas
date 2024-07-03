@@ -29,3 +29,12 @@ class HTTP:
 class CountMatrixInput(Enum):
     X: str = "X"
     RAW_X: str = "raw.X"
+
+
+class Headers:
+    # The authorization header.
+    authorization = "Authorization"
+    # The client session id that is used to track a user's CAS client session.
+    client_session_id = "x-client-session-id"
+    # The client action id that is used to track a user's logical action that may span multiple requests.
+    client_action_id = "x-client-action-id"
