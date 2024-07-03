@@ -3,6 +3,7 @@ import datetime
 import functools
 import math
 import operator
+import pkgutil
 import time
 import typing as t
 import warnings
@@ -18,6 +19,8 @@ CHUNK_SIZE_ANNOTATE_DEFAULT = 1000
 CHUNK_SIZE_SEARCH_DEFAULT = 500
 DEFAULT_PRUNE_THRESHOLD = 0.1
 DEFAULT_WEIGHTING_PREFACTOR = 1.0
+
+FEEDBACK_TEMPLATE = pkgutil.get_data(__name__, "resources/feedback_template.html").decode("utf-8")
 
 
 class CASClient:
@@ -92,24 +95,11 @@ class CASClient:
 
     def _render_feedback_link(self):
         try:
-            if settings.is_interactive_environment and self.should_show_feedback:
+            if settings.is_interactive_environment() and self.should_show_feedback:
                 # only import IPython if we are in an interactive environment
-                from IPython.display import Markdown, display
+                from IPython.display import HTML, display
 
-                display(
-                    Markdown(
-                        f"""
-We're happy that you are using the Cell Annotation Service!
-We'd love to hear about your experience and how we can improve.\n
-[Please click here to provide feedback and increase your weekly quota!]({self.cas_api_service.get_feedback_answer_link()})\n
-If you'd like to opt out, you can run the following command in a cell:\n
-```
-[cas client].feedback_opt_out()
-```
-where `[cas client]` is the name of the CAS client instance.
-"""
-                    )
-                )
+                display(HTML(FEEDBACK_TEMPLATE.format(link=self.cas_api_service.get_feedback_answer_link())))
         except ModuleNotFoundError:
             pass
 
