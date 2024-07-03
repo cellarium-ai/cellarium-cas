@@ -184,6 +184,7 @@ class TestCasClient:
                     "schema_name": TEST_SCHEMA,
                     "is_default_model": True,
                     "embedding_dimension": 512,
+                    "description": "",
                 }
             ],
         )
@@ -245,7 +246,12 @@ class TestCasClient:
         return anndata.AnnData(X=X, obs=obs, dtype=np.float32)
 
     def _mock_response(
-        self, url: str, status_code: int, response_body: dict | list, method: str = "get", post_data: dict | list = None
+        self,
+        url: str,
+        status_code: int,
+        response_body: t.Union[dict, list],
+        method: str = "get",
+        post_data: t.Union[dict, list] = None,
     ):
         response = mock(aiohttp.ClientResponse)
         response.status_code = status_code
@@ -260,7 +266,7 @@ class TestCasClient:
             raise ValueError(f"Unsupported method: {method}")
 
     def _mock_async_post_response(
-        self, url: str, status_code: int, response_body: dict | list, post_data: dict | list = None
+        self, url: str, status_code: int, response_body: t.Union[dict, list], post_data: t.Union[dict, list] = None
     ):
         # Mock response
         response = mock(aiohttp.ClientResponse)
@@ -279,7 +285,7 @@ class TestCasClient:
         self.async_post_mocks[url] = session
 
     def _verify_headers(
-        self, urls: list[str], async_post_urls: list[str], active_session_id: str, num__expected_actions: int
+        self, urls: t.List[str], async_post_urls: t.List[str], active_session_id: str, num__expected_actions: int
     ):
         """
         Verify that the expected header values were sent.
