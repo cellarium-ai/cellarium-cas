@@ -7,5 +7,5 @@ nest_asyncio~=1.5
 certifi==2023.7.22
 Deprecated~=1.2
 tqdm~=4.66
-owlready2~=0.20
-networkx~=3.3
+owlready2
+networkx
