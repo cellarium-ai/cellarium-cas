@@ -102,9 +102,9 @@ class _BaseService:
             raise exceptions.HTTPError404(message)
 
         elif (
-            constants.HTTP.STATUS_500_INTERNAL_SERVER_ERROR <=
-            status_code <=
-            constants.HTTP.STATUS_511_NETWORK_AUTHENTICATION_REQUIRED
+            constants.HTTP.STATUS_500_INTERNAL_SERVER_ERROR
+            <= status_code
+            <= constants.HTTP.STATUS_511_NETWORK_AUTHENTICATION_REQUIRED
         ):
             raise exceptions.HTTPError5XX(message)
         else:
