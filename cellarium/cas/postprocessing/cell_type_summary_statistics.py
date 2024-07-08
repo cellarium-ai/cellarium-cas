@@ -97,7 +97,7 @@ def reduce_cas_cell_type_summary_statistics_response_by_majority_vote_per_cluste
     cluster_key: str = "leiden",
     output_cell_type_obs_column: str = "cas_per_cluster_cell_type",
     output_cell_type_confidence_score_obs_column: str = "cas_per_cluster_cell_type_confidence_score",
-    ignore_set: set | None = None,
+    ignore_set: t.Optional[set] = None,
 ) -> dict:
     """
     Reduce the CAS query result by performing a majority vote per cluster.

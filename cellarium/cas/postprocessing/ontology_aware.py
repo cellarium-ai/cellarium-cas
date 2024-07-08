@@ -180,7 +180,7 @@ def convert_aggregated_cell_ontology_scores_to_rooted_tree(
     cl: CellOntologyCache,
     root_cl_name: str = CL_CELL_ROOT_NODE,
     min_fraction: float = 0.0,
-    hidden_cl_names_set: set[str] | None = None,
+    hidden_cl_names_set: t.Optional[t.Set[str]] = None,
 ) -> OrderedDict:
     """
     Convert aggregated cell ontology scores to a rooted tree.
@@ -286,7 +286,7 @@ def generate_phyloxml_from_scored_cell_ontology_tree(
 
 def get_most_granular_top_k_calls(
     aggregated_scores: AggregatedCellOntologyScores, cl: CellOntologyCache, min_acceptable_score: float, top_k: int = 1
-) -> list[tuple]:
+) -> t.List[tuple]:
     depth_list = list(map(cl.get_longest_path_lengths_from_target(CL_CELL_ROOT_NODE).get, aggregated_scores.cl_names))
     sorted_score_and_depth_list = sorted(
         list(

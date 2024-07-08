@@ -1,9 +1,9 @@
 import logging
 import os
 import tempfile
+import typing as t
 from collections import OrderedDict
 from logging import log
-from typing import Sequence, Tuple
 
 import numpy as np
 import plotly.graph_objects as go
@@ -94,7 +94,7 @@ class CASCircularTreePlotUMAPDashApp:
         self,
         adata: AnnData,
         cas_ontology_aware_response: list,
-        cluster_label_obs_column: str | None = None,
+        cluster_label_obs_column: t.Optional[str] = None,
         aggregation_op: CellOntologyScoresAggregationOp = CellOntologyScoresAggregationOp.MEAN,
         aggregation_domain: CellOntologyScoresAggregationDomain = CellOntologyScoresAggregationDomain.OVER_THRESHOLD,
         score_threshold: float = 0.05,
@@ -175,7 +175,7 @@ class CASCircularTreePlotUMAPDashApp:
             self.app.run_server(port=port, jupyter_mode="inline", jupyter_height=self.height + 50, **kwargs)
 
     def _instantiate_circular_tree_plot(
-        self, obs_indices_override: Sequence | None = None, title_override: str | None = None
+        self, obs_indices_override: t.Optional[t.Sequence] = None, title_override: t.Optional[str] = None
     ) -> CircularTreePlot:
         # reduce scores over the provided cells
         aggregated_scores = get_aggregated_cas_ontology_aware_scores(
@@ -223,7 +223,7 @@ class CASCircularTreePlotUMAPDashApp:
             shown_cl_names_set=self.shown_cl_names_set,
         )
 
-    def _get_padded_umap_bounds(self, umap_padding: float) -> Tuple[float, float, float, float]:
+    def _get_padded_umap_bounds(self, umap_padding: float) -> t.Tuple[float, float, float, float]:
         actual_min_x = np.min(self.adata.obsm["X_umap"][:, 0])
         actual_max_x = np.max(self.adata.obsm["X_umap"][:, 0])
         actual_min_y = np.min(self.adata.obsm["X_umap"][:, 1])
@@ -397,7 +397,7 @@ class CASCircularTreePlotUMAPDashApp:
         return fig
 
     def _initialize_circular_tree_plot(
-        self, obs_indices_override: Sequence | None = None, title_override: str | None = None
+        self, obs_indices_override: t.Optional[t.Sequence] = None, title_override: t.Optional[str] = None
     ) -> go.Figure:
         self.circular_tree_plot = self._instantiate_circular_tree_plot(obs_indices_override, title_override)
         fig = self.circular_tree_plot.plotly_figure
