@@ -1,5 +1,5 @@
 import logging
-from functools import cache, cached_property
+from functools import lru_cache
 from logging import log
 
 import networkx as nx
@@ -97,7 +97,8 @@ class CellOntologyCache:
         self.cl_idx_to_names_map = cl_idx_to_names_map
         self.cl_graph = cl_graph
 
-    @cached_property
+    @property
+    @lru_cache(maxsize=None)
     def cl_ancestors_csr_matrix(self) -> sp.csr_matrix:
         """Returns a sparse matrix representation of ancestors.
 
@@ -121,7 +122,7 @@ class CellOntologyCache:
         cl_ancestors_csr_matrix = sp.csr_matrix((data, (row, col)), shape=(n_nodes, n_nodes))
         return cl_ancestors_csr_matrix
 
-    @cache
+    @lru_cache(maxsize=None)
     def get_longest_path_lengths_from_target(self, target: str) -> dict[str, float]:
         # Perform a topological sort of the graph
         topo_order = list(nx.topological_sort(self.cl_graph))

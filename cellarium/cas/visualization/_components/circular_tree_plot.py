@@ -1,4 +1,4 @@
-from functools import cached_property
+from functools import lru_cache
 from typing import Dict, List, Tuple
 
 import numpy as np
@@ -271,7 +271,8 @@ class CircularTreePlot:
 
         return x_nodes, y_nodes, x_lines, y_lines, x_arcs, y_arcs
 
-    @cached_property
+    @property
+    @lru_cache(maxsize=None)
     def plotly_figure(self) -> go.Figure:
         trace_nodes = dict(
             type="scatter",
