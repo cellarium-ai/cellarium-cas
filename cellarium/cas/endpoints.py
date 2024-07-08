@@ -4,6 +4,8 @@ _API_GENERAL_ENDPOINT_PREFIX = f"{_API_BASE_ENDPOINT}/cellarium-general"
 # General
 VALIDATE_TOKEN = f"{_API_GENERAL_ENDPOINT_PREFIX}/validate-token"
 APPLICATION_INFO = f"{_API_GENERAL_ENDPOINT_PREFIX}/application-info"
+FEEDBACK_OPT_OUT = f"{_API_GENERAL_ENDPOINT_PREFIX}/feedback/opt-out"
+FEEDBACK_ANSWER = f"{_API_GENERAL_ENDPOINT_PREFIX}/feedback/answer?client_session_id={{client_session_id}}&client_action_id={{client_action_id}}"
 GET_FEATURE_SCHEMAS = f"{_API_GENERAL_ENDPOINT_PREFIX}/feature-schemas"
 GET_SCHEMA_BY_NAME = f"{_API_GENERAL_ENDPOINT_PREFIX}/feature-schema/{{schema_name}}"
 LIST_MODELS = f"{_API_GENERAL_ENDPOINT_PREFIX}/list-models"

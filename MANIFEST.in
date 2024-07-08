@@ -2,3 +2,4 @@ include README.md
 include requirements/
 include cellarium/cas/assets/*
 include cellarium/cas/visualization/circular_tree_plot_umap_dash_app/assets/*
+recursive-include cellarium/cas/resources/ *.html

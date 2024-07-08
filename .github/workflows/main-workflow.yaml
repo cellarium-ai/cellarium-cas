@@ -1,16 +1,56 @@
 name: Cellarium CAS Repository Update Workflow
-on: [push, workflow_dispatch]
+on: 
+  push:
+  workflow_dispatch:
+    inputs:
+      pypi-type:
+        description: 'The type of PyPI deployment to perform or none'
+        required: true
+        default: 'none'
+        type: choice
+        options:
+          - none
+          - test
+          - prod
+      skip-unit-tests:
+        description: 'Skip the unit tests'
+        required: false
+        default: false
+        type: boolean
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
+    if: ${{ !github.event.inputs.skip-unit-tests }}
     strategy:
       matrix:
-        python: [ '3.7', '3.8', '3.9', '3.10' ]
+        python-version: [ '3.7', '3.8', '3.9', '3.10' ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/unit-tests
         env:
           TEST_API_TOKEN: ${{ secrets.TEST_API_TOKEN }}
           TEST_API_URL: ${{ secrets.TEST_API_URL }}
         with:
           python-version: ${{ matrix.python-version }}
+  publish-to-pypi:
+    runs-on: ubuntu-latest
+    needs:
+      - unit-tests
+    if: |
+      always()
+      && !cancelled()
+      && contains(fromJson('["skipped", "success"]'), needs.unit-tests.result)
+      && github.event_name == 'workflow_dispatch'
+      && github.event.inputs.pypi-type != 'none'
+    permissions:
+      id-token: write
+    environment:
+      name: ${{ inputs.pypi-type == 'prod' && 'pypi' || 'test-pypi'}}
+      url: ${{ inputs.pypi-type == 'prod' && 'https://pypi.org/p/cellarium-cas' || 'https://test.pypi.org/p/cellarium-cas'}}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/pypi-deploy
+        with:
+          python-version: '3.7'
+          pypi-type: ${{ inputs.pypi-type }}
+          
