@@ -41,3 +41,7 @@ class DataValidationError(CASBaseError):
 
 class QuotaExceededError(CASBaseError):
     pass
+
+
+class ClientTooOldError(CASBaseError):
+    pass
