@@ -144,26 +144,24 @@ def get_aggregated_cas_ontology_aware_scores(
     mask_aggregation_nc = (sliced_cas_scores_nc > threshold).toarray()
     fraction_over_threshold_c = mask_aggregation_nc.sum(0) / n_selected_cells
 
-    match aggregation_op:
-        case CellOntologyScoresAggregationOp.MEAN:
-            aggregation_op_func = np.mean
-        case CellOntologyScoresAggregationOp.MEDIAN:
-            aggregation_op_func = np.median
-        case _:
-            raise ValueError
+    if aggregation_op == CellOntologyScoresAggregationOp.MEAN:
+        aggregation_op_func = np.mean
+    elif aggregation_op == CellOntologyScoresAggregationOp.MEDIAN:
+        aggregation_op_func = np.median
+    else:
+        raise ValueError
 
     sliced_cas_scores_dense_nc = sliced_cas_scores_nc.toarray()
     n_cols = sliced_cas_scores_dense_nc.shape[1]
     aggregated_scores_c = np.zeros((n_cols,))
     for c in range(n_cols):
-        match aggregation_domain:
-            case CellOntologyScoresAggregationDomain.ALL_CELLS:
-                value = aggregation_op_func(sliced_cas_scores_dense_nc[:, c])
-            case CellOntologyScoresAggregationDomain.OVER_THRESHOLD:
-                data = sliced_cas_scores_dense_nc[:, c][mask_aggregation_nc[:, c]]
-                value = aggregation_op_func(data) if data.size else 0.0
-            case _:
-                raise ValueError
+        if aggregation_domain == CellOntologyScoresAggregationDomain.ALL_CELLS:
+            value = aggregation_op_func(sliced_cas_scores_dense_nc[:, c])
+        elif aggregation_domain == CellOntologyScoresAggregationDomain.OVER_THRESHOLD:
+            data = sliced_cas_scores_dense_nc[:, c][mask_aggregation_nc[:, c]]
+            value = aggregation_op_func(data) if data.size else 0.0
+        else:
+            raise ValueError
         aggregated_scores_c[c] = value
 
     return AggregatedCellOntologyScores(
