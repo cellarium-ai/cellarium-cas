@@ -1,8 +1,8 @@
+import typing as t
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from operator import itemgetter
-from typing import Sequence
 
 import numpy as np
 import scipy.sparse as sp
@@ -113,7 +113,7 @@ class AggregatedCellOntologyScores:
 
 def get_aggregated_cas_ontology_aware_scores(
     adata: AnnData,
-    obs_indices: Sequence | None,
+    obs_indices: t.Optional[t.Sequence],
     aggregation_op: CellOntologyScoresAggregationOp = CellOntologyScoresAggregationOp.MEAN,
     aggregation_domain: CellOntologyScoresAggregationDomain = CellOntologyScoresAggregationDomain.ALL_CELLS,
     threshold: float = 1e-4,

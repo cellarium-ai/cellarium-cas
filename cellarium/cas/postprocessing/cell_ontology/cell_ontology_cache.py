@@ -1,4 +1,5 @@
 import logging
+import typing as t
 from functools import lru_cache
 from logging import log
 
@@ -123,7 +124,7 @@ class CellOntologyCache:
         return cl_ancestors_csr_matrix
 
     @lru_cache(maxsize=None)
-    def get_longest_path_lengths_from_target(self, target: str) -> dict[str, float]:
+    def get_longest_path_lengths_from_target(self, target: str) -> t.Dict[str, float]:
         # Perform a topological sort of the graph
         topo_order = list(nx.topological_sort(self.cl_graph))
 
