@@ -45,3 +45,8 @@ class QuotaExceededError(CASBaseError):
 
 class ClientTooOldError(CASBaseError):
     pass
+
+
+class DatasetProcessingError(CASBaseError):
+    pass
+

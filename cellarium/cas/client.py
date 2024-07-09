@@ -358,7 +358,7 @@ class CASClient:
             processed_response.append(query_item)
 
         if num_unannotated_cells > 0:
-            self._print(f"{num_unannotated_cells} cells were not processed by CAS")
+            raise exceptions.DatasetProcessingError(f"{num_unannotated_cells} cells were not processed by CAS")
 
         return processed_response
 
