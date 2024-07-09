@@ -109,9 +109,8 @@ class CASClient:
         self.should_show_feedback = False
         self.user_info = self.cas_api_service.feedback_opt_out()
         self._print("Successfully opted out. You will no longer receive requests to provide feedback.")
-		
-		
-		def validate_version(self):
+
+    def validate_version(self):
         """
         Validate that this version of the client library is compatible with the selected server.
         """
