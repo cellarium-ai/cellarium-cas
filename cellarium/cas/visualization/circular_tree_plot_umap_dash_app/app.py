@@ -423,7 +423,7 @@ class CASCircularTreePlotUMAPDashApp:
     def _render_breadcrumb(self) -> Component:
         selected_cells = self._get_effective_selected_cells()
         if len(selected_cells) == 0 and self.selected_cell_domain_key.get() == DomainSelectionConstants.NONE:
-            label = f"Viewing results for all cells"
+            label = "Viewing results for all cells"
             show_clear = False
         elif (
             len(selected_cells) == 1 and self.selected_cell_domain_key.get() == DomainSelectionConstants.USER_SELECTION
