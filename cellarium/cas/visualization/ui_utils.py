@@ -1,5 +1,6 @@
 import platform
 import subprocess
+import typing as t
 
 
 def find_and_kill_process(port: int, verbose: bool = False):
@@ -54,3 +55,50 @@ def find_and_kill_process(port: int, verbose: bool = False):
     except subprocess.CalledProcessError as e:
         if verbose:
             print(f"No process found using port {port}. {e}")
+
+
+T = t.TypeVar("T")
+
+
+class ConfigValue(t.Generic[T]):
+    """
+    Class to store a configuration value and its original value.  Useful for tracking uncommitted changes.
+
+    Note: there is no typechecking to ensure that the original value and the new value are of the same type.
+    """
+
+    def __init__(self, value: T):
+        self.__value__ = value
+        self.__original_value__ = value
+        self.__dirty_value__ = None
+        self.__is_dirty__ = False
+
+    def set(self, value: T) -> t.Self:
+        self.__dirty_value__ = value
+        self.__is_dirty__ = True
+        return self
+
+    def rollback(self) -> t.Self:
+        self.__dirty_value__ = None
+        self.__is_dirty__ = False
+        return self
+
+    def commit(self) -> t.Self:
+        if self.__is_dirty__:
+            self.__value__ = self.__dirty_value__
+        self.__is_dirty__ = False
+        return self
+
+    def get(self, dirty_read: bool = False) -> T:
+        if dirty_read and self.__is_dirty__:
+            return self.__dirty_value__
+        return self.__value__
+
+    def is_dirty(self) -> bool:
+        return self.__is_dirty__
+
+    def reset(self) -> t.Self:
+        self.__value__ = self.__original_value__
+        self.__dirty_value__ = None
+        self.__is_dirty__ = False
+        return self

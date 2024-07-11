@@ -1,5 +1,5 @@
+import typing as t
 from functools import lru_cache
-from typing import Dict, List, Tuple
 
 import numpy as np
 import plotly.graph_objs as go
@@ -30,7 +30,7 @@ class CircularTreePlot:
     def __init__(
         self,
         tree: Phylo.BaseTree.Tree,
-        title: str,
+        title: t.Optional[str] = None,
         order: str = "preorder",
         dist: float = 1.0,
         start_angle: float = 0.0,
@@ -122,7 +122,7 @@ class CircularTreePlot:
             for cl_name in self.cl_name_list
         ]
 
-    def _get_radius(self) -> Dict:
+    def _get_radius(self) -> t.Dict:
         """
         Associates each clade root with its radius, equal to the distance from that clade to the tree root.
 
@@ -134,7 +134,7 @@ class CircularTreePlot:
             node_radius = self.tree.depths(unit_branch_lengths=True)
         return node_radius
 
-    def _get_vertical_position(self) -> Dict:
+    def _get_vertical_position(self) -> t.Dict:
         """
         Returns a dictionary {clade: y_coord}, where y_coord is the Cartesian y-coordinate of a clade root in a rectangular phylogram.
 
@@ -176,7 +176,7 @@ class CircularTreePlot:
         y_right: float = 0,
         y_bottom: float = 0,
         y_top: float = 0,
-    ) -> Tuple[List[float], List[float]]:
+    ) -> t.Tuple[t.List[float], t.List[float]]:
         """
         Define the points that generate a radial branch and the circular arcs, perpendicular to that branch.
 
@@ -208,10 +208,10 @@ class CircularTreePlot:
         self,
         clade: Phylo.BaseTree.Clade,
         x_left: float,
-        x_lines: List[float],
-        y_lines: List[float],
-        x_arcs: List[float],
-        y_arcs: List[float],
+        x_lines: t.List[float],
+        y_lines: t.List[float],
+        x_arcs: t.List[float],
+        y_arcs: t.List[float],
     ):
         """
         Recursively compute the lists of points that span the tree branches.
@@ -243,7 +243,7 @@ class CircularTreePlot:
 
     def _get_circular_tree_data(
         self,
-    ) -> Tuple[List[float], List[float], List[float], List[float], List[float], List[float]]:
+    ) -> t.Tuple[t.List[float], t.List[float], t.List[float], t.List[float], t.List[float], t.List[float]]:
         """
         Define data needed to get the Plotly plot of a circular tree.
 
@@ -333,8 +333,12 @@ class CircularTreePlot:
             hoverinfo="none",
         )
 
+        title = dict(
+            text=self.title,
+            font=dict(family="Arial", size=1) if self.title is None else dict(family="Arial", size=20),
+        )
         layout = dict(
-            title=self.title,
+            title=title,
             font=dict(family="Arial", size=14),
             autosize=True,
             showlegend=False,

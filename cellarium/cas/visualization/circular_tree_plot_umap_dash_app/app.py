@@ -5,12 +5,14 @@ import typing as t
 from collections import OrderedDict
 from logging import log
 
+import dash_bootstrap_components as dbc
 import numpy as np
 import plotly.graph_objects as go
 from anndata import AnnData
 from Bio import Phylo
-from dash import Dash, dcc, html
+from dash import Dash, State, dcc, html
 from dash.dependencies import Input, Output
+from dash.development.base_component import Component
 from plotly.express.colors import sample_colorscale
 
 from cellarium.cas.postprocessing import (
@@ -25,10 +27,16 @@ from cellarium.cas.postprocessing import (
 )
 from cellarium.cas.postprocessing.cell_ontology import CL_CELL_ROOT_NODE, CellOntologyCache
 from cellarium.cas.visualization._components.circular_tree_plot import CircularTreePlot
-from cellarium.cas.visualization.dash_utils import find_and_kill_process
+from cellarium.cas.visualization.ui_utils import ConfigValue, find_and_kill_process
 
 # cell type ontology terms (and all descendents) to hide from the visualization
 DEFAULT_HIDDEN_CL_NAMES_SET = {}
+
+
+class DomainSelectionConstants:
+    NONE = 0
+    USER_SELECTION = 1
+    SEPARATOR = 2
 
 
 # cell type ontology terms to always show as text labels in the visualization
@@ -114,13 +122,13 @@ class CASCircularTreePlotUMAPDashApp:
         figure_height: int = 400,
         hidden_cl_names_set: set[str] = DEFAULT_HIDDEN_CL_NAMES_SET,
         shown_cl_names_set: set[str] = DEFAULT_SHOWN_CL_NAMES_SET,
-        score_colorscale: str | list = "Viridis",
+        score_colorscale: t.Union[str, list] = "Viridis",
     ):
         self.adata = adata
         self.aggregation_op = aggregation_op
         self.aggregation_domain = aggregation_domain
-        self.score_threshold = score_threshold
-        self.min_cell_fraction = min_cell_fraction
+        self.score_threshold = ConfigValue(score_threshold)
+        self.min_cell_fraction = ConfigValue(min_cell_fraction)
         self.umap_min_opacity = umap_min_opacity
         self.umap_max_opacity = umap_max_opacity
         self.umap_marker_size = umap_marker_size
@@ -151,7 +159,8 @@ class CASCircularTreePlotUMAPDashApp:
                 )
 
         # default cell domain
-        self.selected_cell_domain_key = self.ALL_CELLS_DOMAIN_KEY
+        self.selected_cell_domain_key = ConfigValue(DomainSelectionConstants.NONE)
+        self.selected_cells = []
 
         # instantiate the cell type ontology cache
         self.cl = CellOntologyCache()
@@ -160,7 +169,7 @@ class CASCircularTreePlotUMAPDashApp:
         insert_cas_ontology_aware_response_into_adata(cas_ontology_aware_response, adata, self.cl)
 
         # instantiate the Dash app
-        self.app = Dash(__name__)
+        self.app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP])
         self.server = self.app.server
         self.app.layout = self._create_layout()
         self._setup_initialization()
@@ -169,25 +178,22 @@ class CASCircularTreePlotUMAPDashApp:
     def run(self, port: int = 8050, **kwargs):
         log(logging.INFO, "Starting Dash application...")
         try:
-            self.app.run_server(port=port, jupyter_mode="inline", jupyter_height=self.height + 50, **kwargs)
+            self.app.run_server(port=port, jupyter_mode="inline", jupyter_height=self.height + 100, **kwargs)
         except OSError:  # Dash raises OSError if the port is already in use
             find_and_kill_process(port)
-            self.app.run_server(port=port, jupyter_mode="inline", jupyter_height=self.height + 50, **kwargs)
+            self.app.run_server(port=port, jupyter_mode="inline", jupyter_height=self.height + 100, **kwargs)
 
-    def _instantiate_circular_tree_plot(
-        self, obs_indices_override: t.Optional[t.Sequence] = None, title_override: t.Optional[str] = None
-    ) -> CircularTreePlot:
+    def _instantiate_circular_tree_plot(self) -> CircularTreePlot:
         # reduce scores over the provided cells
+        selected_cells = self._get_effective_selected_cells()
         aggregated_scores = get_aggregated_cas_ontology_aware_scores(
             self.adata,
             obs_indices=(
-                self.cell_domain_map[self.selected_cell_domain_key]
-                if obs_indices_override is None
-                else obs_indices_override
+                self.cell_domain_map[self.ALL_CELLS_DOMAIN_KEY] if len(selected_cells) == 0 else selected_cells
             ),
             aggregation_op=self.aggregation_op,
             aggregation_domain=self.aggregation_domain,
-            threshold=self.score_threshold,
+            threshold=self.score_threshold.get(),
         )
 
         # generate a Phylo tree
@@ -195,7 +201,7 @@ class CASCircularTreePlotUMAPDashApp:
             aggregated_scores=aggregated_scores,
             cl=self.cl,
             root_cl_name=CL_CELL_ROOT_NODE,
-            min_fraction=self.min_cell_fraction,
+            min_fraction=self.min_cell_fraction.get(),
             hidden_cl_names_set=self.hidden_cl_names_set,
         )
         phyloxml_string = generate_phyloxml_from_scored_cell_ontology_tree(
@@ -212,10 +218,8 @@ class CASCircularTreePlotUMAPDashApp:
         finally:
             os.remove(temp_file_name)
 
-        domain_label = self.selected_cell_domain_key if title_override is None else title_override
         return CircularTreePlot(
             tree=phyloxml_tree,
-            title=f"Score summary of {domain_label}",
             score_colorscale=self.score_colorscale,
             linecolor=self.circular_tree_plot_linecolor,
             start_angle=self.circular_tree_start_angle,
@@ -260,112 +264,82 @@ class CASCircularTreePlotUMAPDashApp:
         """
 
         layout = html.Div(
-            id="main-container",
-            children=[
-                html.Div(
-                    [
-                        html.H3("Control Panel", style={"margin-top": "0px", "margin-bottom": "50px"}),
-                        html.Div(
-                            [
-                                html.Label("Cell selection:", style={"margin-bottom": "5px"}),
-                                dcc.Dropdown(
-                                    id="domain-dropdown",
-                                    options=list(dict(label=k, value=k) for k in self.cell_domain_map.keys()),
-                                    value=self.ALL_CELLS_DOMAIN_KEY,  # default to all cells
-                                    className="custom-dropdown",
-                                ),
-                            ],
-                            style={"margin-bottom": "20px"},
-                        ),
-                        html.Div(
-                            [
-                                html.Label("Evidence threshold:", style={"margin-bottom": "5px"}),
-                                dcc.Input(id="evidence-threshold", type="text", value=self.score_threshold),
-                            ],
-                            style={"margin-bottom": "20px"},
-                        ),
-                        html.Div(
-                            [
-                                html.Label("Minimum cell fraction:"),
-                                dcc.Input(id="cell-fraction", type="text", value=self.min_cell_fraction),
-                            ],
-                            style={"margin-bottom": "20px"},
-                        ),
-                        html.Div(
-                            [
-                                html.Button(
-                                    "Update",
-                                    id="update-button",
-                                    n_clicks=0,
-                                    style={"margin-top": "20px", "margin-left": "0px"},
-                                )
-                            ],
-                            style={"margin-top": "20px"},
-                        ),
-                        html.Img(
-                            src="assets/cellarium-powered-400px.png",
-                            style={"width": "150px", "position": "absolute", "bottom": "20px"},
-                        ),
-                    ],
-                    style={
-                        "width": "300px",
-                        "backgroundColor": "white",
-                        "padding": "20px",
-                        "boxSizing": "border-box",
-                        "height": "100vh",
-                    },
+            [
+                dbc.Row(dbc.Col(className="gr-spacer", width=12)),
+                dbc.Row(
+                    dbc.Col(
+                        [
+                            html.H3(self._render_breadcrumb(), id="selected-domain-label", className="gr-breadcrumb"),
+                            html.Div(
+                                [
+                                    dbc.ButtonGroup(
+                                        [
+                                            dbc.Button(
+                                                html.I(className="bi bi-gear-fill"),
+                                                id="settings-button",
+                                                n_clicks=0,
+                                                size="sm",
+                                            ),
+                                        ]
+                                    )
+                                ],
+                                className="gr-settings-buttons",
+                            ),
+                        ],
+                        className="gr-title",
+                        width=12,
+                    )
                 ),
-                html.Div(
+                dbc.Row(
                     [
-                        dcc.Graph(
-                            id="circular-tree-plot",
-                            style={"width": "100%", "display": "inline-block", "height": f"{self.height}x"},
-                            config={"scrollZoom": True},
-                        )
-                    ],
-                    style={
-                        "width": "40%",
-                        "display": "inline-block",
-                        "backgroundColor": "white",
-                        "padding": "0px",
-                        "boxSizing": "border-box",
-                        "height": "100vh",
-                        "float": "left",
-                    },
+                        dbc.Col(
+                            html.Div(
+                                [
+                                    html.Div("Ontology View", className="gr-header"),
+                                    dcc.Graph(
+                                        id="circular-tree-plot",
+                                        style={
+                                            "width": "100%",
+                                            "display": "inline-block",
+                                            "height": f"{self.height}px",
+                                        },
+                                        config={"scrollZoom": True},
+                                    ),
+                                ]
+                            ),
+                            width=6,
+                        ),
+                        dbc.Col(
+                            html.Div(
+                                [
+                                    html.Div("UMAP View", className="gr-header"),
+                                    dcc.Graph(
+                                        id="umap-scatter-plot",
+                                        style={
+                                            "width": "100%",
+                                            "display": "inline-block",
+                                            "height": f"{self.height-10}px",
+                                        },
+                                        config={"scrollZoom": True},
+                                    ),
+                                ]
+                            ),
+                            width=6,
+                        ),
+                    ]
                 ),
-                html.Div(
-                    [
-                        dcc.Graph(
-                            id="umap-scatter-plot",
-                            style={"width": "100%", "display": "inline-block", "height": f"{self.height}px"},
-                            config={"scrollZoom": True},
-                        )
-                    ],
-                    style={
-                        "width": "40%",
-                        "backgroundColor": "white",
-                        "padding": "0px",
-                        "boxSizing": "border-box",
-                        "height": "100vh",
-                    },
+                dbc.Offcanvas(
+                    id="settings-pane", title="Settings", is_open=False, children=self._render_closed_settings_pane()
                 ),
                 html.Div(id="init", style={"display": "none"}),
                 html.Div(id="no-action", style={"display": "none"}),
                 html.Script(scroll_zoom_js),
             ],
-            style={
-                "display": "flex",
-                "flexDirection": "row",
-                "backgroundColor": "white",
-                "margin": "0",
-                "padding": "0",
-                "height": "100vh",
-            },
         )
 
         return layout
 
-    def _initialize_umap_scatter_plot(self, highlight_active: bool = False) -> go.Figure:
+    def _initialize_umap_scatter_plot(self) -> go.Figure:
         # calculate static bounds for the UMAP scatter plot
         self.umap_min_x, self.umap_max_x, self.umap_min_y, self.umap_max_y = self._get_padded_umap_bounds(
             self.umap_padding
@@ -374,11 +348,13 @@ class CASCircularTreePlotUMAPDashApp:
         fig = go.Figure()
 
         color = self.umap_default_cell_color
-        if highlight_active:
-            if self.selected_cell_domain_key != self.ALL_CELLS_DOMAIN_KEY:
-                color = [self.umap_inactive_cell_color] * self.adata.n_obs
-                for i_obs in self.cell_domain_map[self.selected_cell_domain_key]:
-                    color[i_obs] = self.umap_active_cell_color
+
+        selected_cells = self._get_effective_selected_cells()
+
+        if len(selected_cells) > 0:
+            color = [self.umap_inactive_cell_color] * self.adata.n_obs
+            for i_obs in selected_cells:
+                color[i_obs] = self.umap_active_cell_color
 
         fig.add_trace(
             go.Scatter(
@@ -396,10 +372,8 @@ class CASCircularTreePlotUMAPDashApp:
         self._umap_scatter_plot_figure = fig
         return fig
 
-    def _initialize_circular_tree_plot(
-        self, obs_indices_override: t.Optional[t.Sequence] = None, title_override: t.Optional[str] = None
-    ) -> go.Figure:
-        self.circular_tree_plot = self._instantiate_circular_tree_plot(obs_indices_override, title_override)
+    def _initialize_circular_tree_plot(self) -> go.Figure:
+        self.circular_tree_plot = self._instantiate_circular_tree_plot()
         fig = self.circular_tree_plot.plotly_figure
         self._circular_tree_plot_figure = fig
         return fig
@@ -446,7 +420,153 @@ class CASCircularTreePlotUMAPDashApp:
             dragmode="pan",
         )
 
-    def _setup_callbacks(self):
+    def _render_breadcrumb(self) -> Component:
+        selected_cells = self._get_effective_selected_cells()
+        if len(selected_cells) == 0 and self.selected_cell_domain_key.get() == DomainSelectionConstants.NONE:
+            label = f"Viewing results for all cells"
+            show_clear = False
+        elif (
+            len(selected_cells) == 1 and self.selected_cell_domain_key.get() == DomainSelectionConstants.USER_SELECTION
+        ):
+            label = f"Selected cell index {selected_cells[0]}"
+            show_clear = True
+        elif len(selected_cells) > 1 and self.selected_cell_domain_key.get() == DomainSelectionConstants.USER_SELECTION:
+            label = f"Selected {len(selected_cells)} cells"
+            show_clear = True
+        else:
+            modifier = "cell" if len(selected_cells) == 1 else "cells"
+            label = f"Selected cell domain {self.selected_cell_domain_key.get()} ({len(selected_cells)} {modifier})"
+            show_clear = True
+        children = [html.B(label, className="gr-breadcrumb-label")]
+
+        if show_clear:
+            children.append(
+                html.Div(
+                    [html.I(className="bi bi-x-circle")],
+                    id="reset-selection-button",
+                    n_clicks=0,
+                    className="btn btn-link",
+                    title="Clear selection",
+                )
+            )
+        return html.Div(children)
+
+    def _render_closed_settings_pane(self) -> Component:
+        return [
+            html.Div(
+                [
+                    html.Label("Cell selection:", style={"margin-bottom": "5px"}),
+                    self._render_domain_dropdown(),
+                ],
+                className="gr-form-item",
+            ),
+            html.Div(
+                [
+                    dbc.Label("Evidence threshold:", html_for="evidence-threshold"),
+                    dcc.Slider(
+                        id="evidence-threshold",
+                        min=0,
+                        max=1,
+                        value=self.score_threshold.get(dirty_read=True),
+                        marks={
+                            0: "0",
+                            0.25: "0.25",
+                            0.5: "0.5",
+                            0.75: "0.75",
+                            1: "1",
+                        },
+                        tooltip={"placement": "bottom", "always_visible": True, "style": {"margin": "0 5px"}},
+                    ),
+                ],
+                className="gr-form-item",
+            ),
+            html.Div(
+                [
+                    dbc.Label("Minimum cell fraction:", html_for="cell-fraction"),
+                    dcc.Slider(
+                        id="cell-fraction",
+                        min=0,
+                        max=1,
+                        value=self.min_cell_fraction.get(dirty_read=True),
+                        marks={
+                            0: "0",
+                            0.25: "0.25",
+                            0.5: "0.5",
+                            0.75: "0.75",
+                            1: "1",
+                        },
+                        tooltip={"placement": "bottom", "always_visible": True, "style": {"margin": "0 5px"}},
+                    ),
+                ],
+                className="gr-form-item",
+            ),
+            html.Div(
+                [
+                    dbc.Button(
+                        "Cancel",
+                        id="cancel-button",
+                        title="Cancel the changes and close the settings pane",
+                        n_clicks=0,
+                    ),
+                    dbc.Button(
+                        "Update",
+                        id="update-button",
+                        title="Update the graphs based on the specified configuration",
+                        n_clicks=0,
+                    ),
+                ],
+                className="gr-settings-button-bar",
+            ),
+            html.A(
+                html.Img(
+                    src="assets/cellarium-powered-400px.png",
+                ),
+                href="https://cellarium.ai",
+                className="gr-powered-by",
+                target="_blank",
+            ),
+        ]
+
+    def _render_domain_dropdown(self) -> Component:
+        labels = [{"label": "None selected", "value": DomainSelectionConstants.NONE}]
+        if len(self.selected_cells) > 0:
+            labels.append({"label": "User selection", "value": DomainSelectionConstants.USER_SELECTION})
+
+        if len(self.cell_domain_map.keys()) > 1:
+            labels.append({"label": "________________", "value": None, "disabled": True})
+            labels.append({"label": html.Span("Provided domains"), "value": None, "disabled": True})
+
+            for k in list(self.cell_domain_map.keys())[1:]:
+                labels.append({"label": k, "value": k})
+
+        return dcc.Dropdown(
+            id="domain-dropdown",
+            options=labels,
+            value=self.selected_cell_domain_key.get(),  # default to no selection
+            className="gr-custom-dropdown",
+            clearable=False,
+        )
+
+    def _get_effective_selected_cells(self) -> list:
+        # User has chosen not to show any highlighted cells
+        if self.selected_cell_domain_key.get() == DomainSelectionConstants.NONE:
+            return []
+
+        # User has chose to highlight explicitly selected cells
+        if self.selected_cell_domain_key.get() == DomainSelectionConstants.USER_SELECTION:
+            return self.selected_cells
+
+        # User has chose to highlight pre-calculated domain cells
+        if self.selected_cell_domain_key.get() is not None:
+            return self.cell_domain_map[self.selected_cell_domain_key.get()]
+
+    def _clear_selection(self):
+        self.selected_cells = []
+        self.selected_cell_domain_key.reset()
+
+    def _setup_callbacks(self) -> None:
+
+        # Cell selection callbacks
         @self.app.callback(
             Output("umap-scatter-plot", "figure", allow_duplicate=True),
             Input("circular-tree-plot", "clickData"),
@@ -468,7 +588,7 @@ class CASCircularTreePlotUMAPDashApp:
             scores = self._get_scores_for_cl_name(cl_name)
             opacity = self._get_scatter_plot_opacity_from_scores(scores)
             color = sample_colorscale(self.circular_tree_plot.score_colorscale, scores)
-            selected_cells_set = set(self.cell_domain_map[self.selected_cell_domain_key])
+            selected_cells_set = set(self._get_effective_selected_cells())
             for i_obs in range(self.adata.n_obs):
                 if i_obs not in selected_cells_set:
                     color[i_obs] = self.umap_inactive_cell_color
@@ -492,44 +612,141 @@ class CASCircularTreePlotUMAPDashApp:
         @self.app.callback(
             Output("circular-tree-plot", "figure", allow_duplicate=True),
             Output("umap-scatter-plot", "figure", allow_duplicate=True),
-            Input("domain-dropdown", "value"),
-            prevent_initial_call=True,
-        )
-        def _update_figures_based_on_dropdown(domain):
-            # set the domain
-            self.selected_cell_domain_key = domain
-
-            # update the figures
-            self._initialize_umap_scatter_plot(highlight_active=True)
-            self._initialize_circular_tree_plot()
-            return self._circular_tree_plot_figure, self._umap_scatter_plot_figure
-
-        @self.app.callback(
-            Output("circular-tree-plot", "figure", allow_duplicate=True),
+            Output("selected-domain-label", "children", allow_duplicate=True),
             Input("umap-scatter-plot", "clickData"),
             prevent_initial_call=True,
         )
         def _update_circular_tree_plot_based_on_umap_scatter_plot(clickData):
             if clickData is None or "points" not in clickData:
-                return self._circular_tree_plot_figure
+                return self._circular_tree_plot_figure, self._umap_scatter_plot_figure, self._render_breadcrumb()
 
             point = clickData["points"][0]
 
             if "pointIndex" not in point:
-                return self._circular_tree_plot_figure
+                return self._circular_tree_plot_figure, self._umap_scatter_plot_figure, self._render_breadcrumb()
 
             node_index = point["pointIndex"]
-            self._initialize_circular_tree_plot([node_index], f"cell index {node_index}")
-            return self._circular_tree_plot_figure
+            self.selected_cells = [node_index]
+            self.selected_cell_domain_key.set(DomainSelectionConstants.USER_SELECTION).commit()
+            self._initialize_circular_tree_plot()
+            self._initialize_umap_scatter_plot()
+            return self._circular_tree_plot_figure, self._umap_scatter_plot_figure, self._render_breadcrumb()
 
         @self.app.callback(
             Output("circular-tree-plot", "figure", allow_duplicate=True),
+            Output("umap-scatter-plot", "figure", allow_duplicate=True),
+            Output("selected-domain-label", "children", allow_duplicate=True),
+            Input("umap-scatter-plot", "selectedData"),
+            prevent_initial_call=True,
+        )
+        def _update_circular_tree_plot_based_on_umap_scatter_plot_select(selectedData):
+            # A selection event is firing on initialization. Ignore it by only accepting selectedData with a range field or lasso field
+            if (
+                selectedData is None
+                or "points" not in selectedData
+                or ("range" not in selectedData and "lassoPoints" not in selectedData)
+            ):
+                return self._circular_tree_plot_figure, self._umap_scatter_plot_figure, self._render_breadcrumb()
+
+            points = selectedData["points"]
+
+            node_indexes = [point["pointIndex"] for point in points]
+            self.selected_cells = node_indexes
+            self.selected_cell_domain_key.set(DomainSelectionConstants.USER_SELECTION).commit()
+            self._initialize_circular_tree_plot()
+            self._initialize_umap_scatter_plot()
+            return self._circular_tree_plot_figure, self._umap_scatter_plot_figure, self._render_breadcrumb()
+
+        @self.app.callback(
+            Output("circular-tree-plot", "figure", allow_duplicate=True),
+            Output("umap-scatter-plot", "figure", allow_duplicate=True),
+            Output("selected-domain-label", "children", allow_duplicate=True),
+            Output("settings-pane", "children", allow_duplicate=True),
+            Input("reset-selection-button", "n_clicks"),
+            prevent_initial_call=True,
+        )
+        def _reset_selection(n_clicks):
+            if n_clicks != 0:
+                self._clear_selection()
+
+                # update the figures
+                self._initialize_umap_scatter_plot()
+                self._initialize_circular_tree_plot()
+
+            return (
+                self._circular_tree_plot_figure,
+                self._umap_scatter_plot_figure,
+                self._render_breadcrumb(),
+                self._render_closed_settings_pane(),
+            )
+
+        # Settings callbacks
+        @self.app.callback(
+            Output("circular-tree-plot", "figure", allow_duplicate=True),
+            Output("umap-scatter-plot", "figure", allow_duplicate=True),
+            Output("selected-domain-label", "children", allow_duplicate=True),
+            Output("settings-pane", "children", allow_duplicate=True),
+            Output("settings-pane", "is_open", allow_duplicate=True),
             Input("update-button", "n_clicks"),
             prevent_initial_call=True,
         )
-        def _update_circular_tree_plot_based_on_update_button(n_clicks):
-            self._initialize_circular_tree_plot()
-            return self._circular_tree_plot_figure
+        def _save_settings(n_clicks):
+            if n_clicks > 0:
+                # If a domain selection was changed and set to None, clear all selections
+                if (
+                    self.selected_cell_domain_key.is_dirty()
+                    and self.selected_cell_domain_key.get(dirty_read=True) is DomainSelectionConstants.NONE
+                ):
+                    self._clear_selection()
+
+                self.selected_cell_domain_key.commit()
+                self.score_threshold.commit()
+                self.min_cell_fraction.commit()
+
+                # update the figures
+                self._initialize_umap_scatter_plot()
+                self._initialize_circular_tree_plot()
+
+            return (
+                self._circular_tree_plot_figure,
+                self._umap_scatter_plot_figure,
+                self._render_breadcrumb(),
+                self._render_closed_settings_pane(),
+                False,
+            )
+
+        @self.app.callback(
+            Output("settings-pane", "children", allow_duplicate=True),
+            Output("settings-pane", "is_open", allow_duplicate=True),
+            Input("cancel-button", "n_clicks"),
+            prevent_initial_call=True,
+        )
+        def _cancel_settings(n_clicks):
+            self.selected_cell_domain_key.rollback()
+            self.score_threshold.rollback()
+            self.min_cell_fraction.rollback()
+
+            return self._render_closed_settings_pane(), False
+
+        @self.app.callback(
+            Output("settings-pane", "is_open", allow_duplicate=True),
+            Input("settings-button", "n_clicks"),
+            [State("settings-pane", "is_open")],
+            prevent_initial_call=True,
+        )
+        def _toggle_settings(n_clicks, is_open):
+            if n_clicks:
+                return not is_open
+            return is_open
+
+        @self.app.callback(
+            Output("no-action", "children", allow_duplicate=True),
+            Input("domain-dropdown", "value"),
+            prevent_initial_call=True,
+        )
+        def _update_domain(domain):
+            # set the domain
+            self.selected_cell_domain_key.set(domain)
 
         @self.app.callback(
             Output("no-action", "children", allow_duplicate=True),
@@ -538,7 +755,7 @@ class CASCircularTreePlotUMAPDashApp:
         )
         def _update_evidence_threshold(input_value):
             try:
-                self.score_threshold = float(input_value)
+                self.score_threshold.set(float(input_value))
             except ValueError:
                 pass
             return input_value
@@ -550,7 +767,7 @@ class CASCircularTreePlotUMAPDashApp:
         )
         def _update_cell_fraction(input_value):
             try:
-                self.min_cell_fraction = float(input_value)
+                self.min_cell_fraction.set(float(input_value))
             except ValueError:
                 pass
             return input_value
