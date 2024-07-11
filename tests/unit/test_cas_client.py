@@ -195,6 +195,12 @@ class TestCasClient:
                 {"schema_name": TEST_SCHEMA},
             ],
         )
+        self._mock_response(
+            url=f"{TEST_URL}/api/cellarium-general/validate-client-version",
+            status_code=200,
+            response_body={"is_valid": True, "min_version": "1.4.0"},
+            method="post",
+        )
 
     def _mock_annotate_matrix_cell_type_summary_statistics_strategy_calls(
         self, num_cells: int = 3, num_features: int = 3

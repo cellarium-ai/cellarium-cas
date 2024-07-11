@@ -12,7 +12,7 @@ from uuid import UUID, uuid4
 import anndata
 from deprecated import deprecated
 
-from cellarium.cas import _io, constants, data_preparation, exceptions, service, settings
+from cellarium.cas import _io, constants, data_preparation, exceptions, service, settings, version
 from cellarium.cas.service import action_context_manager
 
 CHUNK_SIZE_ANNOTATE_DEFAULT = 1000
@@ -66,6 +66,8 @@ class CASClient:
         if "should_ask_for_feedback" in self.user_info:
             self.should_show_feedback = self.user_info["should_ask_for_feedback"]
 
+        self.validate_version()
+
         # Retrieving General Info
         application_info = self.cas_api_service.get_application_info()
 
@@ -107,6 +109,20 @@ class CASClient:
         self.should_show_feedback = False
         self.user_info = self.cas_api_service.feedback_opt_out()
         self._print("Successfully opted out. You will no longer receive requests to provide feedback.")
+
+    def validate_version(self):
+        """
+        Validate that this version of the client library is compatible with the selected server.
+        """
+        client_version = version.get_version()
+        version_validation_info = self.cas_api_service.validate_version(version_str=client_version)
+        if version_validation_info["is_valid"]:
+            self._print(f"Client version {client_version} is compatible with selected server.")
+        else:
+            raise exceptions.ClientTooOldError(
+                f"Client version {client_version} is older than the minimum version for this server {version_validation_info['min_version']}. "
+                f"Please update the client to the latest version using 'pip install cellarium-cas --upgrade'."
+            )
 
     def validate_and_sanitize_input_data(
         self,
