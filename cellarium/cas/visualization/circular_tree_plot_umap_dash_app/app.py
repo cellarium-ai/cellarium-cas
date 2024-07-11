@@ -565,7 +565,6 @@ class CASCircularTreePlotUMAPDashApp:
         self.selected_cell_domain_key.reset()
 
     def _setup_callbacks(self) -> None:
-
         # Cell selection callbacks
         @self.app.callback(
             Output("umap-scatter-plot", "figure", allow_duplicate=True),
@@ -642,9 +641,9 @@ class CASCircularTreePlotUMAPDashApp:
         def _update_circular_tree_plot_based_on_umap_scatter_plot_select(selectedData):
             # A selection event is firing on initialization. Ignore it by only accepting selectedData with a range field or lasso field
             if (
-                selectedData is None
-                or "points" not in selectedData
-                or ("range" not in selectedData and "lassoPoints" not in selectedData)
+                selectedData is None or
+                "points" not in selectedData or
+                ("range" not in selectedData and "lassoPoints" not in selectedData)
             ):
                 return self._circular_tree_plot_figure, self._umap_scatter_plot_figure, self._render_breadcrumb()
 
@@ -694,8 +693,8 @@ class CASCircularTreePlotUMAPDashApp:
             if n_clicks > 0:
                 # If a domain selection was changed and set to None, clear all selections
                 if (
-                    self.selected_cell_domain_key.is_dirty()
-                    and self.selected_cell_domain_key.get(dirty_read=True) is DomainSelectionConstants.NONE
+                    self.selected_cell_domain_key.is_dirty() and
+                    self.selected_cell_domain_key.get(dirty_read=True) is DomainSelectionConstants.NONE
                 ):
                     self._clear_selection()
 
