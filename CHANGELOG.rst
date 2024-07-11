@@ -16,6 +16,13 @@ dev - 2024-06-29
 - Added circular tree plot visualization Dash App
 
 
+1.4.7 - 2024-07-09
+------------------
+
+Added
+~~~~~
+- Add check in client initialization to ensure the current version of the client code is compatbile with the selected CAS server
+
 1.4.6 - 2024-06-12
 ------------------
 

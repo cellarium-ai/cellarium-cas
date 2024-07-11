@@ -316,6 +316,15 @@ class CASAPIService(_BaseService):
             )
         )
 
+    def validate_version(self, version_str: str) -> t.Dict[str, t.Any]:
+        """
+        Validate client version with the server to see if it is compatible.
+        Would raise 400 Bad Request if version is not compatible.
+
+        :return: Void
+        """
+        return self.post_json(endpoint=endpoints.VALIDATE_VERSION, data={"client_version": version_str})
+
     def get_feature_schemas(self) -> t.List[str]:
         """
         Retrieve a list of feature schemas that exist in Cellarium Cloud CAS
