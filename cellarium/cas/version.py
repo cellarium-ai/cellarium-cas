@@ -14,7 +14,7 @@ def get_version() -> str:
         from importlib.metadata import PackageNotFoundError, version
 
         try:
-            return version(__package__)
+            return version("cellarium-cas")
         except PackageNotFoundError:
             return os.environ.get("CAS_VERSION", "0.0.1")
     elif python_version_info.major == 3 and python_version_info.minor == 7:
