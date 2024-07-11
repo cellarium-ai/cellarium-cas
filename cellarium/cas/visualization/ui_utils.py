@@ -2,6 +2,8 @@ import platform
 import subprocess
 import typing as t
 
+from typing_extensions import Self
+
 
 def find_and_kill_process(port: int, verbose: bool = False):
     """
@@ -73,17 +75,17 @@ class ConfigValue(t.Generic[T]):
         self.__dirty_value__ = None
         self.__is_dirty__ = False
 
-    def set(self, value: T) -> t.Self:
+    def set(self, value: T) -> Self:
         self.__dirty_value__ = value
         self.__is_dirty__ = True
         return self
 
-    def rollback(self) -> t.Self:
+    def rollback(self) -> Self:
         self.__dirty_value__ = None
         self.__is_dirty__ = False
         return self
 
-    def commit(self) -> t.Self:
+    def commit(self) -> Self:
         if self.__is_dirty__:
             self.__value__ = self.__dirty_value__
         self.__is_dirty__ = False
@@ -97,7 +99,7 @@ class ConfigValue(t.Generic[T]):
     def is_dirty(self) -> bool:
         return self.__is_dirty__
 
-    def reset(self) -> t.Self:
+    def reset(self) -> Self:
         self.__value__ = self.__original_value__
         self.__dirty_value__ = None
         self.__is_dirty__ = False
