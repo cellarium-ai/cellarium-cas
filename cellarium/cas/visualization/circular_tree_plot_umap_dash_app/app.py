@@ -160,7 +160,10 @@ class CASCircularTreePlotUMAPDashApp:
 
         # default cell domain
         self.selected_cell_domain_key = ConfigValue(DomainSelectionConstants.NONE)
+        # Selected cells (from UMAP chart)
         self.selected_cells = []
+        # Selected cell class (from tree diagram)
+        self.selected_cl_name = None
 
         # instantiate the cell type ontology cache
         self.cl = CellOntologyCache()
@@ -176,7 +179,7 @@ class CASCircularTreePlotUMAPDashApp:
         self._setup_callbacks()
 
     def run(self, port: int = 8050, **kwargs):
-        log(logging.INFO, "Starting Dash application...")
+        log(logging.INFO, "Starting Dash application on port {port}...")
         try:
             self.app.run_server(port=port, jupyter_mode="inline", jupyter_height=self.height + 100, **kwargs)
         except OSError:  # Dash raises OSError if the port is already in use
@@ -252,17 +255,6 @@ class CASCircularTreePlotUMAPDashApp:
         )
 
     def _create_layout(self):
-        # Custom JavaScript for increasing scroll zoom sensitivity (doesn't seem to work)
-        scroll_zoom_js = """
-        function(graph) {
-            var plot = document.getElementById(graph.id);
-            plot.on('wheel', function(event) {
-                event.deltaY *= 0.2;  // Adjust this value to change sensitivity
-            });
-            return graph;
-        }
-        """
-
         layout = html.Div(
             [
                 dbc.Row(dbc.Col(className="gr-spacer", width=12)),
@@ -320,7 +312,8 @@ class CASCircularTreePlotUMAPDashApp:
                                             "display": "inline-block",
                                             "height": f"{self.height-10}px",
                                         },
-                                        config={"scrollZoom": True},
+                                        # Zoom is very choppy with this enabled.  Users should use selection zoom
+                                        config={"scrollZoom": False},
                                     ),
                                 ]
                             ),
@@ -333,7 +326,6 @@ class CASCircularTreePlotUMAPDashApp:
                 ),
                 html.Div(id="init", style={"display": "none"}),
                 html.Div(id="no-action", style={"display": "none"}),
-                html.Script(scroll_zoom_js),
             ],
         )
 
@@ -389,6 +381,8 @@ class CASCircularTreePlotUMAPDashApp:
 
     def _update_umap_scatter_plot_layout(self, umap_scatter_plot_fig):
         umap_scatter_plot_fig.update_layout(
+            # uirevision is needed to maintain pan/zoom state.  It must be updated to trigger a refresh
+            uirevision="true",
             plot_bgcolor="white",
             margin=dict(l=0, r=25, t=50, b=0),
             xaxis=dict(
@@ -580,14 +574,18 @@ class CASCircularTreePlotUMAPDashApp:
                 return self._umap_scatter_plot_figure
 
             node_index = point["pointIndex"]
-            cl_name = self.circular_tree_plot.clade_index_to_cl_name_map.get(node_index)
-            if cl_name is None:
+            self.selected_cl_name = self.circular_tree_plot.clade_index_to_cl_name_map.get(node_index)
+            if self.selected_cl_name is None:
                 return self._umap_scatter_plot_figure
 
-            scores = self._get_scores_for_cl_name(cl_name)
+            scores = self._get_scores_for_cl_name(self.selected_cl_name)
             opacity = self._get_scatter_plot_opacity_from_scores(scores)
             color = sample_colorscale(self.circular_tree_plot.score_colorscale, scores)
             selected_cells_set = set(self._get_effective_selected_cells())
+            # if no cells are selected but a cell class is, highlight all cells
+            if len(selected_cells_set) == 0 and self.selected_cl_name is not None:
+                selected_cells_set = set(self.cell_domain_map[self.ALL_CELLS_DOMAIN_KEY])
+
             for i_obs in range(self.adata.n_obs):
                 if i_obs not in selected_cells_set:
                     color[i_obs] = self.umap_inactive_cell_color
@@ -604,8 +602,14 @@ class CASCircularTreePlotUMAPDashApp:
                 text=[f"{score:.5f}" for score in scores],
                 hovertemplate="<b>Evidence score: %{text}</b><extra></extra>",
             )
-            self._umap_scatter_plot_figure.update_layout(title=self.cl.cl_names_to_labels_map[cl_name])
 
+            self._umap_scatter_plot_figure.update_layout(
+                title=self.cl.cl_names_to_labels_map[self.selected_cl_name],
+                plot_bgcolor="white",
+                margin=dict(l=0, r=25, t=50, b=0),
+                # uirevision is needed to maintain pan/zoom state.  It must be updated to trigger a refresh
+                uirevision=self._umap_scatter_plot_figure["layout"]["uirevision"],
+            )
             return self._umap_scatter_plot_figure
 
         @self.app.callback(
