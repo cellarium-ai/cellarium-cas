@@ -358,6 +358,7 @@ class CASCircularTreePlotUMAPDashApp:
                     size=self.umap_marker_size,
                     opacity=self.umap_default_opacity,
                 ),
+                unselected=dict(marker=dict(opacity=self.umap_default_opacity)),
             )
         )
         self._update_umap_scatter_plot_layout(fig)
@@ -367,7 +368,6 @@ class CASCircularTreePlotUMAPDashApp:
     def _initialize_circular_tree_plot(self) -> go.Figure:
         self.circular_tree_plot = self._instantiate_circular_tree_plot()
         fig = self.circular_tree_plot.plotly_figure
-        self._circular_tree_plot_figure = fig
         return fig
 
     def _setup_initialization(self):
@@ -561,26 +561,42 @@ class CASCircularTreePlotUMAPDashApp:
     def _setup_callbacks(self) -> None:
         # Cell selection callbacks
         @self.app.callback(
+            Output("circular-tree-plot", "figure", allow_duplicate=True),
             Output("umap-scatter-plot", "figure", allow_duplicate=True),
             Input("circular-tree-plot", "clickData"),
             prevent_initial_call=True,
         )
         def _update_umap_scatter_plot_based_on_circular_tree_plot(clickData):
             if clickData is None or "points" not in clickData:
-                return self._umap_scatter_plot_figure
+                return self.circular_tree_plot.plotly_figure, self._umap_scatter_plot_figure
 
             point = clickData["points"][0]
             if "pointIndex" not in point:
                 return self._umap_scatter_plot_figure
 
             node_index = point["pointIndex"]
-            self.selected_cl_name = self.circular_tree_plot.clade_index_to_cl_name_map.get(node_index)
-            if self.selected_cl_name is None:
-                return self._umap_scatter_plot_figure
+            selected_cl_name = self.circular_tree_plot.clade_index_to_cl_name_map.get(node_index)
+            if selected_cl_name is not None:
+                # Toggle selection if the selected cell class was clicked
+                if selected_cl_name == self.selected_cl_name:
+                    self.circular_tree_plot.update_selected_nodes(selected_cl_path=[])
+                    self.selected_cl_name = None
+                else:
+                    selected_cl_path = self.circular_tree_plot.get_clade_path_from_index(selected_cl_idx=node_index)
+                    self.circular_tree_plot.update_selected_nodes(selected_cl_path)
+                    self.selected_cl_name = selected_cl_name
 
-            scores = self._get_scores_for_cl_name(self.selected_cl_name)
-            opacity = self._get_scatter_plot_opacity_from_scores(scores)
-            color = sample_colorscale(self.circular_tree_plot.score_colorscale, scores)
+            selected_cells_set = set(self._get_effective_selected_cells())
+
+            if self.selected_cl_name is None:
+                # Optimizing for lower code complexity over performance by always treating color and opacity as arrays in this case
+                color = [self.umap_default_cell_color] * self.adata.n_obs
+                opacity = [self.umap_default_opacity] * self.adata.n_obs
+            else:
+                scores = self._get_scores_for_cl_name(self.selected_cl_name)
+                opacity = self._get_scatter_plot_opacity_from_scores(scores)
+                color = sample_colorscale(self.circular_tree_plot.score_colorscale, scores)
+
             selected_cells_set = set(self._get_effective_selected_cells())
             # if no cells are selected but a cell class is, highlight all cells
             if len(selected_cells_set) == 0 and self.selected_cl_name is not None:
@@ -599,8 +615,10 @@ class CASCircularTreePlotUMAPDashApp:
                     cmin=0.0,
                     cmax=1.0,
                 ),
-                text=[f"{score:.5f}" for score in scores],
-                hovertemplate="<b>Evidence score: %{text}</b><extra></extra>",
+                text=[f"{score:.5f}" for score in scores] if self.selected_cl_name is not None else None,
+                hovertemplate=(
+                    "<b>Evidence score: %{text}</b><extra></extra>" if self.selected_cl_name is not None else None
+                ),
             )
 
             self._umap_scatter_plot_figure.update_layout(
@@ -610,34 +628,38 @@ class CASCircularTreePlotUMAPDashApp:
                 # uirevision is needed to maintain pan/zoom state.  It must be updated to trigger a refresh
                 uirevision=self._umap_scatter_plot_figure["layout"]["uirevision"],
             )
-            return self._umap_scatter_plot_figure
+            return self.circular_tree_plot.plotly_figure, self._umap_scatter_plot_figure
 
         @self.app.callback(
             Output("circular-tree-plot", "figure", allow_duplicate=True),
             Output("umap-scatter-plot", "figure", allow_duplicate=True),
             Output("selected-domain-label", "children", allow_duplicate=True),
             Input("umap-scatter-plot", "clickData"),
+            State("umap-scatter-plot", "selectedData"),
             prevent_initial_call=True,
         )
-        def _update_circular_tree_plot_based_on_umap_scatter_plot(clickData):
+        def _update_circular_tree_plot_based_on_umap_scatter_plot(clickData, selectedData):
+            self._umap_scatter_plot_figure.update_selections()
             if clickData is None or "points" not in clickData:
-                return self._circular_tree_plot_figure, self._umap_scatter_plot_figure, self._render_breadcrumb()
+                return self.circular_tree_plot.plotly_figure, self._umap_scatter_plot_figure, self._render_breadcrumb()
 
             point = clickData["points"][0]
 
             if "pointIndex" not in point:
-                return self._circular_tree_plot_figure, self._umap_scatter_plot_figure, self._render_breadcrumb()
+                return self.circular_tree_plot.plotly_figure, self._umap_scatter_plot_figure, self._render_breadcrumb()
 
             node_index = point["pointIndex"]
             self.selected_cells = [node_index]
             self.selected_cell_domain_key.set(DomainSelectionConstants.USER_SELECTION).commit()
             self._initialize_circular_tree_plot()
             self._initialize_umap_scatter_plot()
-            return self._circular_tree_plot_figure, self._umap_scatter_plot_figure, self._render_breadcrumb()
+
+            return self.circular_tree_plot.plotly_figure, self._umap_scatter_plot_figure, self._render_breadcrumb()
 
         @self.app.callback(
             Output("circular-tree-plot", "figure", allow_duplicate=True),
             Output("umap-scatter-plot", "figure", allow_duplicate=True),
+            Output("umap-scatter-plot", "selectedData", allow_duplicate=True),
             Output("selected-domain-label", "children", allow_duplicate=True),
             Input("umap-scatter-plot", "selectedData"),
             prevent_initial_call=True,
@@ -649,7 +671,12 @@ class CASCircularTreePlotUMAPDashApp:
                 or "points" not in selectedData
                 or ("range" not in selectedData and "lassoPoints" not in selectedData)
             ):
-                return self._circular_tree_plot_figure, self._umap_scatter_plot_figure, self._render_breadcrumb()
+                return (
+                    self.circular_tree_plot.plotly_figure,
+                    self._umap_scatter_plot_figure,
+                    None,
+                    self._render_breadcrumb(),
+                )
 
             points = selectedData["points"]
 
@@ -658,7 +685,12 @@ class CASCircularTreePlotUMAPDashApp:
             self.selected_cell_domain_key.set(DomainSelectionConstants.USER_SELECTION).commit()
             self._initialize_circular_tree_plot()
             self._initialize_umap_scatter_plot()
-            return self._circular_tree_plot_figure, self._umap_scatter_plot_figure, self._render_breadcrumb()
+            return (
+                self.circular_tree_plot.plotly_figure,
+                self._umap_scatter_plot_figure,
+                selectedData,
+                self._render_breadcrumb(),
+            )
 
         @self.app.callback(
             Output("circular-tree-plot", "figure", allow_duplicate=True),
@@ -673,11 +705,11 @@ class CASCircularTreePlotUMAPDashApp:
                 self._clear_selection()
 
                 # update the figures
-                self._initialize_umap_scatter_plot()
                 self._initialize_circular_tree_plot()
+                self._initialize_umap_scatter_plot()
 
             return (
-                self._circular_tree_plot_figure,
+                self.circular_tree_plot.plotly_figure,
                 self._umap_scatter_plot_figure,
                 self._render_breadcrumb(),
                 self._render_closed_settings_pane(),
@@ -707,11 +739,11 @@ class CASCircularTreePlotUMAPDashApp:
                 self.min_cell_fraction.commit()
 
                 # update the figures
-                self._initialize_umap_scatter_plot()
                 self._initialize_circular_tree_plot()
+                self._initialize_umap_scatter_plot()
 
             return (
-                self._circular_tree_plot_figure,
+                self.circular_tree_plot.plotly_figure,
                 self._umap_scatter_plot_figure,
                 self._render_breadcrumb(),
                 self._render_closed_settings_pane(),

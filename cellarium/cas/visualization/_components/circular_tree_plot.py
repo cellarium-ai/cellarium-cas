@@ -87,10 +87,12 @@ class CircularTreePlot:
         self.cl_label_list = []
         self.size_list = []
         self.clade_index_to_cl_name_map = dict()
+        self.clade_to_index = dict()
         self.cl_name_to_cl_label_map = dict()
         for idx, clade in enumerate(self.tree.find_clades(order="preorder")):
             cl_name = clade.name
             self.clade_index_to_cl_name_map[idx] = cl_name
+            self.clade_to_index[clade] = idx
             parsed_property_dict = dict()
             for property in clade.properties:
                 if property.ref == CAS_SCORE_PROPERTY_REF:
@@ -116,6 +118,7 @@ class CircularTreePlot:
             self.cl_label_list.append(cl_label)
             self.cl_name_to_cl_label_map[cl_name] = cl_label
 
+        self.num_nodes = len(self.clade_to_index.keys())
         # text labels
         self.text_labels = [
             self.cl_name_to_cl_label_map[cl_name] if cl_name in shown_cl_names_set else ""
@@ -273,9 +276,11 @@ class CircularTreePlot:
 
     @property
     @lru_cache(maxsize=None)
-    def plotly_figure(self) -> go.Figure:
+    def plotly_figure(self, selected_cl_name: t.Optional[str] = None) -> go.Figure:
+        # Plot points
         trace_nodes = dict(
             type="scatter",
+            name="data_nodes",
             x=self.x_nodes,
             y=self.y_nodes,
             mode="markers+text",
@@ -309,14 +314,19 @@ class CircularTreePlot:
                 ),
                 cmin=0.0,
                 cmax=1.0,
+                opacity=1.0,
             ),
             hovertext=self.tooltip_string_list,
             hoverinfo="text",
             opacity=1,
+            # uirevision is needed to maintain pan/zoom state.  It must be updated to trigger a refresh
+            uirevision="true",
         )
 
+        # Straight lines
         trace_radial_lines = dict(
             type="scatter",
+            name="radial_lines",
             x=self.x_lines,
             y=self.y_lines,
             mode="lines",
@@ -324,8 +334,10 @@ class CircularTreePlot:
             hoverinfo="none",
         )
 
+        # Curved lines
         trace_arcs = dict(
             type="scatter",
+            name="arc_lines",
             x=self.x_arcs,
             y=self.y_arcs,
             mode="lines",
@@ -357,3 +369,44 @@ class CircularTreePlot:
         fig = go.Figure(data=[trace_radial_lines, trace_arcs, trace_nodes], layout=layout)
 
         return fig
+
+    def get_clade_path_from_index(self, selected_cl_idx: int) -> t.Optional[t.List[str]]:
+        """
+        Returns the path from the root to the selected clade.  Returns None if the index isn't found.
+        """
+        node = list(self.tree.find_clades(order="preorder"))[selected_cl_idx]
+        if node is None:
+            return None
+
+        return [self.tree.root.name] + [cl.name for cl in self.tree.root.get_path(target=node)]
+
+    def update_selected_nodes(self, selected_cl_path: t.List[str] = []):
+        if len(selected_cl_path) == 0:
+            line_widths = 0
+        else:
+            # Find the starting node to start navigating down the tree
+            node = self.tree.find_clades(name=selected_cl_path[0], order="preorder")
+            selected_nodes = []
+            if node is not None:
+                node = next(node)
+                selected_nodes.append(self.clade_to_index[node])
+
+            for node_name in selected_cl_path[1:]:
+                node = next(filter(lambda cl: cl.name == node_name, node.clades))
+                if node is not None:
+                    selected_nodes.append(self.clade_to_index[node])
+                else:
+                    break
+            last_index = selected_nodes.pop()
+
+            line_widths = [0] * self.num_nodes
+            for idx in selected_nodes:
+                line_widths[idx] = 1.5
+            # The selected note should have a thicker line
+            line_widths[last_index] = 3
+
+        self.plotly_figure.update_traces(
+            marker=dict(line=dict(color="DarkSlateGrey", width=line_widths)),
+            selector=({"name": "data_nodes"}),
+            uirevision=self.plotly_figure["layout"]["uirevision"],
+        )
