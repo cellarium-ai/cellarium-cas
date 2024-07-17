@@ -622,7 +622,9 @@ class CASCircularTreePlotUMAPDashApp:
             )
 
             self._umap_scatter_plot_figure.update_layout(
-                title=self.cl.cl_names_to_labels_map[self.selected_cl_name],
+                title=(
+                    self.cl.cl_names_to_labels_map[self.selected_cl_name] if self.selected_cl_name is not None else None
+                ),
                 plot_bgcolor="white",
                 margin=dict(l=0, r=25, t=50, b=0),
                 # uirevision is needed to maintain pan/zoom state.  It must be updated to trigger a refresh
