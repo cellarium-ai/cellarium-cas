@@ -276,7 +276,7 @@ class CircularTreePlot:
 
     @property
     @lru_cache(maxsize=None)
-    def plotly_figure(self, selected_cl_name: t.Optional[str] = None) -> go.Figure:
+    def plotly_figure(self) -> go.Figure:
         # Plot points
         trace_nodes = dict(
             type="scatter",

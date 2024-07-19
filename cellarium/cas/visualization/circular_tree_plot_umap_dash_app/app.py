@@ -32,6 +32,12 @@ from cellarium.cas.visualization.ui_utils import ConfigValue, find_and_kill_proc
 # cell type ontology terms (and all descendents) to hide from the visualization
 DEFAULT_HIDDEN_CL_NAMES_SET = {}
 
+# header component ID -> default title mapping for the panels
+DEFAULT_PANEL_TITLES = {
+    "cell-selection-title-tree": "Ontology View",
+    "cell-selection-title-umap": "UMAP View",
+}
+
 
 class DomainSelectionConstants:
     NONE = 0
@@ -283,11 +289,14 @@ class CASCircularTreePlotUMAPDashApp:
                     )
                 ),
                 dbc.Row(
+                    self._render_cell_selection_panes(),
+                    id="panel-titles",
+                ),
+                dbc.Row(
                     [
                         dbc.Col(
                             html.Div(
                                 [
-                                    html.Div("Ontology View", className="gr-header"),
                                     dcc.Graph(
                                         id="circular-tree-plot",
                                         style={
@@ -304,7 +313,6 @@ class CASCircularTreePlotUMAPDashApp:
                         dbc.Col(
                             html.Div(
                                 [
-                                    html.Div("UMAP View", className="gr-header"),
                                     dcc.Graph(
                                         id="umap-scatter-plot",
                                         style={
@@ -445,6 +453,20 @@ class CASCircularTreePlotUMAPDashApp:
             )
         return html.Div(children)
 
+    def _render_cell_selection_panes(self) -> Component:
+        return [
+            dbc.Col(self._render_cell_selection_title(panel_id="cell-selection-title-tree"), width=6),
+            dbc.Col(self._render_cell_selection_title(panel_id="cell-selection-title-umap"), width=6),
+        ]
+
+    def _render_cell_selection_title(self, panel_id: str) -> Component:
+        if self.selected_cl_name is not None:
+            title = f"Selected cell class: {self.cl.cl_names_to_labels_map[self.selected_cl_name]}"
+        else:
+            title = DEFAULT_PANEL_TITLES[panel_id]
+
+        return [html.Div(title, className="gr-header", id=panel_id)]
+
     def _render_closed_settings_pane(self) -> Component:
         return [
             html.Div(
@@ -554,33 +576,45 @@ class CASCircularTreePlotUMAPDashApp:
         if self.selected_cell_domain_key.get() is not None:
             return self.cell_domain_map[self.selected_cell_domain_key.get()]
 
-    def _clear_selection(self):
+    def _clear_cell_selection(self):
         self.selected_cells = []
         self.selected_cell_domain_key.reset()
+
+    def _clear_cell_class_selection(self):
+        self.selected_cl_name = None
+        self.circular_tree_plot.update_selected_nodes(selected_cl_path=[])
 
     def _setup_callbacks(self) -> None:
         # Cell selection callbacks
         @self.app.callback(
             Output("circular-tree-plot", "figure", allow_duplicate=True),
             Output("umap-scatter-plot", "figure", allow_duplicate=True),
+            Output("panel-titles", "children", allow_duplicate=True),
             Input("circular-tree-plot", "clickData"),
             prevent_initial_call=True,
         )
         def _update_umap_scatter_plot_based_on_circular_tree_plot(clickData):
             if clickData is None or "points" not in clickData:
-                return self.circular_tree_plot.plotly_figure, self._umap_scatter_plot_figure
+                return (
+                    self.circular_tree_plot.plotly_figure,
+                    self._umap_scatter_plot_figure,
+                    self._render_cell_selection_panes(),
+                )
 
             point = clickData["points"][0]
             if "pointIndex" not in point:
-                return self._umap_scatter_plot_figure
+                return (
+                    self._umap_scatter_plot_figure,
+                    self._umap_scatter_plot_figure,
+                    self._render_cell_selection_panes(),
+                )
 
             node_index = point["pointIndex"]
             selected_cl_name = self.circular_tree_plot.clade_index_to_cl_name_map.get(node_index)
             if selected_cl_name is not None:
                 # Toggle selection if the selected cell class was clicked
                 if selected_cl_name == self.selected_cl_name:
-                    self.circular_tree_plot.update_selected_nodes(selected_cl_path=[])
-                    self.selected_cl_name = None
+                    self._clear_cell_class_selection()
                 else:
                     selected_cl_path = self.circular_tree_plot.get_clade_path_from_index(selected_cl_idx=node_index)
                     self.circular_tree_plot.update_selected_nodes(selected_cl_path)
@@ -622,20 +656,22 @@ class CASCircularTreePlotUMAPDashApp:
             )
 
             self._umap_scatter_plot_figure.update_layout(
-                title=(
-                    self.cl.cl_names_to_labels_map[self.selected_cl_name] if self.selected_cl_name is not None else None
-                ),
                 plot_bgcolor="white",
                 margin=dict(l=0, r=25, t=50, b=0),
                 # uirevision is needed to maintain pan/zoom state.  It must be updated to trigger a refresh
                 uirevision=self._umap_scatter_plot_figure["layout"]["uirevision"],
             )
-            return self.circular_tree_plot.plotly_figure, self._umap_scatter_plot_figure
+            return (
+                self.circular_tree_plot.plotly_figure,
+                self._umap_scatter_plot_figure,
+                self._render_cell_selection_panes(),
+            )
 
         @self.app.callback(
             Output("circular-tree-plot", "figure", allow_duplicate=True),
             Output("umap-scatter-plot", "figure", allow_duplicate=True),
             Output("selected-domain-label", "children", allow_duplicate=True),
+            Output("panel-titles", "children", allow_duplicate=True),
             Input("umap-scatter-plot", "clickData"),
             State("umap-scatter-plot", "selectedData"),
             prevent_initial_call=True,
@@ -643,26 +679,43 @@ class CASCircularTreePlotUMAPDashApp:
         def _update_circular_tree_plot_based_on_umap_scatter_plot(clickData, selectedData):
             self._umap_scatter_plot_figure.update_selections()
             if clickData is None or "points" not in clickData:
-                return self.circular_tree_plot.plotly_figure, self._umap_scatter_plot_figure, self._render_breadcrumb()
+                return (
+                    self.circular_tree_plot.plotly_figure,
+                    self._umap_scatter_plot_figure,
+                    self._render_breadcrumb(),
+                    self._render_cell_selection_panes(),
+                )
 
             point = clickData["points"][0]
 
             if "pointIndex" not in point:
-                return self.circular_tree_plot.plotly_figure, self._umap_scatter_plot_figure, self._render_breadcrumb()
+                return (
+                    self.circular_tree_plot.plotly_figure,
+                    self._umap_scatter_plot_figure,
+                    self._render_breadcrumb(),
+                    self._render_cell_selection_panes(),
+                )
 
             node_index = point["pointIndex"]
             self.selected_cells = [node_index]
             self.selected_cell_domain_key.set(DomainSelectionConstants.USER_SELECTION).commit()
+            self._clear_cell_class_selection()
             self._initialize_circular_tree_plot()
             self._initialize_umap_scatter_plot()
 
-            return self.circular_tree_plot.plotly_figure, self._umap_scatter_plot_figure, self._render_breadcrumb()
+            return (
+                self.circular_tree_plot.plotly_figure,
+                self._umap_scatter_plot_figure,
+                self._render_breadcrumb(),
+                self._render_cell_selection_panes(),
+            )
 
         @self.app.callback(
             Output("circular-tree-plot", "figure", allow_duplicate=True),
             Output("umap-scatter-plot", "figure", allow_duplicate=True),
             Output("umap-scatter-plot", "selectedData", allow_duplicate=True),
             Output("selected-domain-label", "children", allow_duplicate=True),
+            Output("panel-titles", "children", allow_duplicate=True),
             Input("umap-scatter-plot", "selectedData"),
             prevent_initial_call=True,
         )
@@ -678,6 +731,7 @@ class CASCircularTreePlotUMAPDashApp:
                     self._umap_scatter_plot_figure,
                     None,
                     self._render_breadcrumb(),
+                    self._render_cell_selection_panes(),
                 )
 
             points = selectedData["points"]
@@ -685,6 +739,7 @@ class CASCircularTreePlotUMAPDashApp:
             node_indexes = [point["pointIndex"] for point in points]
             self.selected_cells = node_indexes
             self.selected_cell_domain_key.set(DomainSelectionConstants.USER_SELECTION).commit()
+            self._clear_cell_class_selection()
             self._initialize_circular_tree_plot()
             self._initialize_umap_scatter_plot()
             return (
@@ -692,6 +747,7 @@ class CASCircularTreePlotUMAPDashApp:
                 self._umap_scatter_plot_figure,
                 selectedData,
                 self._render_breadcrumb(),
+                self._render_cell_selection_panes(),
             )
 
         @self.app.callback(
@@ -699,12 +755,14 @@ class CASCircularTreePlotUMAPDashApp:
             Output("umap-scatter-plot", "figure", allow_duplicate=True),
             Output("selected-domain-label", "children", allow_duplicate=True),
             Output("settings-pane", "children", allow_duplicate=True),
+            Output("panel-titles", "children", allow_duplicate=True),
             Input("reset-selection-button", "n_clicks"),
             prevent_initial_call=True,
         )
         def _reset_selection(n_clicks):
             if n_clicks != 0:
-                self._clear_selection()
+                self._clear_cell_selection()
+                self._clear_cell_class_selection()
 
                 # update the figures
                 self._initialize_circular_tree_plot()
@@ -715,6 +773,7 @@ class CASCircularTreePlotUMAPDashApp:
                 self._umap_scatter_plot_figure,
                 self._render_breadcrumb(),
                 self._render_closed_settings_pane(),
+                self._render_cell_selection_panes(),
             )
 
         # Settings callbacks
@@ -723,6 +782,7 @@ class CASCircularTreePlotUMAPDashApp:
             Output("umap-scatter-plot", "figure", allow_duplicate=True),
             Output("selected-domain-label", "children", allow_duplicate=True),
             Output("settings-pane", "children", allow_duplicate=True),
+            Output("panel-titles", "children", allow_duplicate=True),
             Output("settings-pane", "is_open", allow_duplicate=True),
             Input("update-button", "n_clicks"),
             prevent_initial_call=True,
@@ -734,11 +794,13 @@ class CASCircularTreePlotUMAPDashApp:
                     self.selected_cell_domain_key.is_dirty()
                     and self.selected_cell_domain_key.get(dirty_read=True) is DomainSelectionConstants.NONE
                 ):
-                    self._clear_selection()
+                    self._clear_cell_selection()
 
                 self.selected_cell_domain_key.commit()
                 self.score_threshold.commit()
                 self.min_cell_fraction.commit()
+
+                self._clear_cell_class_selection()
 
                 # update the figures
                 self._initialize_circular_tree_plot()
@@ -749,6 +811,7 @@ class CASCircularTreePlotUMAPDashApp:
                 self._umap_scatter_plot_figure,
                 self._render_breadcrumb(),
                 self._render_closed_settings_pane(),
+                self._render_cell_selection_panes(),
                 False,
             )
 
