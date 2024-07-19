@@ -33,3 +33,9 @@ def test_cell_annotation(test_api_token: str, test_api_url: str):
     adata = anndata.read_h5ad(constants.TEST_ADATA_PATH)
     result = cas.annotate_anndata(adata=adata, chunk_size=50)
     assert len(result) == len(adata), "Result length does not correspond to original number of cells"
+    # Make sure that the results were all successful
+    error_results = []
+    for i, r in enumerate(result):
+        if r["matches"] == []:
+            error_results.append(i)
+    assert len(error_results) == 0, f"Error in cell annotation at indices {error_results}"
