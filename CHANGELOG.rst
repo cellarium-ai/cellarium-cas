@@ -6,6 +6,15 @@ All notable changes to Cellarium CAS client will be documented in this file.
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_,
 and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0.html>`_.
 
+1.4.8 - 2024-07-22
+------------------
+
+Changed
+~~~~~~~
+
+- Decrease `MAX_NUM_REQUESTS_AT_A_TIME` to 8
+
+
 1.4.7 - 2024-07-09
 ------------------
 
