@@ -34,7 +34,7 @@ DEFAULT_HIDDEN_CL_NAMES_SET = {}
 
 # header component ID -> default title mapping for the panels
 DEFAULT_PANEL_TITLES = {
-    "cell-selection-title-tree": "Ontology View",
+    "cell-selection-title-tree": "Cell Type Ontology View",
     "cell-selection-title-umap": "UMAP View",
 }
 
