@@ -1,9 +1,9 @@
-from cellarium.cas.settings.base import *  # noqa
-from cellarium.cas.version import get_version_environment
+from ..version import get_version_environment
+from .base import *  # noqa
 
 VERSION_ENVIRONMENT = get_version_environment()
 
 if VERSION_ENVIRONMENT == "development" or VERSION_ENVIRONMENT == "test":
-    from cellarium.cas.settings.development import *  # noqa
+    from .development import *  # noqa
 else:
-    from cellarium.cas.settings.production import *  # noqa
+    from .production import *  # noqa

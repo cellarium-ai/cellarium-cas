@@ -1,4 +1,5 @@
 include README.md
 include requirements/
-include cellarium/cas/assets/cellarium_cas_tx_pca_002_grch38_2020_a.json
+include cellarium/cas/assets/*
+include cellarium/cas/visualization/circular_tree_plot_umap_dash_app/assets/*
 recursive-include cellarium/cas/resources/ *.html

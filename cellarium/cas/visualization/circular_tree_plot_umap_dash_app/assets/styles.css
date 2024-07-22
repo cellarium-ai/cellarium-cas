@@ -1,0 +1,81 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    overflow: hidden; /* Hide the scrollbar */
+}
+
+.gr-custom-dropdown .Select-control {
+    height: 10px; /* Adjust the height as needed */
+    line-height: 10px; /* Ensure the text is vertically centered */
+}
+
+.gr-custom-dropdown .Select-menu-outer {
+    border-radius: 0px;
+}
+
+.gr-custom-dropdown .Select-input>input {
+    background:none;
+    border:0;
+    box-shadow:none;
+    display:inline-block;
+    font-family:inherit;
+    font-size:inherit;
+    margin:0;
+    line-height:14px;
+    padding:8px 0 12px;
+}
+
+.gr-title {
+    text-align: center;
+    position: relative;
+}
+
+.gr-settings-buttons {
+    position: absolute;
+    top: 0;
+    right: 20px;
+}
+
+.gr-header {
+    text-align: center;
+    font-weight: bold;
+}
+
+.gr-form-item {
+    margin-bottom: 20px;
+}
+
+.gr-breadcrumb {
+    text-align: center;
+}
+
+.gr-breadcrumb .btn-link {
+    padding-top: 0;
+    margin-top: 0;
+    padding-bottom: 0;
+    margin-bottom: 0;
+    color: #000000;
+}
+
+.gr-spacer {
+    height: 20px;
+}
+
+.gr-settings-button-bar {
+    float: right;
+}
+.gr-settings-button-bar button {
+    margin-left: 10px;
+}
+
+.gr-powered-by {
+    width: 150px;
+    position: absolute;
+    bottom: 20px;
+    text-decoration: none;
+}
+
+.gr-powered-by img {
+    width: 150px;
+}

@@ -7,17 +7,28 @@ import pkgutil
 import time
 import typing as t
 import warnings
+from contextlib import contextmanager
 from uuid import UUID, uuid4
 
 import anndata
+from anndata import ImplicitModificationWarning
 from deprecated import deprecated
 
-from cellarium.cas import _io, constants, data_preparation, exceptions, service, settings, version
 from cellarium.cas.service import action_context_manager
+
+from . import _io, constants, exceptions, preprocessing, service, settings, version
+
+
+@contextmanager
+def suppress_implicit_modification_warning():
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", ImplicitModificationWarning)
+        yield
+
 
 CHUNK_SIZE_ANNOTATE_DEFAULT = 1000
 CHUNK_SIZE_SEARCH_DEFAULT = 500
-DEFAULT_PRUNE_THRESHOLD = 0.1
+DEFAULT_PRUNE_THRESHOLD = 0.05
 DEFAULT_WEIGHTING_PREFACTOR = 1.0
 
 FEEDBACK_TEMPLATE = pkgutil.get_data(__name__, "resources/feedback_template.html").decode("utf-8")
@@ -161,7 +172,7 @@ class CASClient:
             self._feature_schemas_cache[feature_schema_name] = cas_feature_schema_list
 
         try:
-            data_preparation.validate(
+            preprocessing.validate(
                 adata=adata,
                 cas_feature_schema_list=cas_feature_schema_list,
                 feature_ids_column_name=feature_ids_column_name,
@@ -190,7 +201,7 @@ class CASClient:
                     f"CAS schema but in a different order. The input features will be reordered according to "
                     f"'{feature_schema_name}'"
                 )
-            return data_preparation.sanitize(
+            return preprocessing.sanitize(
                 adata=adata,
                 cas_feature_schema_list=cas_feature_schema_list,
                 count_matrix_input=count_matrix_name,
@@ -273,6 +284,7 @@ class CASClient:
 
         return sharded_request_task
 
+    @suppress_implicit_modification_warning()
     def __async_sharded_request(
         self,
         adata: anndata.AnnData,
@@ -377,7 +389,7 @@ class CASClient:
 
     @staticmethod
     def __postprocess_query_cells_by_ids_response(
-        query_response: t.List[t.Dict[str, t.Any]]
+        query_response: t.List[t.Dict[str, t.Any]],
     ) -> t.List[t.Dict[str, t.Any]]:
         """
         Postprocess query cells by ids response by removing None values from cell metadata items in response

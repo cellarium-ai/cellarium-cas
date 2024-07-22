@@ -6,6 +6,23 @@ All notable changes to Cellarium CAS client will be documented in this file.
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_,
 and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0.html>`_.
 
+
+1.4.9 - 2024-07-22
+------------------
+
+Added
+~~~~~
+- Added circular tree plot visualization Dash App
+
+Changed
+~~~~~~~
+- Renamed `data_preparation`` to `preprocessing``
+- Moved all preprocessing-related code to `preprocessing`` submodule
+- Added a `postprocessing`` submodule
+- Added a `visualization`` submodule
+- Renamed `scanpy` optional dependencies to `vis` (for all visualization-related dependencies)
+
+
 1.4.8 - 2024-07-22
 ------------------
 
@@ -28,6 +45,7 @@ Added
 Added
 ~~~~~
 - Add text requesting feedback at the end of calls with instructions on opting out of feedback requests
+
 
 1.4.5 - 2024-06-03
 ------------------

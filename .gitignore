@@ -137,3 +137,7 @@ cellarium/data/
 
 # IDE
 .vscode/
+
+# Misc
+*.h5ad
+*.pkl

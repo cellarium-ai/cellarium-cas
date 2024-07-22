@@ -6,3 +6,7 @@ numpy>=1.21,<1.26
 nest_asyncio~=1.5
 certifi==2023.7.22
 Deprecated~=1.2
+tqdm~=4.66
+typing_extensions~=4.7.1
+owlready2
+networkx
