@@ -16,8 +16,11 @@ DEFAULT_CL_OWL_PATH = "https://github.com/obophenotype/cell-ontology/raw/v2022-0
 # only keep nodes with the following prefix when parsing CL ontology
 CL_PREFIX = "CL_"
 
+# the 'cell' node
+CL_CELL_ROOT_NODE = "CL_0000000"
+
 # the 'eukaryotic cell' node
-CL_CELL_ROOT_NODE = "CL_0000255"
+CL_EUKARYOTIC_CELL_ROOT_NODE = "CL_0000255"
 
 
 class CellOntologyCache:

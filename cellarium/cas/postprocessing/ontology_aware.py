@@ -8,7 +8,7 @@ import numpy as np
 import scipy.sparse as sp
 from anndata import AnnData
 
-from .cell_ontology.cell_ontology_cache import CL_CELL_ROOT_NODE, CellOntologyCache
+from .cell_ontology.cell_ontology_cache import CL_CELL_ROOT_NODE, CL_EUKARYOTIC_CELL_ROOT_NODE, CellOntologyCache
 from .common import get_obs_indices_for_cluster
 
 # AnnData-related constants
@@ -178,7 +178,7 @@ def get_aggregated_cas_ontology_aware_scores(
 def convert_aggregated_cell_ontology_scores_to_rooted_tree(
     aggregated_scores: AggregatedCellOntologyScores,
     cl: CellOntologyCache,
-    root_cl_name: str = CL_CELL_ROOT_NODE,
+    root_cl_name: str = CL_EUKARYOTIC_CELL_ROOT_NODE,
     min_fraction: float = 0.0,
     hidden_cl_names_set: t.Optional[t.Set[str]] = None,
 ) -> OrderedDict:
@@ -226,7 +226,20 @@ def convert_aggregated_cell_ontology_scores_to_rooted_tree(
                 build_subtree(node_dict[node_name]["children"], children_node_name)
         return node_dict
 
-    return build_subtree(tree_dict, root_cl_name)
+    tree_dict = build_subtree(tree_dict, root_cl_name)
+    # Validate that this is actually a rooted tree and if not recalculate with the base cell node
+    if len(tree_dict) == 1:  # singly-rooted tree
+        return tree_dict
+    elif root_cl_name != CL_CELL_ROOT_NODE:
+        return convert_aggregated_cell_ontology_scores_to_rooted_tree(
+            aggregated_scores=aggregated_scores,
+            cl=cl,
+            root_cl_name=CL_CELL_ROOT_NODE,
+            min_fraction=min_fraction,
+            hidden_cl_names_set=hidden_cl_names_set,
+        )
+    else:
+        raise ValueError("The tree is not singly-rooted.")
 
 
 def generate_phyloxml_from_scored_cell_ontology_tree(
@@ -287,7 +300,9 @@ def generate_phyloxml_from_scored_cell_ontology_tree(
 def get_most_granular_top_k_calls(
     aggregated_scores: AggregatedCellOntologyScores, cl: CellOntologyCache, min_acceptable_score: float, top_k: int = 1
 ) -> t.List[tuple]:
-    depth_list = list(map(cl.get_longest_path_lengths_from_target(CL_CELL_ROOT_NODE).get, aggregated_scores.cl_names))
+    depth_list = list(
+        map(cl.get_longest_path_lengths_from_target(CL_EUKARYOTIC_CELL_ROOT_NODE).get, aggregated_scores.cl_names)
+    )
     sorted_score_and_depth_list = sorted(
         list(
             (score, depth, cl_name)
@@ -302,7 +317,7 @@ def get_most_granular_top_k_calls(
     trunc_list = sorted_score_and_depth_list[:top_k]
     # pad with root node if necessary
     for _ in range(len(trunc_list) - top_k):
-        trunc_list.append((1.0, 0, CL_CELL_ROOT_NODE))
+        trunc_list.append((1.0, 0, CL_EUKARYOTIC_CELL_ROOT_NODE))
     return trunc_list
 
 
