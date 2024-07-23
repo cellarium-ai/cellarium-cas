@@ -101,35 +101,76 @@ DEFAULT_SHOWN_CL_NAMES_SET = {
 
 
 class CASCircularTreePlotUMAPDashApp:
-    ALL_CELLS_DOMAIN_KEY = "all cells"
-    CLUSTER_PREFIX_DOMAIN_KEY = "cluster "
     """
     A Dash app for visualizing the results of a Cellarium CAS cell type ontology-aware analysis.
 
     :param adata: The AnnData object containing the cell type ontology-aware analysis results.
-    :param cas_ontology_aware_response: The response from the Cellarium CAS cell type ontology-aware analysis.
-    :param cluster_label_obs_column: The name of the observation column containing the cluster labels.
-    :param aggregation_op: The aggregation operation to apply to the cell type ontology-aware scores.
-    :param aggregation_domain: The domain over which to aggregate the cell type ontology-aware scores.
-    :param score_threshold: The threshold for the cell type ontology-aware scores.
-    :param min_cell_fraction: The minimum fraction of cells that must have a cell type ontology-aware score above the threshold.
-    :param umap_marker_size: The size of the markers in the UMAP scatter plot.
-    :param umap_padding: The padding to apply to the UMAP scatter plot bounds.
-    :param umap_min_opacity: The minimum opacity for the UMAP scatter plot markers.
-    :param umap_max_opacity: The maximum opacity for the UMAP scatter plot markers.
-    :param umap_inactive_cell_color: The color for inactive cells in the UMAP scatter plot.
-    :param umap_inactive_cell_opacity: The opacity for inactive cells in the UMAP scatter plot.
-    :param umap_active_cell_color: The color for active cells in the UMAP scatter plot.
-    :param umap_default_cell_color: The default color for cells in the UMAP scatter plot.
-    :param umap_default_opacity: The default opacity for cells in the UMAP scatter plot.
-    :param circular_tree_plot_linecolor: The line color for the circular tree plot.
-    :param circular_tree_start_angle: The start angle for the circular tree plot.
-    :param circular_tree_end_angle: The end angle for the circular tree plot.
-    :param figure_height: The height of the figures in the Dash app.
-    :param hidden_cl_names_set: The set of cell type ontology terms to hide from the visualization.
-    :param shown_cl_names_set: The set of cell type ontology terms to always show as text labels in the visualization.
-    :param score_colorscale: The colorscale to use for the cell type ontology-aware scores.
+    :param cas_ontology_aware_response: The response from the Cellarium CAS cell type ontology-aware analysis. |br|
+        `Default:` ``None``
+    :param cluster_label_obs_column: The name of the observation column containing the cluster labels. |br|
+        `Default:` ``None``
+    :param aggregation_op: The aggregation operation to apply to the cell type ontology-aware scores. |br|
+        `Default:` ``CellOntologyScoresAggregationOp.MEAN``
+    :param aggregation_domain: The domain over which to aggregate the cell type ontology-aware scores. |br|
+        `Default:` ``CellOntologyScoresAggregationDomain.OVER_THRESHOLD``
+    :param score_threshold: The threshold for the cell type ontology-aware scores. |br|
+        `Default:` ``0.05``
+    :param min_cell_fraction: The minimum fraction of cells that must have a cell type ontology-aware score above the threshold. |br|
+        `Default:` ``0.01``
+    :param umap_marker_size: The size of the markers in the UMAP scatter plot. |br|
+        `Default:` ``3.0``
+    :param umap_padding: The padding to apply to the UMAP scatter plot bounds. |br|
+        `Default:` ``0.15``
+    :param umap_min_opacity: The minimum opacity for the UMAP scatter plot markers. |br|
+        `Default:` ``0.1``
+    :param umap_max_opacity: The maximum opacity for the UMAP scatter plot markers. |br|
+        `Default:` ``1.0``
+    :param umap_inactive_cell_color: The color for inactive cells in the UMAP scatter plot. |br|
+        `Default:` ``"rgb(180,180,180)"``
+    :param umap_inactive_cell_opacity: The opacity for inactive cells in the UMAP scatter plot. |br|
+        `Default:` ``0.5``
+    :param umap_active_cell_color: The color for active cells in the UMAP scatter plot. |br|
+        `Default:` ``"rgb(250,50,50)"``
+    :param umap_default_cell_color: The default color for cells in the UMAP scatter plot. |br|
+        `Default:` ``"rgb(180,180,180)"``
+    :param umap_default_opacity: The default opacity for cells in the UMAP scatter plot. |br|
+        `Default:` ``0.9``
+    :param circular_tree_plot_linecolor: The line color for the circular tree plot. |br|
+        `Default:` ``"rgb(200,200,200)"``
+    :param circular_tree_start_angle: The start angle for the circular tree plot. |br|
+        `Default:` ``180``
+    :param circular_tree_end_angle: The end angle for the circular tree plot. |br|
+        `Default:` ``360``
+    :param figure_height: The height of the figures in the Dash app. |br|
+        `Default:` ``400``
+    :param hidden_cl_names_set: The set of cell type ontology terms to hide from the visualization. |br|
+        `Default:` ``DEFAULT_HIDDEN_CL_NAMES_SET``
+    :param shown_cl_names_set: The set of cell type ontology terms to always show as text labels in the
+        visualization. |br|
+        `Default:` ``DEFAULT_SHOWN_CL_NAMES_SET``
+    :param score_colorscale: The colorscale to use for the cell type ontology-aware scores. |br|
+        `Default:` ``"Viridis"``
+
+    Example:
+    ________
+        >>> from cellarium.cas._io import suppress_stderr
+        >>> from cellarium.cas.visualization import CASCircularTreePlotUMAPDashApp
+        >>> DASH_SERVER_PORT = 8050
+        >>> adata = ... # get your matrix
+        >>> cas_ontology_aware_response = cas.annotate_matrix_cell_type_ontology_aware_strategy(
+        >>>     matrix=adata,
+        >>>     chunk_size=500
+        >>> )
+        >>> with suppress_stderr():
+        >>>     CASCircularTreePlotUMAPDashApp(
+        >>>         adata,
+        >>>         cas_ontology_aware_response,
+        >>>         cluster_label_obs_column="cluster_label",
+        >>>     ).run(port=DASH_SERVER_PORT, debug=False, jupyter_width="100%")
     """
+
+    ALL_CELLS_DOMAIN_KEY = "all cells"
+    CLUSTER_PREFIX_DOMAIN_KEY = "cluster "
 
     def __init__(
         self,
