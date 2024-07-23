@@ -20,6 +20,8 @@ Cellarium Cell Annotation Service
    :caption: Codebase Documentation
 
    automodules/client
+   automodules/visualization
+
 
 Other Tools
 ===========

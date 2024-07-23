@@ -80,7 +80,7 @@ class CircularTreePlot:
             self.y_arcs,
         ) = self._get_circular_tree_data()
 
-        # generate assets for visualization
+        # generate assets for visualization.rst
         self.tooltip_string_list = []
         self.score_list = []
         self.cl_name_list = []

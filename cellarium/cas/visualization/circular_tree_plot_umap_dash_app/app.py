@@ -29,7 +29,7 @@ from cellarium.cas.postprocessing.cell_ontology import CL_CELL_ROOT_NODE, CellOn
 from cellarium.cas.visualization._components.circular_tree_plot import CircularTreePlot
 from cellarium.cas.visualization.ui_utils import ConfigValue, find_and_kill_process
 
-# cell type ontology terms (and all descendents) to hide from the visualization
+# cell type ontology terms (and all descendents) to hide from the visualization.rst
 DEFAULT_HIDDEN_CL_NAMES_SET = {}
 
 # header component ID -> default title mapping for the panels
@@ -45,7 +45,7 @@ class DomainSelectionConstants:
     SEPARATOR = 2
 
 
-# cell type ontology terms to always show as text labels in the visualization
+# cell type ontology terms to always show as text labels in the visualization.rst
 DEFAULT_SHOWN_CL_NAMES_SET = {
     "CL_0000236",
     "CL_0000084",
@@ -101,6 +101,72 @@ DEFAULT_SHOWN_CL_NAMES_SET = {
 
 
 class CASCircularTreePlotUMAPDashApp:
+    """
+    A Dash application for visualizing cell ontology scores and UMAP embeddings in an interactive interface.
+
+    :param adata: The annotated data matrix.
+    :param cas_ontology_aware_response: List of ontology-aware responses.
+    :param cluster_label_obs_column: Column in `adata.obs` containing cluster labels. |br|
+        ``Default:`` ``None``
+    :param aggregation_op: Aggregation operation for cell ontology scores. |br|
+        ``Default:`` ``CellOntologyScoresAggregationOp.MEAN``
+    :param aggregation_domain: Domain for aggregating cell ontology scores. |br|
+        ``Default:`` ``CellOntologyScoresAggregationDomain.OVER_THRESHOLD``
+    :param score_threshold: Threshold for considering scores. |br|
+        ``Default:`` ``0.05``
+    :param min_cell_fraction: Minimum fraction of cells for display. |br|
+        ``Default:`` ``0.01``
+    :param umap_marker_size: Size of UMAP markers. |br|
+        ``Default:`` ``3.0``
+    :param umap_padding: Padding around UMAP plot. |br|
+        ``Default:`` ``0.15``
+    :param umap_min_opacity: Minimum opacity for UMAP markers. |br|
+        ``Default:`` ``0.1``
+    :param umap_max_opacity: Maximum opacity for UMAP markers. |br|
+        ``Default:`` ``1.0``
+    :param umap_inactive_cell_color: Color for inactive UMAP cells. |br|
+        ``Default:`` ``"rgb(180,180,180)"``
+    :param umap_inactive_cell_opacity: Opacity for inactive UMAP cells. |br|
+        ``Default:`` ``0.5``
+    :param umap_active_cell_color: Color for active UMAP cells. |br|
+        ``Default:`` ``"rgb(250,50,50)"``
+    :param umap_default_cell_color: Default color for UMAP cells. |br|
+        ``Default:`` ``"rgb(180,180,180)"``
+    :param umap_default_opacity: Default opacity for UMAP cells. |br|
+        ``Default:`` ``0.9``
+    :param circular_tree_plot_linecolor: Line color for circular tree plot. |br|
+        ``Default:`` ``"rgb(200,200,200)"``
+    :param circular_tree_start_angle: Start angle for circular tree plot. |br|
+        ``Default:`` ``180``
+    :param circular_tree_end_angle: End angle for circular tree plot. |br|
+        ``Default:`` ``360``
+    :param figure_height: Height of the figure. |br|
+        ``Default:`` ``400``
+    :param hidden_cl_names_set: Set of cell ontology terms to hide. |br|
+        ``Default:`` ``DEFAULT_HIDDEN_CL_NAMES_SET``
+    :param shown_cl_names_set: Set of cell ontology terms to always show. |br|
+        ``Default:`` ``DEFAULT_SHOWN_CL_NAMES_SET``
+    :param score_colorscale: Colorscale for scores. |br|
+        ``Default:`` ``"Viridis"``
+
+    Example:
+    ________
+        >>> from cellarium.cas._io import suppress_stderr
+        >>> from cellarium.cas.visualization.rst import CASCircularTreePlotUMAPDashApp
+        >>> DASH_SERVER_PORT = 8050
+        >>> adata = ... # get your matrix
+        >>> cas_ontology_aware_response = cas.annotate_matrix_cell_type_ontology_aware_strategy(
+        >>>     matrix=adata,
+        >>>     chunk_size=500
+        >>> )
+        >>> with suppress_stderr():
+        >>>     CASCircularTreePlotUMAPDashApp(
+        >>>         adata,
+        >>>         cas_ontology_aware_response,
+        >>>         cluster_label_obs_column="cluster_label",
+        >>>     ).run(port=DASH_SERVER_PORT, debug=False, jupyter_width="100%")
+    """
+
     ALL_CELLS_DOMAIN_KEY = "all cells"
     CLUSTER_PREFIX_DOMAIN_KEY = "cluster "
 
