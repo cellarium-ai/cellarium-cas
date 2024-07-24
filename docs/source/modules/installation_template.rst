@@ -8,4 +8,4 @@ From github repository
 
 Install the latest alpha version using `pip` with a specified version::
 
-    pip install git+https://github.com/cellarium-ai/cellarium-cas.git@|cas_version|
+    pip install cellarium-cas==|cas_version|

@@ -11,6 +11,7 @@ python:
       path: .
       extra_requirements:
         - docs
+        - vis
 
 sphinx:
   configuration: docs/source/conf.py
