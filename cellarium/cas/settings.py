@@ -5,6 +5,7 @@ MAX_RETRY_DELAY = 32
 AIOHTTP_TOTAL_TIMEOUT_SECONDS = 750
 AIOHTTP_READ_TIMEOUT_SECONDS = 730
 MAX_CHUNK_SIZE_SEARCH_METHOD = 500
+CELLARIUM_CLOUD_BACKEND_URL = "https://cellarium-cloud-api.cellarium.ai"
 
 
 def is_interactive_environment() -> bool:
