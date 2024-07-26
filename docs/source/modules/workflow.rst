@@ -31,7 +31,7 @@ Check your quota
 Your CAS account has a quota for the number of cells that you can annotate each week.  If the data you have provided
 would exceed that quota, the client will raise an exception and inform you of the issue.
 
-The default quota value for a new account is 50,000 cells per week.  You can increase your quota by filling out the
+The default quota value for a new account is 100,000 cells per week.  You can increase your quota by filling out the
 feedback form that is linked in the output when you complete a call to annotate your data.
 
 You can check your total and remaining quota, along with its reset date, by calling the following method on **CASClient**::
