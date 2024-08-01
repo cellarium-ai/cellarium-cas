@@ -6,6 +6,15 @@ All notable changes to Cellarium CAS client will be documented in this file.
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_,
 and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0.html>`_.
 
+1.4.12 - 2024-08-01
+-------------------
+
+Changed
+~~~~~~~
+- Removed references to the development environment in the client code
+- Updated client documentation
+- Updated the demo notebook's documentation
+
 1.4.11 - 2024-07-24
 -------------------
 
