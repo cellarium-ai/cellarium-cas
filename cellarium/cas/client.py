@@ -716,7 +716,7 @@ class CASClient:
             feature_ids_column_name=feature_ids_column_name,
             feature_names_column_name=feature_names_column_name,
         )
-        
+
         results = self.__async_sharded_request(
             adata=matrix,
             chunk_size=chunk_size,

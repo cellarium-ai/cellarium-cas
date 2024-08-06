@@ -124,6 +124,7 @@ class TestdataPreparation(unittest.TestCase):
                 adata=adata,
                 cas_feature_schema_list=cas_feature_schema_list,
                 feature_ids_column_name="index",
+                count_matrix_input=constants.CountMatrixInput.X,
             )
         except exceptions.DataValidationError as e:
             number_of_missing_features = e.missing_features
@@ -161,6 +162,7 @@ class TestdataPreparation(unittest.TestCase):
                 adata=adata,
                 cas_feature_schema_list=cas_feature_schema_list,
                 feature_ids_column_name="index",
+                count_matrix_input=constants.CountMatrixInput.X,
             )
         except exceptions.DataValidationError as e:
             number_of_missing_features = e.missing_features
@@ -202,6 +204,7 @@ class TestdataPreparation(unittest.TestCase):
                 adata=adata,
                 cas_feature_schema_list=cas_feature_schema_list,
                 feature_ids_column_name="index",
+                count_matrix_input=constants.CountMatrixInput.X,
             )
         except exceptions.DataValidationError as e:
             number_of_missing_features = e.missing_features
@@ -234,6 +237,7 @@ class TestdataPreparation(unittest.TestCase):
                 adata=adata,
                 cas_feature_schema_list=cas_feature_schema_list,
                 feature_ids_column_name="index",
+                count_matrix_input=constants.CountMatrixInput.X,
             )
         except exceptions.DataValidationError as e:
             number_of_missing_features = e.missing_features

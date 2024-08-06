@@ -45,11 +45,10 @@ def validate(
     else:
         if adata.raw.X.dtype != np.float32:
             incompatible_x_type = adata.raw.X.dtype
-    
+
     incompatible_total_mrna_umis_type: t.Optional[str] = None
     if "total_mrna_umis" in adata.obs and adata.obs["total_mrna_umis"].dtype != np.float32:
         incompatible_total_mrna_umis_type = adata.obs["total_mrna_umis"].dtype
-
 
     if (
         adata_feature_schema_list == cas_feature_schema_list
@@ -64,5 +63,8 @@ def validate(
     extra_features = len(adata_feature_schema_set - cas_feature_schema_set)
 
     raise exceptions.DataValidationError(
-        missing_features=missing_features, extra_features=extra_features, incompatible_x_type=incompatible_x_type, incompatible_total_mrna_umis_type=incompatible_total_mrna_umis_type
+        missing_features=missing_features,
+        extra_features=extra_features,
+        incompatible_x_type=incompatible_x_type,
+        incompatible_total_mrna_umis_type=incompatible_total_mrna_umis_type,
     )
