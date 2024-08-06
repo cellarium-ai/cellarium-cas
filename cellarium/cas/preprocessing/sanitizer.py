@@ -59,7 +59,8 @@ def sanitize(
 ) -> anndata.AnnData:
     """
     Cellarium CAS sanitizing script. Returns a new `anndata.AnnData` instance, based on the feature expression
-    matrix of the input instance. Extra features get omitted. Missing features get filled with zeros.
+    matrix of the input instance. Extra features get omitted. Missing features get filled with zeros. If the
+    data matrix is not of type float32, it will be converted to float32.
 
     :param adata: Instance to sanitize
     :param cas_feature_schema_list: List of Ensembl feature ids to rely on.
@@ -80,6 +81,14 @@ def sanitize(
             "`feature_ids_name_column_name` should have a value of either 'index' "
             "or be present as a column in the `adata.var` object."
         )
+
+    # Convert matrix to float32 if it's not
+    # We have to do this before everything else because some of the following steps derive values
+    # from the matrix, and those will cause things to break if they're the wrong type
+    if count_matrix_input == constants.CountMatrixInput.X and adata.X.dtype != np.float32:
+        adata.X = adata.X.astype(np.float32, "same_kind")
+    elif count_matrix_input == constants.CountMatrixInput.RAW_X and adata.raw.X.dtype != np.float32:
+        adata.raw.X = adata.raw.X.astype(np.float32, "same_kind")
 
     callbacks.pre_sanitize_callback(adata=adata, count_matrix_input=count_matrix_input)
 
@@ -130,6 +139,7 @@ def sanitize(
         var_df_data["feature_name"] = cas_feature_name_list
 
     var_df = pd.DataFrame(index=cas_feature_schema_list, data=var_df_data)
+
     return anndata.AnnData(
         result_matrix.tocsr(),
         obs=obs,
