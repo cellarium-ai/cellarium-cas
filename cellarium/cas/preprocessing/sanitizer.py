@@ -86,9 +86,9 @@ def sanitize(
     # We have to do this before everything else because some of the following steps derive values
     # from the matrix, and those will cause things to break if they're the wrong type
     if count_matrix_input == constants.CountMatrixInput.X and adata.X.dtype != np.float32:
-        adata.X = adata.X.astype(np.float32, "same_kind")
+        adata.X = adata.X.astype(np.float32)
     elif count_matrix_input == constants.CountMatrixInput.RAW_X and adata.raw.X.dtype != np.float32:
-        adata.raw.X = adata.raw.X.astype(np.float32, "same_kind")
+        adata.raw.X = adata.raw.X.astype(np.float32)
 
     callbacks.pre_sanitize_callback(adata=adata, count_matrix_input=count_matrix_input)
 
