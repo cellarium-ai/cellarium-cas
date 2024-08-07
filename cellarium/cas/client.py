@@ -152,7 +152,7 @@ class CASClient:
             `Allowed Values:` Model name from the :attr:`allowed_models_list` list keyword, which refers to the
             default selected model in the Cellarium backend. |br|
         :param count_matrix_name:  Where to obtain a feature expression count matrix from. |br|
-            `Allowed Values:` Choice of either ``"X"``  or ``"raw.X"`` in order to use ``adata.X`` or ``adata.raw.X``|br|
+            `Allowed Values:` Choice of either ``"X"``  or ``"raw.X"`` in order to use ``adata.X`` or ``adata.raw.X`` |br|
         :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. |br|
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
             column. |br|
