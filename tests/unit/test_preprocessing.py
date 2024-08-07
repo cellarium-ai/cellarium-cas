@@ -113,7 +113,7 @@ class TestdataPreparation(unittest.TestCase):
         data_validation_error_was_raised = False
         number_of_missing_features = 0
         number_of_extra_features = 0
-        d = np_random_state.randint(0, 500, size=(self.INPUT_DATASET_LENGTH, len(adata_feature_schema_list)))
+        d = np_random_state.randn(self.INPUT_DATASET_LENGTH, len(adata_feature_schema_list)).astype(np.float32)
         adata = anndata.AnnData(
             X=sp.csr_matrix(d),
             obs=pd.DataFrame(index=np.arange(0, self.INPUT_DATASET_LENGTH)),
@@ -129,12 +129,16 @@ class TestdataPreparation(unittest.TestCase):
         except exceptions.DataValidationError as e:
             number_of_missing_features = e.missing_features
             number_of_extra_features = e.extra_features
+            incompatible_x_type = e.incompatible_x_type
+            incompatible_total_mrna_umis_type = e.incompatible_total_mrna_umis_type
             data_validation_error_was_raised = True
 
         self.assertTrue(
             data_validation_error_was_raised,
             msg="`DataValidationError should be raised`",
         )
+        self.assertIsNone(incompatible_x_type)
+        self.assertIsNone(incompatible_total_mrna_umis_type)
         self.assertEqual(
             number_of_missing_features,
             len(cas_feature_schema_list) - len(adata_feature_schema_list),
@@ -151,7 +155,7 @@ class TestdataPreparation(unittest.TestCase):
         data_validation_error_was_raised = False
         number_of_missing_features = 0
         number_of_extra_features = 0
-        d = np_random_state.randint(0, 500, size=(self.INPUT_DATASET_LENGTH, len(adata_feature_schema_list)))
+        d = np_random_state.randn(self.INPUT_DATASET_LENGTH, len(adata_feature_schema_list)).astype(np.float32)
         adata = anndata.AnnData(
             X=sp.csr_matrix(d),
             obs=pd.DataFrame(index=np.arange(0, self.INPUT_DATASET_LENGTH)),
@@ -167,12 +171,16 @@ class TestdataPreparation(unittest.TestCase):
         except exceptions.DataValidationError as e:
             number_of_missing_features = e.missing_features
             number_of_extra_features = e.extra_features
+            incompatible_x_type = e.incompatible_x_type
+            incompatible_total_mrna_umis_type = e.incompatible_total_mrna_umis_type
             data_validation_error_was_raised = True
 
         self.assertTrue(
             data_validation_error_was_raised,
             msg="`DataValidationError should be raised`",
         )
+        self.assertIsNone(incompatible_x_type)
+        self.assertIsNone(incompatible_total_mrna_umis_type)
         self.assertEqual(
             number_of_missing_features,
             0,
@@ -193,7 +201,7 @@ class TestdataPreparation(unittest.TestCase):
         data_validation_error_was_raised = False
         number_of_missing_features = 0
         number_of_extra_features = 0
-        d = np_random_state.randint(0, 500, size=(self.INPUT_DATASET_LENGTH, len(adata_feature_schema_list)))
+        d = np_random_state.randn(self.INPUT_DATASET_LENGTH, len(adata_feature_schema_list)).astype(np.float32)
         adata = anndata.AnnData(
             X=sp.csr_matrix(d),
             obs=pd.DataFrame(index=np.arange(0, self.INPUT_DATASET_LENGTH)),
@@ -209,6 +217,8 @@ class TestdataPreparation(unittest.TestCase):
         except exceptions.DataValidationError as e:
             number_of_missing_features = e.missing_features
             number_of_extra_features = e.extra_features
+            incompatible_x_type = e.incompatible_x_type
+            incompatible_total_mrna_umis_type = e.incompatible_total_mrna_umis_type
             data_validation_error_was_raised = True
 
         missing_features = len(set(cas_feature_schema_list) - set(adata_feature_schema_list))
@@ -217,6 +227,8 @@ class TestdataPreparation(unittest.TestCase):
             data_validation_error_was_raised,
             msg="`DataValidationError should be raised`",
         )
+        self.assertIsNone(incompatible_x_type)
+        self.assertIsNone(incompatible_total_mrna_umis_type)
         self.assertEqual(number_of_missing_features, missing_features)
         self.assertEqual(number_of_extra_features, extra_features)
 
@@ -226,7 +238,7 @@ class TestdataPreparation(unittest.TestCase):
         data_validation_error_was_raised = False
         number_of_missing_features = 0
         number_of_extra_features = 0
-        d = np_random_state.randint(0, 500, size=(self.INPUT_DATASET_LENGTH, len(adata_feature_schema_list)))
+        d = np_random_state.randn(self.INPUT_DATASET_LENGTH, len(adata_feature_schema_list)).astype(np.float32)
         adata = anndata.AnnData(
             X=sp.csr_matrix(d),
             obs=pd.DataFrame(index=np.arange(0, self.INPUT_DATASET_LENGTH)),
@@ -242,24 +254,134 @@ class TestdataPreparation(unittest.TestCase):
         except exceptions.DataValidationError as e:
             number_of_missing_features = e.missing_features
             number_of_extra_features = e.extra_features
+            incompatible_x_type = e.incompatible_x_type
+            incompatible_total_mrna_umis_type = e.incompatible_total_mrna_umis_type
             data_validation_error_was_raised = True
 
         self.assertTrue(
             data_validation_error_was_raised,
             msg="`DataValidationError should be raised`",
         )
+        self.assertIsNone(incompatible_x_type)
+        self.assertIsNone(incompatible_total_mrna_umis_type)
+        self.assertEqual(number_of_missing_features, 0)
+        self.assertEqual(number_of_extra_features, 0)
+
+    def test_matrix_is_float64(self):
+        cas_feature_schema_list = self.get_feature_schema()
+        data_validation_error_was_raised = False
+        number_of_missing_features = 0
+        number_of_extra_features = 0
+        d = np_random_state.randn(self.INPUT_DATASET_LENGTH, len(cas_feature_schema_list)).astype(np.float32)
+        adata = anndata.AnnData(
+            X=sp.csr_matrix(d),
+            obs=pd.DataFrame(index=np.arange(0, self.INPUT_DATASET_LENGTH)),
+            var=pd.DataFrame(index=cas_feature_schema_list),
+        )
+        adata.X = adata.X.astype(np.float64)
+        try:
+            preprocessing.validate(
+                adata=adata,
+                cas_feature_schema_list=cas_feature_schema_list,
+                feature_ids_column_name="index",
+                count_matrix_input=constants.CountMatrixInput.X,
+            )
+        except exceptions.DataValidationError as e:
+            number_of_missing_features = e.missing_features
+            number_of_extra_features = e.extra_features
+            incompatible_x_type = e.incompatible_x_type
+            incompatible_total_mrna_umis_type = e.incompatible_total_mrna_umis_type
+            data_validation_error_was_raised = True
+
+        self.assertTrue(
+            data_validation_error_was_raised,
+            msg="`DataValidationError should be raised`",
+        )
+        self.assertEqual(incompatible_x_type, np.float64)
+        self.assertIsNone(incompatible_total_mrna_umis_type)
+        self.assertEqual(number_of_missing_features, 0)
+        self.assertEqual(number_of_extra_features, 0)
+    
+    def test_matrix_is_int(self):
+        cas_feature_schema_list = self.get_feature_schema()
+        data_validation_error_was_raised = False
+        number_of_missing_features = 0
+        number_of_extra_features = 0
+        d = np_random_state.randn(self.INPUT_DATASET_LENGTH, len(cas_feature_schema_list)).astype(np.float32)
+        adata = anndata.AnnData(
+            X=sp.csr_matrix(d),
+            obs=pd.DataFrame(index=np.arange(0, self.INPUT_DATASET_LENGTH)),
+            var=pd.DataFrame(index=cas_feature_schema_list),
+        )
+        adata.X = adata.X.astype(np.int32)
+        try:
+            preprocessing.validate(
+                adata=adata,
+                cas_feature_schema_list=cas_feature_schema_list,
+                feature_ids_column_name="index",
+                count_matrix_input=constants.CountMatrixInput.X,
+            )
+        except exceptions.DataValidationError as e:
+            number_of_missing_features = e.missing_features
+            number_of_extra_features = e.extra_features
+            incompatible_x_type = e.incompatible_x_type
+            incompatible_total_mrna_umis_type = e.incompatible_total_mrna_umis_type
+            data_validation_error_was_raised = True
+
+        self.assertTrue(
+            data_validation_error_was_raised,
+            msg="`DataValidationError should be raised`",
+        )
+        self.assertEqual(incompatible_x_type, np.int32)
+        self.assertIsNone(incompatible_total_mrna_umis_type)
+        self.assertEqual(number_of_missing_features, 0)
+        self.assertEqual(number_of_extra_features, 0)
+
+    def test_total_mrna_umis_is_float64(self):
+        cas_feature_schema_list = self.get_feature_schema()
+        data_validation_error_was_raised = False
+        number_of_missing_features = 0
+        number_of_extra_features = 0
+        d = np_random_state.randn(self.INPUT_DATASET_LENGTH, len(cas_feature_schema_list)).astype(np.float32)
+        adata = anndata.AnnData(
+            X=sp.csr_matrix(d),
+            obs=pd.DataFrame(index=np.arange(0, self.INPUT_DATASET_LENGTH)),
+            var=pd.DataFrame(index=cas_feature_schema_list),
+        )
+        adata.obs["total_mrna_umis"] = np.zeros(self.INPUT_DATASET_LENGTH).astype(np.float64)
+        try:
+            preprocessing.validate(
+                adata=adata,
+                cas_feature_schema_list=cas_feature_schema_list,
+                feature_ids_column_name="index",
+                count_matrix_input=constants.CountMatrixInput.X,
+            )
+        except exceptions.DataValidationError as e:
+            number_of_missing_features = e.missing_features
+            number_of_extra_features = e.extra_features
+            incompatible_x_type = e.incompatible_x_type
+            incompatible_total_mrna_umis_type = e.incompatible_total_mrna_umis_type
+            data_validation_error_was_raised = True
+
+        self.assertTrue(
+            data_validation_error_was_raised,
+            msg="`DataValidationError should be raised`",
+        )
+        self.assertIsNone(incompatible_x_type)
+        self.assertEqual(incompatible_total_mrna_umis_type, np.float64)
         self.assertEqual(number_of_missing_features, 0)
         self.assertEqual(number_of_extra_features, 0)
 
     def test_data_sanitizing(self):
         cas_feature_schema_list = self.get_feature_schema()
         adata_feature_schema_list = self.get_schema_that_has_missing_and_extra()
-        d = np_random_state.randint(0, 500, size=(self.INPUT_DATASET_LENGTH, len(adata_feature_schema_list)))
+        d = np_random_state.randn(self.INPUT_DATASET_LENGTH, len(adata_feature_schema_list)).astype(np.float32)
         adata = anndata.AnnData(
             X=sp.csr_matrix(d),
             obs=pd.DataFrame(index=np.arange(0, self.INPUT_DATASET_LENGTH)),
             var=pd.DataFrame(index=adata_feature_schema_list),
         )
+        adata.X = adata.X.astype(np.float64)
         adata_new = preprocessing.sanitize(
             adata=adata,
             cas_feature_schema_list=cas_feature_schema_list,
@@ -269,6 +391,8 @@ class TestdataPreparation(unittest.TestCase):
         intersect_features = list(set(cas_feature_schema_list).intersection(set(adata_feature_schema_list)))
         new_matrix_didnt_lose_values = (adata_new[:, intersect_features].X != adata[:, intersect_features].X).sum() == 0
         self.assertTrue(new_matrix_didnt_lose_values)
+        self.assertEqual(adata_new.X.dtype, np.float32)
+        self.assertEqual(adata_new.obs["total_mrna_umis"].dtype, np.float32)
 
 
 def main():
