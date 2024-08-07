@@ -11,6 +11,9 @@ The cellarium-cas package officially supports Python versions between 3.7 and 3.
 From github repository
 ++++++++++++++++++++++
 
-Install the latest alpha version using `pip` with a specified version::
+Install the latest alpha version using `pip` with a specified version:
 
-    pip install cellarium-cas==|cas_version|
+.. code-block:: bash
+   :substitutions:
+
+    pip install cellarium-cas==|version|
