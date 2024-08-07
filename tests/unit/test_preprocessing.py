@@ -301,7 +301,7 @@ class TestdataPreparation(unittest.TestCase):
         self.assertIsNone(incompatible_total_mrna_umis_type)
         self.assertEqual(number_of_missing_features, 0)
         self.assertEqual(number_of_extra_features, 0)
-    
+
     def test_matrix_is_int(self):
         cas_feature_schema_list = self.get_feature_schema()
         data_validation_error_was_raised = False
