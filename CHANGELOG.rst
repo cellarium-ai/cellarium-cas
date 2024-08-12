@@ -83,12 +83,12 @@ Added
 
 Added
 ~~~~~
-- Add :meth:`annotate_matrix_cell_type_summary_statistics_strategy` method to :class:`CASClient`
-- Add :meth:`annotate_matrix_cell_type_ontology_aware_strategy` method to :class:`CASClient`
+- Add :meth:`cellarium.cas.client.CASClient.annotate_matrix_cell_type_summary_statistics_strategy` method to :class:`cellarium.cas.client.CASClient`
+- Add :meth:`cellarium.cas.client.CASClient.annotate_matrix_cell_type_ontology_aware_strategy` method to :class:`cellarium.cas.client.CASClient`
 
 Changed
 ~~~~~~~
-- Deprecate :meth:`annotate_anndata`, :meth:`annotate_anndata_file`, :meth:`annotate_10x_h5_file`, :meth:`search_anndata`, and :meth:`search_10x_h5_file`,  methods in :class:`CASClient`
+- Deprecate :meth:`cellarium.cas.client.CASClient.annotate_anndata`, :meth:`cellarium.cas.client.CASClient.annotate_anndata_file`, :meth:`cellarium.cas.client.CASClient.annotate_10x_h5_file`, :meth:`cellarium.cas.client.CASClient.search_anndata`, and :meth:`cellarium.cas.client.CASClient.search_10x_h5_file`,  methods in :class:`cellarium.cas.client.CASClient`
 
 File Structure Changes
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -121,8 +121,8 @@ Added
 - Include kNN search method (#49)
 - Include get cells by IDs method (#49)
 - Include helper methods for visualization and demo
-- Add model name validation method to :class:`clients.CASClient`
-- Add sync POST method (using requests) to :class:`services.CASAPIService`
+- Add model name validation method to :class:`cellarium.cas.client.CASClient`
+- Add sync POST method (using requests) to CASAPIService
 - Add `CHANGELOG.rst` file
 - Add settings module that chooses the correct settings file based on the environment according to current git version. Since now package will use development settings if it's tagged as a pre-release (alpha, beta, or release candidate (rc)), and production settings otherwise.
 - Add version determination based on git tags
@@ -130,10 +130,10 @@ Added
 
 Changed
 ~~~~~~~
-- Reorganize :class:`CASClient` methods: factor out sharding logic
+- Reorganize :class:`cellarium.cas.client.CASClient` methods: factor out sharding logic
 - Update `MAX_NUM_REQUESTS_AT_A_TIME` to 25
-- Update default `chunk_size` in :meth:`annotate` methods to 1000
-- Make :meth:`__validate_and_sanitize_input_data` method public (now it's a :meth:`validate_and_sanitize_input_data`) in CASClient
+- Update default `chunk_size` in :meth:`cellarium.cas.client.CASClient.annotate_anndata` methods to 1000
+- Make `__validate_and_sanitize_input_data` method public (now it is :meth:`cellarium.cas.client.CASClient.validate_and_sanitize_input_data`) in :class:`cellarium.cas.client.CASClient`
 - Update backend API url to point to the new API endpoints depending on the environment
 - Update `pyproject.toml` file to include scanpy optional dependencies
 - Restructure data_preparation into a module

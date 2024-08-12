@@ -3,6 +3,8 @@
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 import time
+
+from sphinx.application import Sphinx
 from setuptools_git_versioning import get_tag
 
 # -- Project information -----------------------------------------------------
@@ -22,6 +24,7 @@ extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
+    "sphinx.ext.intersphinx",
     "sphinx_substitution_extensions",
 ]
 
@@ -39,6 +42,10 @@ rst_epilog = """
 
    <br />
 """
+
+intersphinx_mapping = {
+    "anndata": ("https://anndata.readthedocs.io/en/stable/", None),
+}
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output

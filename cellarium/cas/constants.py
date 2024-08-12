@@ -3,7 +3,8 @@ from enum import Enum
 
 class HTTP:
     """
-    HTTP status codes constants
+    HTTP status codes constants.
+
     """
 
     STATUS_200_OK = 200
@@ -27,11 +28,21 @@ class HTTP:
 
 
 class CountMatrixInput(Enum):
+    """
+    Constants for the count matrix input type.
+
+    """
+
     X: str = "X"
     RAW_X: str = "raw.X"
 
 
 class Headers:
+    """
+    Header constants that are potentially sent to the CAS API.
+
+    """
+
     # The authorization header.
     authorization = "Authorization"
     # The client session id that is used to track a user's CAS client session.

@@ -3,4 +3,8 @@ Client
 
 .. automodule:: cellarium.cas.client
    :members:
-   :show-inheritance:
+
+.. autoclass:: cellarium.cas.constants.CountMatrixInput
+   :members:
+   :undoc-members:
+   :member-order: bysource
