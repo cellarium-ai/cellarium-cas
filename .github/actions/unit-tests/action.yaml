@@ -23,8 +23,21 @@ runs:
       run: tox -e lint
       shell: bash
 
+    - name: Should run doc build
+      run: |
+        import os
+        from packaging.version import Version
+        with open(os.getenv("GITHUB_ENV"), "a") as file_env:
+          python_version = Version("${{ inputs.python-version }}")
+          min_python_version = Version("3.10")
+          if python_version < min_python_version:
+            file_env.write(f"DO_DOC_BUILD=false\n")
+          else:
+            file_env.write(f"DO_DOC_BUILD=true\n")
+      shell: python
     - name: Run doc build
       # Run tox using the version of Python in `PATH`
+      if: ${{ env.DO_DOC_BUILD == 'true' }}
       run: tox -e docs
       shell: bash
 
