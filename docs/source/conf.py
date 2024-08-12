@@ -13,8 +13,8 @@ from setuptools_git_versioning import get_tag
 project = "Cellarium CAS"
 copyright = f"{time.strftime('%Y')}, Cellarium AI"
 author = "Cellarium AI"
-version = get_tag()
-release = get_tag()
+version = get_tag() or "<no version>"
+release = get_tag() or "<no release>"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
