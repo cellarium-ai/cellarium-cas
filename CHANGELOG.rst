@@ -6,6 +6,15 @@ All notable changes to Cellarium CAS client will be documented in this file.
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_,
 and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0.html>`_.
 
+<pre-version> - <pre-date>
+--------------------------
+
+Changed
+~~~~~~~
+- Added ability to render documentation locally
+- PR tests will now fail when doc is invalid
+- Fixed bugs documentation navigation
+
 1.4.12 - 2024-08-01
 -------------------
 
