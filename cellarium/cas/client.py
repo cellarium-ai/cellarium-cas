@@ -511,8 +511,7 @@ class CASClient:
             keyword, which refers to the default selected model in the Cellarium backend. |br|
             `Default:` ``"default"``
         :param count_matrix_input:  Where to obtain a feature expression count matrix from. |br|
-            `Allowed Values: Choices from enum :class:`constants.CountMatrixInput` |br|
-            `Allowed Values: Choices from enum :class:`constants.CountMatrixInput` |br|
+            `Allowed Values:` Choices from enum :class:`~.CountMatrixInput` |br|
             `Default:` ``"CountMatrixInput.X"``
         :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. |br|
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
@@ -574,7 +573,7 @@ class CASClient:
             keyword, which refers to the default selected model in the Cellarium backend. |br|
             `Default:` ``"default"``
         :param count_matrix_input:  Where to obtain a feature expression count matrix from. |br|
-            `Allowed Values: Choices from enum :class:`constants.CountMatrixInput` |br|
+            `Allowed Values:` Choices from enum :class:`~.CountMatrixInput` |br|
             `Default:` ``"CountMatrixInput.X"``
         :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. |br|
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
@@ -626,7 +625,7 @@ class CASClient:
             keyword, which refers to the default selected model in the Cellarium backend. |br|
             `Default:` ``"default"``
         :param count_matrix_input:  Where to obtain a feature expression count matrix from. |br|
-            `Allowed Values: Choices from enum :class:`constants.CountMatrixInput` |br|
+            `Allowed Values:` Choices from enum :class:`~.CountMatrixInput` |br|
             `Default:` ``"CountMatrixInput.X"``
         :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. |br|
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
@@ -672,7 +671,7 @@ class CASClient:
             to annotate
         :param chunk_size: Size of chunks to split on
         :param count_matrix_input:  Where to obtain a feature expression count matrix from. |br|
-            `Allowed Values: Choices from enum :class:`constants.CountMatrixInput` |br|
+            `Allowed Values:` Choices from enum :class:`~.CountMatrixInput` |br|
             `Default:` ``"CountMatrixInput.X"``
         :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. |br|
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
@@ -741,7 +740,7 @@ class CASClient:
             to annotate
         :param chunk_size: Size of chunks to split on
         :param count_matrix_input:  Where to obtain a feature expression count matrix from. |br|
-            `Allowed Values: Choices from enum :class:`constants.CountMatrixInput` |br|
+            `Allowed Values:` Choices from enum :class:`~.CountMatrixInput` |br|
             `Default:` ``"CountMatrixInput.X"``
         :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. |br|
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
@@ -815,7 +814,7 @@ class CASClient:
             keyword, which refers to the default selected model in the Cellarium backend. |br|
             `Default:` ``"default"``
         :param count_matrix_input:  Where to obtain a feature expression count matrix from. |br|
-            `Allowed Values: Choices from enum :class:`constants.CountMatrixInput` |br|
+            `Allowed Values:` Choices from enum :class:`~.CountMatrixInput` |br|
             `Default:` ``"CountMatrixInput.X"``
         :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. |br|
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
@@ -873,7 +872,7 @@ class CASClient:
             keyword, which refers to the default selected model in the Cellarium backend. |br|
             `Default:` ``"default"``
         :param count_matrix_input:  Where to obtain a feature expression count matrix from. |br|
-            `Allowed Values: Choices from enum :class:`constants.CountMatrixInput` |br|
+            `Allowed Values:` Choices from enum :class:`~.CountMatrixInput` |br|
             `Default:` ``"CountMatrixInput.X"``
         :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. |br|
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
@@ -918,7 +917,7 @@ class CASClient:
             to annotate
         :param chunk_size: Size of chunks to split on
         :param count_matrix_input:  Where to obtain a feature expression count matrix from. |br|
-            `Allowed Values: Choices from enum :class:`constants.CountMatrixInput` |br|
+            `Allowed Values:` Choices from enum :class:`~.CountMatrixInput` |br|
             `Default:` ``"CountMatrixInput.X"``
         :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. |br|
             `Allowed Values:` A value from ``adata.var.columns`` or ``"index"`` keyword, which refers to index
