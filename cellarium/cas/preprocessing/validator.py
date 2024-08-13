@@ -38,13 +38,8 @@ def validate(
     cas_feature_schema_set = set(cas_feature_schema_list)
     adata_feature_schema_set = set(adata_feature_schema_list)
 
-    incompatible_x_type: t.Optional[str] = None
-    if count_matrix_input == constants.CountMatrixInput.X:
-        if adata.X.dtype != np.float32:
-            incompatible_x_type = adata.X.dtype
-    else:
-        if adata.raw.X.dtype != np.float32:
-            incompatible_x_type = adata.raw.X.dtype
+    dtype_to_check = adata.X.dtype if count_matrix_input == constants.CountMatrixInput.X else adata.raw.X.dtype
+    incompatible_x_type: t.Optional[str] = None if dtype_to_check == np.float32 else dtype_to_check
 
     incompatible_total_mrna_umis_type: t.Optional[str] = None
     if "total_mrna_umis" in adata.obs and adata.obs["total_mrna_umis"].dtype != np.float32:
