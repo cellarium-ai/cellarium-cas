@@ -6,7 +6,7 @@ try:
 
     __all__ = ["CASCircularTreePlotUMAPDashApp", "find_and_kill_process"]
 except ImportError:
-    logging.debug(
+    logging.warn(
         """
 Visualization dependencies not installed.
 To install the Cellarium CAS Client with visualation dependencies, please run:
