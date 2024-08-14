@@ -4,7 +4,6 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 import time
 
-from sphinx.application import Sphinx
 from setuptools_git_versioning import get_tag
 
 # -- Project information -----------------------------------------------------
