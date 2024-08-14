@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 
-from cellarium.cas import constants, exceptions
+from cellarium.cas import constants
 from cellarium.cas.preprocessing import callbacks
 
 
@@ -16,38 +16,11 @@ def _get_adata_var_index_or_by_column(adata: anndata.AnnData, var_column_name: s
     return adata.var[var_column_name].values.tolist()
 
 
-def validate(
-    adata: anndata.AnnData,
-    cas_feature_schema_list: t.List,
-    feature_ids_column_name: str,
-) -> None:
+def pre_sanitize(adata: anndata.AnnData, count_matrix_input: constants.CountMatrixInput) -> None:
     """
-    Validate input `anndata.AnnData` instance in concordance with feature schema `cas_feature_schema_list`.
-    Raise `exceptions.DataValidationError` with number of missing features and number of extra features
-    that were present in dataset.
-
-    :param adata: Instance to validate
-    :param cas_feature_schema_list: List of features to be validated with
-    :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. Default `index`.
+    Apply preprocessing steps that are necessary before validation and sanitization
     """
-    if feature_ids_column_name != "index" and feature_ids_column_name not in adata.var.columns.values:
-        raise ValueError(
-            "`feature_ids_column_name` should have a value of either 'index' "
-            "or be present as a column in the `adata.var` object."
-        )
-
-    adata_feature_schema_list = _get_adata_var_index_or_by_column(adata=adata, var_column_name=feature_ids_column_name)
-
-    cas_feature_schema_set = set(cas_feature_schema_list)
-    adata_feature_schema_set = set(adata_feature_schema_list)
-
-    if adata_feature_schema_list == cas_feature_schema_list:
-        return
-
-    missing_features = len(cas_feature_schema_set - adata_feature_schema_set)
-    extra_features = len(adata_feature_schema_set - cas_feature_schema_set)
-
-    raise exceptions.DataValidationError(missing_features=missing_features, extra_features=extra_features)
+    callbacks.pre_sanitize_callback(adata=adata, count_matrix_input=count_matrix_input)
 
 
 def sanitize(
@@ -81,16 +54,6 @@ def sanitize(
             "`feature_ids_name_column_name` should have a value of either 'index' "
             "or be present as a column in the `adata.var` object."
         )
-
-    # Convert matrix to float32 if it's not
-    # We have to do this before everything else because some of the following steps derive values
-    # from the matrix, and those will cause things to break if they're the wrong type
-    if count_matrix_input == constants.CountMatrixInput.X and adata.X.dtype != np.float32:
-        adata.X = adata.X.astype(np.float32)
-    elif count_matrix_input == constants.CountMatrixInput.RAW_X and adata.raw.X.dtype != np.float32:
-        adata.raw.X = adata.raw.X.astype(np.float32)
-
-    callbacks.pre_sanitize_callback(adata=adata, count_matrix_input=count_matrix_input)
 
     adata_feature_schema_list = _get_adata_var_index_or_by_column(adata=adata, var_column_name=feature_ids_column_name)
     original_obs_ids = adata.obs.index.values

@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Optional
 
 
 class CASBaseError(Exception):
@@ -38,8 +37,6 @@ class HTTPClientError(HTTPError):
 class DataValidationError(CASBaseError):
     missing_features: int
     extra_features: int
-    incompatible_x_type: Optional[str]
-    incompatible_total_mrna_umis_type: Optional[str]
 
 
 class QuotaExceededError(CASBaseError):

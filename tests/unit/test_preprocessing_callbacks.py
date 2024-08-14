@@ -5,6 +5,8 @@ import pandas as pd
 from cellarium.cas import constants
 from cellarium.cas.preprocessing import callbacks
 
+np_random_state = np.random.RandomState(0)
+
 
 def test_calculate_total_mrna_umis_X():
     """
@@ -78,3 +80,30 @@ def test_calculate_total_mrna_umis_raw_X():
         [3, 1, 3],
         err_msg="Total mRNA UMI calculations are incorrect",
     )
+
+
+def test_ensure_matrix_is_float32_X():
+    """
+    Test :func:`preprocessing.callbacks.ensure_matrix_is_float32` function when X is not of type float32.
+    """
+    X = np_random_state.randn(5, 5).astype(np.float64)
+    obs = pd.DataFrame(index=["cell1", "cell2", "cell3", "cell4", "cell5"])
+    adata = anndata.AnnData(X=X, obs=obs)
+
+    callbacks.ensure_matrix_is_float32(adata, count_matrix_input=constants.CountMatrixInput.X)
+
+    assert adata.X.dtype == np.float32, "X matrix is not of type float32"
+
+
+def test_ensure_matrix_is_float32_raw_X():
+    """
+    Test :func:`preprocessing.callbacks.ensure_matrix_is_float32` function when X is not of type float32.
+    """
+    raw_X = np_random_state.randn(5, 5).astype(np.int32)
+    obs = pd.DataFrame(index=["cell1", "cell2", "cell3", "cell4", "cell5"])
+    adata = anndata.AnnData(X=raw_X, obs=obs)
+    adata.raw = adata
+
+    callbacks.ensure_matrix_is_float32(adata, count_matrix_input=constants.CountMatrixInput.RAW_X)
+
+    assert adata.raw.X.dtype == np.float32, "raw X matrix is not of type float32"

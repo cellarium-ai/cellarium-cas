@@ -1,7 +1,5 @@
 import typing as t
 
-import numpy as np
-
 from cellarium.cas import constants, exceptions
 
 if t.TYPE_CHECKING:
@@ -38,17 +36,8 @@ def validate(
     cas_feature_schema_set = set(cas_feature_schema_list)
     adata_feature_schema_set = set(adata_feature_schema_list)
 
-    dtype_to_check = adata.X.dtype if count_matrix_input == constants.CountMatrixInput.X else adata.raw.X.dtype
-    incompatible_x_type: t.Optional[str] = None if dtype_to_check == np.float32 else dtype_to_check
-
-    incompatible_total_mrna_umis_type: t.Optional[str] = None
-    if "total_mrna_umis" in adata.obs and adata.obs["total_mrna_umis"].dtype != np.float32:
-        incompatible_total_mrna_umis_type = adata.obs["total_mrna_umis"].dtype
-
     if (
         adata_feature_schema_list == cas_feature_schema_list
-        and incompatible_x_type is None
-        and incompatible_total_mrna_umis_type is None
         # We want to be sure to sanitize if the count matrix is raw.X
         and count_matrix_input == constants.CountMatrixInput.X
     ):
@@ -60,6 +49,4 @@ def validate(
     raise exceptions.DataValidationError(
         missing_features=missing_features,
         extra_features=extra_features,
-        incompatible_x_type=incompatible_x_type,
-        incompatible_total_mrna_umis_type=incompatible_total_mrna_umis_type,
     )

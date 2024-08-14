@@ -179,9 +179,15 @@ class CASClient:
             cas_feature_schema_list = self.cas_api_service.get_feature_schema_by(name=feature_schema_name)
             self._feature_schemas_cache[feature_schema_name] = cas_feature_schema_list
 
+        # Make a copy of the input anndata object that we can sanitize
+        new_adata = adata.copy()
+
+        # Apply preprocessing steps that are necessary before validation and sanitization
+        preprocessing.pre_sanitize(adata=new_adata, count_matrix_input=count_matrix_name)
+
         try:
             preprocessing.validate(
-                adata=adata,
+                adata=new_adata,
                 cas_feature_schema_list=cas_feature_schema_list,
                 feature_ids_column_name=feature_ids_column_name,
                 count_matrix_input=count_matrix_name,
@@ -210,19 +216,8 @@ class CASClient:
                     f"CAS schema but in a different order. The input features will be reordered according to "
                     f"'{feature_schema_name}'"
                 )
-            if e.incompatible_x_type is not None:
-                self._print(
-                    f"CAS expects the input data matrix to be of type 'float32', but the data provided is of type "
-                    f"'{e.incompatible_x_type}'. If possible, the input data will be converted to 'float32'."
-                )
-            if e.incompatible_total_mrna_umis_type is not None:
-                self._print(
-                    f"CAS expects that, if a matrix for total mRNA UMIs is provided, it should be of type 'float32', "
-                    f"The provided total mRNA UMIs matrix is of type '{e.incompatible_total_mrna_umis_type}'. If "
-                    f"possible, the total mRNA UMIs matrix will be converted to 'float32'."
-                )
             return preprocessing.sanitize(
-                adata=adata,
+                adata=new_adata,
                 cas_feature_schema_list=cas_feature_schema_list,
                 count_matrix_input=count_matrix_name,
                 feature_ids_column_name=feature_ids_column_name,
@@ -230,7 +225,7 @@ class CASClient:
             )
         else:
             self._print(f"The input data matrix conforms with the '{feature_schema_name}' CAS schema.")
-            return adata
+            return new_adata
 
     def print_user_quota(self) -> None:
         """
