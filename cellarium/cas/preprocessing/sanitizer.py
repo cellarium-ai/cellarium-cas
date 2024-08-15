@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 
-from cellarium.cas import constants, exceptions
+from cellarium.cas import constants
 from cellarium.cas.preprocessing import callbacks
 
 
@@ -16,38 +16,11 @@ def _get_adata_var_index_or_by_column(adata: anndata.AnnData, var_column_name: s
     return adata.var[var_column_name].values.tolist()
 
 
-def validate(
-    adata: anndata.AnnData,
-    cas_feature_schema_list: t.List,
-    feature_ids_column_name: str,
-) -> None:
+def pre_sanitize(adata: anndata.AnnData, count_matrix_input: constants.CountMatrixInput) -> None:
     """
-    Validate input `anndata.AnnData` instance in concordance with feature schema `cas_feature_schema_list`.
-    Raise `exceptions.DataValidationError` with number of missing features and number of extra features
-    that were present in dataset.
-
-    :param adata: Instance to validate
-    :param cas_feature_schema_list: List of features to be validated with
-    :param feature_ids_column_name: Column name where to obtain Ensembl feature ids. Default `index`.
+    Apply preprocessing steps that are necessary before validation and sanitization
     """
-    if feature_ids_column_name != "index" and feature_ids_column_name not in adata.var.columns.values:
-        raise ValueError(
-            "`feature_ids_column_name` should have a value of either 'index' "
-            "or be present as a column in the `adata.var` object."
-        )
-
-    adata_feature_schema_list = _get_adata_var_index_or_by_column(adata=adata, var_column_name=feature_ids_column_name)
-
-    cas_feature_schema_set = set(cas_feature_schema_list)
-    adata_feature_schema_set = set(adata_feature_schema_list)
-
-    if adata_feature_schema_list == cas_feature_schema_list:
-        return
-
-    missing_features = len(cas_feature_schema_set - adata_feature_schema_set)
-    extra_features = len(adata_feature_schema_set - cas_feature_schema_set)
-
-    raise exceptions.DataValidationError(missing_features=missing_features, extra_features=extra_features)
+    callbacks.pre_sanitize_callback(adata=adata, count_matrix_input=count_matrix_input)
 
 
 def sanitize(
@@ -59,7 +32,8 @@ def sanitize(
 ) -> anndata.AnnData:
     """
     Cellarium CAS sanitizing script. Returns a new `anndata.AnnData` instance, based on the feature expression
-    matrix of the input instance. Extra features get omitted. Missing features get filled with zeros.
+    matrix of the input instance. Extra features get omitted. Missing features get filled with zeros. If the
+    data matrix is not of type float32, it will be converted to float32.
 
     :param adata: Instance to sanitize
     :param cas_feature_schema_list: List of Ensembl feature ids to rely on.
@@ -80,8 +54,6 @@ def sanitize(
             "`feature_ids_name_column_name` should have a value of either 'index' "
             "or be present as a column in the `adata.var` object."
         )
-
-    callbacks.pre_sanitize_callback(adata=adata, count_matrix_input=count_matrix_input)
 
     adata_feature_schema_list = _get_adata_var_index_or_by_column(adata=adata, var_column_name=feature_ids_column_name)
     original_obs_ids = adata.obs.index.values
@@ -130,6 +102,7 @@ def sanitize(
         var_df_data["feature_name"] = cas_feature_name_list
 
     var_df = pd.DataFrame(index=cas_feature_schema_list, data=var_df_data)
+
     return anndata.AnnData(
         result_matrix.tocsr(),
         obs=obs,

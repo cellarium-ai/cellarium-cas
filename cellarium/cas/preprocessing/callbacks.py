@@ -8,6 +8,23 @@ from cellarium.cas import constants
 TOTAL_MRNA_UMIS_COLUMN_NAME = "total_mrna_umis"
 
 
+def ensure_matrix_is_float32(adata: anndata.AnnData, count_matrix_input: constants.CountMatrixInput) -> None:
+    """
+    Ensure that the count matrix in the AnnData object is of type float32. If it is not, the function will convert it
+    to float32.
+
+    :param adata: The annotated data matrix to ensure the count matrix is of type float32.
+    :param count_matrix_input: Where to obtain a feature expression count matrix from. Choice of: 'X', 'raw.X'
+
+    :return: A new AnnData object with the same data as ``adata`` but with the count matrix converted to float32.
+    """
+
+    if count_matrix_input == constants.CountMatrixInput.X and adata.X.dtype != np.float32:
+        adata.X = adata.X.astype(np.float32)
+    elif count_matrix_input == constants.CountMatrixInput.RAW_X and adata.raw.X.dtype != np.float32:
+        adata.raw.X = adata.raw.X.astype(np.float32)
+
+
 def calculate_total_mrna_umis(adata: anndata.AnnData, count_matrix_input: constants.CountMatrixInput) -> None:
     """
     Calculate the total mRNA UMIs (Unique Molecular Identifiers) for each observation in the AnnData object and add them
@@ -36,6 +53,7 @@ def calculate_total_mrna_umis(adata: anndata.AnnData, count_matrix_input: consta
 
 
 _PRE_SANITIZE_CALLBACKS: t.List[t.Callable[[anndata.AnnData, constants.CountMatrixInput], None]] = [
+    ensure_matrix_is_float32,
     calculate_total_mrna_umis,
 ]
 

@@ -179,11 +179,18 @@ class CASClient:
             cas_feature_schema_list = self.cas_api_service.get_feature_schema_by(name=feature_schema_name)
             self._feature_schemas_cache[feature_schema_name] = cas_feature_schema_list
 
+        # Make a copy of the input anndata object that we can sanitize
+        new_adata = adata.copy()
+
+        # Apply preprocessing steps that are necessary before validation and sanitization
+        preprocessing.pre_sanitize(adata=new_adata, count_matrix_input=count_matrix_name)
+
         try:
             preprocessing.validate(
-                adata=adata,
+                adata=new_adata,
                 cas_feature_schema_list=cas_feature_schema_list,
                 feature_ids_column_name=feature_ids_column_name,
+                count_matrix_input=count_matrix_name,
             )
         except exceptions.DataValidationError as e:
             if e.extra_features > 0:
@@ -210,7 +217,7 @@ class CASClient:
                     f"'{feature_schema_name}'"
                 )
             return preprocessing.sanitize(
-                adata=adata,
+                adata=new_adata,
                 cas_feature_schema_list=cas_feature_schema_list,
                 count_matrix_input=count_matrix_name,
                 feature_ids_column_name=feature_ids_column_name,
@@ -218,7 +225,7 @@ class CASClient:
             )
         else:
             self._print(f"The input data matrix conforms with the '{feature_schema_name}' CAS schema.")
-            return adata
+            return new_adata
 
     def print_user_quota(self) -> None:
         """
@@ -704,6 +711,7 @@ class CASClient:
             feature_ids_column_name=feature_ids_column_name,
             feature_names_column_name=feature_names_column_name,
         )
+
         results = self.__async_sharded_request(
             adata=matrix,
             chunk_size=chunk_size,
