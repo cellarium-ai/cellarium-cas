@@ -8,6 +8,8 @@ import numpy as np
 import scipy.sparse as sp
 from anndata import AnnData
 
+from cellarium.cas.models import CellTypeOntologyAwareResults
+
 from .cell_ontology.cell_ontology_cache import CL_CELL_ROOT_NODE, CL_EUKARYOTIC_CELL_ROOT_NODE, CellOntologyCache
 from .common import get_obs_indices_for_cluster
 
@@ -22,7 +24,7 @@ CAS_CL_LABEL_PROPERTY_REF = "CAS:cl_label"
 
 
 def convert_cas_ontology_aware_response_to_score_matrix(
-    adata: AnnData, cas_ontology_aware_response: list, cl: CellOntologyCache
+    adata: AnnData, cas_ontology_aware_response: CellTypeOntologyAwareResults, cl: CellOntologyCache
 ) -> sp.csr_matrix:
     """
     Generate a sparse matrix of CAS ontology-aware scores.
@@ -35,7 +37,7 @@ def convert_cas_ontology_aware_response_to_score_matrix(
     :type adata: AnnData
 
     :param cas_ontology_aware_response: A list of CAS ontology-aware responses.
-    :type cas_ontology_aware_response: list
+    :type cas_ontology_aware_response: CellTypeOntologyAwareResults
 
     :param cl: A CellOntologyCache object containing the cell ontology information.
     :type cl: CellOntologyCache
@@ -48,27 +50,27 @@ def convert_cas_ontology_aware_response_to_score_matrix(
     data = []
 
     obs_values = adata.obs.index.values
-    for obs_idx, cas_cell_response in enumerate(cas_ontology_aware_response):
-        assert cas_cell_response["query_cell_id"] == obs_values[obs_idx]
-        for match in cas_cell_response["matches"]:
+    for obs_idx, cas_cell_response in enumerate(cas_ontology_aware_response.data):
+        assert cas_cell_response.query_cell_id == obs_values[obs_idx]
+        for match in cas_cell_response.matches:
             row.append(obs_idx)
-            col.append(cl.cl_names_to_idx_map[match["cell_type_ontology_term_id"]])
-            data.append(match["score"])
+            col.append(cl.cl_names_to_idx_map[match.cell_type_ontology_term_id])
+            data.append(match.score)
 
-    n_obs = len(cas_ontology_aware_response)
+    n_obs = len(cas_ontology_aware_response.data)
     n_cl_names = len(cl.cl_names)
     return sp.coo_matrix((data, (row, col)), shape=(n_obs, n_cl_names)).tocsr()
 
 
 def insert_cas_ontology_aware_response_into_adata(
-    cas_ontology_aware_response: list, adata: AnnData, cl: CellOntologyCache
+    cas_ontology_aware_response: CellTypeOntologyAwareResults, adata: AnnData, cl: CellOntologyCache
 ) -> None:
     """
     Inserts Cellarium CAS ontology aware response into `obsm` property of a provided AnnData file as a
     :class:`scipy.sparse.csr_matrix` named `cas_cl_scores`.
 
     :param cas_ontology_aware_response: The Cellarium CAS ontology aware response.
-    :type cas_ontology_aware_response: list
+    :type cas_ontology_aware_response: CellTypeOntologyAwareResults
 
     :param adata: The AnnData object to insert the response into.
     :type adata: AnnData
