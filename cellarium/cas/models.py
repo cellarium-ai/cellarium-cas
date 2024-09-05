@@ -71,7 +71,7 @@ class CellTypeOntologyAwareResults(BaseModel):
     Represents the data object returned by the CAS API for a ontology-aware annotations.
     """
 
-    class Matches(BaseModel):
+    class Match(BaseModel):
         score: float = Field(description="The score of the match", examples=[0.789])
         cell_type_ontology_term_id: str = Field(
             description="The ontology term ID of the cell type for the match", examples=["CL:0000121"]
@@ -84,7 +84,7 @@ class CellTypeOntologyAwareResults(BaseModel):
         """
 
         query_cell_id: str = Field(description="The ID of the querying cell", examples=["ATTACTTATTTAGTT-12311"])
-        matches: t.List["CellTypeOntologyAwareResults.Matches"] = Field(
+        matches: t.List["CellTypeOntologyAwareResults.Match"] = Field(
             description="The matches found for the querying cell"
         )
         total_weight: float = Field(description="The total weight of the matches", examples=[11.23232])
@@ -105,7 +105,7 @@ class MatrixQueryResults(BaseModel):
     (e.g. a query of the cell database using a matrix).
     """
 
-    class Matches(BaseModel):
+    class Match(BaseModel):
         cas_cell_index: float = Field(description="CAS-specific ID of a single cell", examples=[123])
         distance: float = Field(
             description="The distance between this querying cell and the found cell", examples=[0.123]
@@ -117,7 +117,7 @@ class MatrixQueryResults(BaseModel):
         """
 
         query_cell_id: str = Field(description="The ID of the querying cell", examples=["ATTACTTATTTAGTT-12311"])
-        neighbors: t.List["MatrixQueryResults.Matches"]
+        neighbors: t.List["MatrixQueryResults.Match"]
 
     data: t.List["MatrixQueryResults.MatrixQueryResult"] = Field(description="The results of the query")
 
