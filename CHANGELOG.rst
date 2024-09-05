@@ -20,6 +20,7 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
   - Added ability to render documentation locally
   - PR tests will now fail when doc is invalid
   - Fixed bugs documentation navigation
+  - Update Cell Type Ontology to the version used in cellxgene schema v 5
 
   Fixed
   ~~~~~
