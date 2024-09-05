@@ -372,7 +372,7 @@ class CASAPIService(_BaseService):
         return self.get_json(endpoint=endpoints.GET_USER_QUOTA)
 
     def query_cells_by_ids(
-        self, model_name: str, cell_ids: t.List[int], metadata_feature_names: t.List[str]
+        self, cell_ids: t.List[int], metadata_feature_names: t.List[str]
     ) -> t.List[t.Dict[str, t.Any]]:
         """
         Retrieve cells by their ids from Cellarium Cloud database.
@@ -380,14 +380,12 @@ class CASAPIService(_BaseService):
         Refer to API Docs:
         {api_url}/api/docs#/cell-analysis/get_cells_by_ids_api_cellarium_cas_query_cells_by_ids_post
 
-        :param model_name: Name of the model to use. Model name is required to locate the correct database.
         :param cell_ids: List of cell ids from Cellarium Cloud database to query by.
         :param metadata_feature_names: List of metadata feature names to include in the response.
 
         :return: List of cells with metadata.
         """
         request_data = {
-            "model_name": model_name,
             "cas_cell_ids": cell_ids,
             "metadata_feature_names": metadata_feature_names,
         }
