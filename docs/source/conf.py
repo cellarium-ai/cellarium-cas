@@ -25,6 +25,7 @@ extensions = [
     "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
     "sphinx_substitution_extensions",
+    "sphinxcontrib.autodoc_pydantic",
 ]
 
 # Provide substitutions for common values
@@ -50,3 +51,12 @@ intersphinx_mapping = {
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = "sphinx_rtd_theme"
+
+nitpicky = True
+nitpick_ignore_regex = [
+    # Ignore exceptions from nested Pydantic models
+    (r'py:.*', r'cellarium\.cas\.models\..*'),
+]
+
+# The JSON schema is a bit much in the docs
+autodoc_pydantic_model_show_json = False
