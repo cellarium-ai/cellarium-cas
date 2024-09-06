@@ -17,22 +17,13 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
 
   Changed
   ~~~~~~~
+  - Added ability to render documentation locally
+  - PR tests will now fail when doc is invalid
+  - Fixed bugs documentation navigation
 
   Fixed
   ~~~~~
-
-1.4.13 - 2024-09-06
--------------------
-
-Changed
-~~~~~~~
-- Added ability to render documentation locally
-- PR tests will now fail when doc is invalid
-- Fixed bugs documentation navigation
-
-Fixed
-~~~~~
-- Added a pre-sanitization step to fix an issue where non-float32 anndata matrices would be submitted to CAS and fail
+  - Added a pre-sanitization step to fix an issue where non-float32 anndata matrices would be submitted to CAS and fail
 
 1.4.12 - 2024-08-01
 -------------------
