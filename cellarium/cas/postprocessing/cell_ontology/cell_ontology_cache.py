@@ -9,9 +9,9 @@ from scipy import sparse as sp
 
 from cellarium.cas._io import suppress_stderr
 
-# Used in CZ CELLxGENE schema v3:
-# https://github.com/chanzuckerberg/single-cell-curation/blob/main/schema/3.0.0/schema.md
-DEFAULT_CL_OWL_PATH = "https://github.com/obophenotype/cell-ontology/raw/v2022-09-15/cl.owl"
+# Used in CZ CELLxGENE schema v5:
+# https://github.com/chanzuckerberg/single-cell-curation/blob/main/schema/5.0.0/schema.md
+DEFAULT_CL_OWL_PATH = "https://github.com/obophenotype/cell-ontology/releases/download/v2024-01-04/cl.owl"
 
 # only keep nodes with the following prefix when parsing CL ontology
 CL_PREFIX = "CL_"
