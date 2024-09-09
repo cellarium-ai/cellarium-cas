@@ -17,15 +17,13 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
 
   Changed
   ~~~~~~~
-  - Explicitly typed all objects returned from the client
 
   Fixed
   ~~~~~
-  - Removed unused method parameters
 
 
-1.4.13 - 2024-09-06
--------------------
+1.5.1 - 2024-09-09
+------------------
 
 Changed
 ~~~~~~~
@@ -33,10 +31,17 @@ Changed
 - PR tests will now fail when doc is invalid
 - Fixed bugs in documentation navigation
 - Update Cell Type Ontology to the version used in cellxgene schema v5
+- Explicitly typed all objects returned from the client
 
 Fixed
 ~~~~~
 - Added a pre-sanitization step to fix an issue where non-float32 anndata matrices would be submitted to CAS and fail
+- Removed unused method parameters
+
+
+1.4.13 - 2024-09-06
+-------------------
+**Warning: This version was compromised due to a wrong commit being tagged. It is not a proper release version. Please use version 1.5.1 or later.**
 
 
 1.4.12 - 2024-08-01
