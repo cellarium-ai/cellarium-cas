@@ -17,9 +17,11 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
 
   Changed
   ~~~~~~~
+  - Explicitly typed all objects returned from the client
 
   Fixed
   ~~~~~
+  - Removed unused method parameters
 
 
 1.4.13 - 2024-09-06
@@ -29,7 +31,7 @@ Changed
 ~~~~~~~
 - Added ability to render documentation locally
 - PR tests will now fail when doc is invalid
-- Fixed bugs documentation navigation
+- Fixed bugs in documentation navigation
 - Update Cell Type Ontology to the version used in cellxgene schema v5
 
 Fixed

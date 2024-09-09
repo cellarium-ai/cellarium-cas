@@ -15,6 +15,7 @@ from dash.dependencies import Input, Output
 from dash.development.base_component import Component
 from plotly.express.colors import sample_colorscale
 
+from cellarium.cas.models import CellTypeOntologyAwareResults
 from cellarium.cas.postprocessing import (
     CAS_CL_SCORES_ANNDATA_OBSM_KEY,
     CellOntologyScoresAggregationDomain,
@@ -175,7 +176,7 @@ class CASCircularTreePlotUMAPDashApp:
     def __init__(
         self,
         adata: AnnData,
-        cas_ontology_aware_response: list,
+        cas_ontology_aware_response: CellTypeOntologyAwareResults,
         cluster_label_obs_column: t.Optional[str] = None,
         aggregation_op: CellOntologyScoresAggregationOp = CellOntologyScoresAggregationOp.MEAN,
         aggregation_domain: CellOntologyScoresAggregationDomain = CellOntologyScoresAggregationDomain.OVER_THRESHOLD,
