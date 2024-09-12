@@ -63,9 +63,9 @@ def convert_cas_ontology_aware_response_to_score_matrix(
 
 
 def insert_cas_ontology_aware_response_into_adata(
-        cas_ontology_aware_response: CellTypeOntologyAwareResults,
-        adata: AnnData,
-        cl: CellOntologyCache = CellOntologyCache()
+    cas_ontology_aware_response: CellTypeOntologyAwareResults,
+    adata: AnnData,
+    cl: CellOntologyCache = CellOntologyCache(),
 ) -> None:
     """
     Inserts Cellarium CAS ontology aware response into `obsm` property of a provided AnnData file as a
@@ -298,11 +298,9 @@ def get_most_granular_top_k_calls(
     cl: CellOntologyCache,
     min_acceptable_score: float,
     top_k: int = 1,
-    root_note: str = CL_CELL_ROOT_NODE
+    root_note: str = CL_CELL_ROOT_NODE,
 ) -> t.List[tuple]:
-    depth_list = list(
-        map(cl.get_longest_path_lengths_from_target(root_note).get, aggregated_scores.cl_names)
-    )
+    depth_list = list(map(cl.get_longest_path_lengths_from_target(root_note).get, aggregated_scores.cl_names))
     sorted_score_and_depth_list = sorted(
         list(
             (score, depth, cl_name)
@@ -327,7 +325,7 @@ def compute_most_granular_top_k_calls_single(
     min_acceptable_score: float,
     top_k: int = 3,
     obs_prefix: str = "cas_cell_type",
-    root_note: str = CL_CELL_ROOT_NODE
+    root_note: str = CL_CELL_ROOT_NODE,
 ):
     top_k_calls_dict = defaultdict(list)
     scores_array_nc = adata.obsm[CAS_CL_SCORES_ANNDATA_OBSM_KEY].toarray()
@@ -377,7 +375,7 @@ def compute_most_granular_top_k_calls_cluster(
     aggregation_score_threshod: float = 1e-4,
     top_k: int = 3,
     obs_prefix: str = "cas_cell_type",
-    root_note: str = CL_CELL_ROOT_NODE
+    root_note: str = CL_CELL_ROOT_NODE,
 ):
     top_k_calls_dict = dict()
     for k in range(top_k):

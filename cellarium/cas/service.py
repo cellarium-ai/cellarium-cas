@@ -1,7 +1,7 @@
 import asyncio
 import json
-import ssl
 import logging
+import ssl
 import typing as t
 from contextlib import ContextDecorator
 from contextvars import ContextVar

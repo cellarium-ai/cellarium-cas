@@ -22,7 +22,7 @@ from cellarium.cas.postprocessing import (
     convert_aggregated_cell_ontology_scores_to_rooted_tree,
     generate_phyloxml_from_scored_cell_ontology_tree,
     get_aggregated_cas_ontology_aware_scores,
-    get_obs_indices_for_cluster
+    get_obs_indices_for_cluster,
 )
 from cellarium.cas.postprocessing.cell_ontology import CL_CELL_ROOT_NODE, CellOntologyCache
 from cellarium.cas.visualization._components.circular_tree_plot import CircularTreePlot
@@ -220,11 +220,14 @@ class CASCircularTreePlotUMAPDashApp:
         self.shown_cl_names_set = shown_cl_names_set
         self.score_colorscale = score_colorscale
 
-        assert "X_umap" in adata.obsm, "UMAP coordinates not found in adata.obsm['X_umap']. " \
+        assert "X_umap" in adata.obsm, (
+            "UMAP coordinates not found in adata.obsm['X_umap']. "
             "This visualisation requires precomputed UMAP coordinates."
-        assert (CAS_CL_SCORES_ANNDATA_OBSM_KEY in adata.obsm) and (CAS_METADATA_ANNDATA_UNS_KEY in adata.uns), \
-            "Cell type ontology scores not found in the provided AnnData file. Please please run " \
+        )
+        assert (CAS_CL_SCORES_ANNDATA_OBSM_KEY in adata.obsm) and (CAS_METADATA_ANNDATA_UNS_KEY in adata.uns), (
+            "Cell type ontology scores not found in the provided AnnData file. Please please run "
             "`cellarium.cas.insert_cas_ontology_aware_response_into_adata` prior to running this visualisation."
+        )
 
         # setup cell domains
         self.cell_domain_map = OrderedDict()
