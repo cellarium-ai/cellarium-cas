@@ -63,7 +63,9 @@ def convert_cas_ontology_aware_response_to_score_matrix(
 
 
 def insert_cas_ontology_aware_response_into_adata(
-    cas_ontology_aware_response: CellTypeOntologyAwareResults, adata: AnnData, cl: CellOntologyCache = CellOntologyCache()
+        cas_ontology_aware_response: CellTypeOntologyAwareResults,
+        adata: AnnData,
+        cl: CellOntologyCache = CellOntologyCache()
 ) -> None:
     """
     Inserts Cellarium CAS ontology aware response into `obsm` property of a provided AnnData file as a
