@@ -1,6 +1,7 @@
 import asyncio
 import json
 import ssl
+import logging
 import typing as t
 from contextlib import ContextDecorator
 from contextvars import ContextVar
@@ -15,7 +16,7 @@ from aiohttp import client_exceptions
 from cellarium.cas import constants, endpoints, exceptions, settings
 
 if settings.is_interactive_environment():
-    print("Running in an interactive environment, applying nest_asyncio")
+    logging.debug("Running in an interactive environment, applying nest_asyncio")
     nest_asyncio.apply()
 
 # Context variable to track the action id for the current context
@@ -210,7 +211,7 @@ class _BaseService:
                         except (json.decoder.JSONDecodeError, client_exceptions.ClientResponseError):
                             response_detail = await response.text()
                         except KeyError:
-                            print("Response body doesn't have a 'detail' key, returning full response body")
+                            logging.warning("Response body doesn't have a 'detail' key, returning full response body")
                             response_detail = str(await response.json())
 
                         self.raise_response_exception(status_code=status_code, detail=response_detail)

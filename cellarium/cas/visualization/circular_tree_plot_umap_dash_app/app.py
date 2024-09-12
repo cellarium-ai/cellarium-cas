@@ -177,7 +177,6 @@ class CASCircularTreePlotUMAPDashApp:
     def __init__(
         self,
         adata: AnnData,
-        cas_ontology_aware_response: CellTypeOntologyAwareResults,
         cluster_label_obs_column: t.Optional[str] = None,
         aggregation_op: CellOntologyScoresAggregationOp = CellOntologyScoresAggregationOp.MEAN,
         aggregation_domain: CellOntologyScoresAggregationDomain = CellOntologyScoresAggregationDomain.OVER_THRESHOLD,
@@ -224,11 +223,11 @@ class CASCircularTreePlotUMAPDashApp:
         self.shown_cl_names_set = shown_cl_names_set
         self.score_colorscale = score_colorscale
 
-        assert "X_umap" in adata.obsm, "UMAP coordinates not found in adata.obsm['X_umap']. \
-            This visualisation requires precomputed UMAP coordinates."
+        assert "X_umap" in adata.obsm, "UMAP coordinates not found in adata.obsm['X_umap']. " \
+            "This visualisation requires precomputed UMAP coordinates."
         assert (CAS_CL_SCORES_ANNDATA_OBSM_KEY in adata.obsm) and (CAS_METADATA_ANNDATA_UNS_KEY in adata.uns), \
-            "Cell type ontology scores not found in the provided AnnData file. Please please run \
-            `cellarium.cas.insert_cas_ontology_aware_response_into_adata` prior to running this visualisation."
+            "Cell type ontology scores not found in the provided AnnData file. Please please run " \
+            "`cellarium.cas.insert_cas_ontology_aware_response_into_adata` prior to running this visualisation."
 
         # setup cell domains
         self.cell_domain_map = OrderedDict()

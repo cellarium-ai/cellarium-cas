@@ -7,6 +7,7 @@ import pkgutil
 import time
 import typing as t
 import warnings
+import logging
 from contextlib import contextmanager
 from uuid import UUID, uuid4
 
@@ -70,7 +71,7 @@ class CASClient:
             api_token=api_token, api_url=api_url, client_session_id=self.client_session_id
         )
 
-        self.__print(f"Connecting to the Cellarium Cloud backend with session {self.client_session_id}...")
+        logging.info(f"Connecting to the Cellarium Cloud backend with session {self.client_session_id}...")
         self.user_info = self.cas_api_service.validate_token()
         username = self.user_info["username"]
         self.__print(f"User is {username}")
