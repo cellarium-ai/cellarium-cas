@@ -14,19 +14,24 @@ def is_interactive_environment() -> bool:
 
     :return: True if the current environment is interactive, False otherwise
     """
+    import sys
+
+    import __main__
+
+    # Check if running in an interactive shell (e.g., IPython, Jupyter)
+    if hasattr(sys, "ps1"):
+        return True
+    # Check if running in a context without a '__file__' attribute, typical of interactive environments
+    if not hasattr(__main__, "__file__"):
+        return True
+    # Check specific interactive environment conditions
     try:
+        # Check if running in IPython or Jupyter by checking the module name
         from IPython import get_ipython
 
-        if "IPKernelApp" not in get_ipython().config:
-            # Running in a non-interactive environment.
-            return False
-        else:
-            if "terminal" in get_ipython().config["IPKernelApp"]["connection_file"]:
-                # Running in an IPython terminal
-                return True
-            else:
-                # Running in a Jupyter environment.
-                return True
-    except (ImportError, AttributeError):
-        # Running in a non-interactive environment.
-        return False
+        shell = get_ipython().__class__.__name__
+        if shell in ["ZMQInteractiveShell", "TerminalInteractiveShell"]:
+            return True
+    except (ModuleNotFoundError, NameError):
+        pass
+    return False
