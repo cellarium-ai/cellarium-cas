@@ -1,12 +1,12 @@
 import logging
 import typing as t
 from functools import lru_cache
-from logging import log
 
 import networkx as nx
 import owlready2
 from scipy import sparse as sp
 
+from cellarium.cas import settings
 from cellarium.cas._io import suppress_stderr
 
 # Used in CZ CELLxGENE schema v5:
