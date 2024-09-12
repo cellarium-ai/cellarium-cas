@@ -3,7 +3,6 @@ import os
 import tempfile
 import typing as t
 from collections import OrderedDict
-from logging import log
 
 import dash_bootstrap_components as dbc
 import numpy as np
@@ -15,7 +14,6 @@ from dash.dependencies import Input, Output
 from dash.development.base_component import Component
 from plotly.express.colors import sample_colorscale
 
-from cellarium.cas.models import CellTypeOntologyAwareResults
 from cellarium.cas.postprocessing import (
     CAS_CL_SCORES_ANNDATA_OBSM_KEY,
     CAS_METADATA_ANNDATA_UNS_KEY,
@@ -24,8 +22,7 @@ from cellarium.cas.postprocessing import (
     convert_aggregated_cell_ontology_scores_to_rooted_tree,
     generate_phyloxml_from_scored_cell_ontology_tree,
     get_aggregated_cas_ontology_aware_scores,
-    get_obs_indices_for_cluster,
-    insert_cas_ontology_aware_response_into_adata,
+    get_obs_indices_for_cluster
 )
 from cellarium.cas.postprocessing.cell_ontology import CL_CELL_ROOT_NODE, CellOntologyCache
 from cellarium.cas.visualization._components.circular_tree_plot import CircularTreePlot
@@ -256,19 +253,19 @@ class CASCircularTreePlotUMAPDashApp:
         self.__setup_initialization()
         self.__setup_callbacks()
 
-    def run(self, port: int = 8050, **kwargs):
+    def run(self, port: int = 8050, jupyter_mode: str = "inline", **kwargs):
         """
         Run the Dash application on the specified port.
 
         :param port: The port on which to run the Dash application. |br|
             `Default:` ``8050``
         """
-        log(logging.INFO, "Starting Dash application on port {port}...")
+        logging.info(f"Starting Dash application on port {port}...")
         try:
-            self.app.run_server(port=port, jupyter_mode="inline", jupyter_height=self.height + 100, **kwargs)
+            self.app.run_server(port=port, jupyter_mode=jupyter_mode, jupyter_height=self.height + 100, **kwargs)
         except OSError:  # Dash raises OSError if the port is already in use
             find_and_kill_process(port)
-            self.app.run_server(port=port, jupyter_mode="inline", jupyter_height=self.height + 100, **kwargs)
+            self.app.run_server(port=port, jupyter_mode=jupyter_mode, jupyter_height=self.height + 100, **kwargs)
 
     def __instantiate_circular_tree_plot(self) -> CircularTreePlot:
         # reduce scores over the provided cells

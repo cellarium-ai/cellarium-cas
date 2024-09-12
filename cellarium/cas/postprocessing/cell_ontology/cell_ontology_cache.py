@@ -56,7 +56,7 @@ class CellOntologyCache:
         """
 
         with suppress_stderr():
-            log(logging.INFO, f"Loading cell ontology OWL from:\n{cl_owl_path}")
+            logging.info(f"Loading cell ontology OWL from: {cl_owl_path}")
             cl = owlready2.get_ontology(cl_owl_path).load()
 
         # only keep CL classes with a singleton label
