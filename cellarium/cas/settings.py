@@ -32,6 +32,6 @@ def is_interactive_environment() -> bool:
         shell = get_ipython().__class__.__name__
         if shell in ["ZMQInteractiveShell", "TerminalInteractiveShell"]:
             return True
-    except NameError:
+    except (ModuleNotFoundError, NameError):
         pass
     return False
