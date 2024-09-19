@@ -233,9 +233,7 @@ class CASClient:
         """
         user_quota = self.cas_api_service.get_user_quota()
         lifetime_quota = user_quota["lifetime_quota"] or "unlimited"
-        remaining_lifetime_quota = (
-            user_quota["remaining_lifetime_quota"] or "unlimited"
-        )
+        remaining_lifetime_quota = user_quota["remaining_lifetime_quota"] or "unlimited"
         self.__print(
             f"Weekly quota: {user_quota['weekly_quota']}, Remaining weekly quota: {user_quota['remaining_weekly_quota']}, "
             f"Weekly quota reset date: {user_quota['quota_reset_date']}\n"
