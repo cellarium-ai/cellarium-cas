@@ -444,8 +444,10 @@ class TestCasClient:
             status_code=200,
             response_body={
                 "user_id": 0,
-                "quota": 1000,
-                "remaining_quota": 1000,
+                "weekly_quota": 1000,
+                "remaining_weekly_quota": 1000,
+                "lifetime_quota": None,
+                "remaining_lifetime_quota": None,
                 "quota_reset_date": datetime.datetime.today() + 7 * datetime.timedelta(days=1),
             },
         )
