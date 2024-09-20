@@ -456,7 +456,7 @@ class CASClient:
         elif cell_count > user_quota["remaining_weekly_quota"]:
             raise exceptions.QuotaExceededError(
                 f"Number of cells in the input data ({cell_count}) exceeds the user's remaining quota ({user_quota['remaining_weekly_quota']}).  "
-                f"The user's quota will be reset to {user_quota['quota']} on {user_quota['quota_reset_date']}."
+                f"The user's quota will be reset to {user_quota['weekly_quota']} on {user_quota['quota_reset_date']}."
             )
 
     def __prepare_input_for_sharded_request(
