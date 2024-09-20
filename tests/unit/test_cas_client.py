@@ -6,13 +6,14 @@ import aiohttp
 import anndata
 import numpy as np
 import pandas as pd
+import pytest
 import requests
 import scipy.sparse as sp
 from mockito import ANY, captor, mock, unstub, verify, when
 from mockito.matchers import ArgumentCaptor
 from parameterized import parameterized
 
-from cellarium.cas import constants
+from cellarium.cas import constants, exceptions
 from cellarium.cas.client import CASClient
 from tests.unit.test_utils import async_context_manager_decorator, async_return
 
@@ -144,6 +145,38 @@ class TestCasClient:
             active_session_id=cas_client.client_session_id,
             num_expected_actions=2,  # one for initialization and one for the annotation
         )
+
+    def test_annotate_matrix_cell_type_summary_statistics_strategy_weekly_quota_exceeded(self):
+        num_cells = 100
+        self.__mock_constructor_calls()
+        self.__mock_annotate_matrix_cell_type_summary_statistics_strategy_calls(
+            num_cells=num_cells, remaining_weekly_quota=5
+        )
+
+        cas_client = CASClient(api_token=TEST_TOKEN, api_url=TEST_URL)
+
+        with pytest.raises(
+            exceptions.QuotaExceededError,
+        ):
+            cas_client.annotate_matrix_cell_type_summary_statistics_strategy(
+                matrix=self.__mock_anndata_matrix(num_cells=num_cells), chunk_size=10
+            )
+
+    def test_annotate_matrix_cell_type_summary_statistics_strategy_lifetime_quota_exceeded(self):
+        num_cells = 100
+        self.__mock_constructor_calls()
+        self.__mock_annotate_matrix_cell_type_summary_statistics_strategy_calls(
+            num_cells=num_cells, remaining_lifetime_quota=5
+        )
+
+        cas_client = CASClient(api_token=TEST_TOKEN, api_url=TEST_URL)
+
+        with pytest.raises(
+            exceptions.QuotaExceededError,
+        ):
+            cas_client.annotate_matrix_cell_type_summary_statistics_strategy(
+                matrix=self.__mock_anndata_matrix(num_cells=num_cells), chunk_size=10
+            )
 
     def test_annotate_matrix_cell_type_summary_statistics_strategy_with_several_calls(self):
         num_cells = 100
@@ -298,12 +331,21 @@ class TestCasClient:
         )
 
     def __mock_annotate_matrix_cell_type_summary_statistics_strategy_calls(
-        self, num_cells: int = 3, num_features: int = 3, include_extended_output: bool = False
+        self,
+        num_cells: int = 3,
+        num_features: int = 3,
+        include_extended_output: bool = False,
+        remaining_weekly_quota=1000,
+        remaining_lifetime_quota=None,
     ):
         """
         Mocks the calls made by the CASClient to do an annotation call with the summary statistics strategy
         """
-        self.__mock_pre_call_requests(num_features=num_features)
+        self.__mock_pre_call_requests(
+            num_features=num_features,
+            remaining_weekly_quota=remaining_weekly_quota,
+            remaining_lifetime_quota=remaining_lifetime_quota,
+        )
 
         self.__mock_async_post_response(
             url=f"{TEST_URL}/api/cellarium-cell-operations/annotate-cell-type-summary-statistics-strategy",
@@ -430,7 +472,9 @@ class TestCasClient:
             ],
         )
 
-    def __mock_pre_call_requests(self, num_features: int = 3):
+    def __mock_pre_call_requests(
+        self, num_features: int = 3, remaining_weekly_quota=1000, remaining_lifetime_quota=None
+    ):
         """
         Mocks the calls made by the CASClient before the actual annotation or query/search calls
         """
@@ -445,9 +489,9 @@ class TestCasClient:
             response_body={
                 "user_id": 0,
                 "weekly_quota": 1000,
-                "remaining_weekly_quota": 1000,
-                "lifetime_quota": None,
-                "remaining_lifetime_quota": None,
+                "remaining_weekly_quota": remaining_weekly_quota,
+                "lifetime_quota": None if remaining_lifetime_quota is None else 10000,
+                "remaining_lifetime_quota": remaining_lifetime_quota,
                 "quota_reset_date": datetime.datetime.today() + 7 * datetime.timedelta(days=1),
             },
         )
