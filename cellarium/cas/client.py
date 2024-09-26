@@ -448,7 +448,7 @@ class CASClient:
         :param cell_count: Number of cells in the input data
         """
         user_quota = self.cas_api_service.get_user_quota()
-        if cell_count > (user_quota["remaining_lifetime_quota"] or cell_count):
+        if user_quota["remaining_lifetime_quota"] is not None and cell_count > user_quota["remaining_lifetime_quota"]:
             raise exceptions.QuotaExceededError(
                 f"Number of cells in the input data ({cell_count}) exceeds the user's remaining lifetime quota ({user_quota['remaining_lifetime_quota']}).  "
                 f"If you would like to discuss removing your lifetime quota, please reach out to cas-support@cellarium.ai"
