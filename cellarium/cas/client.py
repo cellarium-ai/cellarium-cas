@@ -232,9 +232,12 @@ class CASClient:
         Print the user's quota information
         """
         user_quota = self.cas_api_service.get_user_quota()
+        lifetime_quota = user_quota["lifetime_quota"] or "unlimited"
+        remaining_lifetime_quota = user_quota["remaining_lifetime_quota"] or "unlimited"
         self.__print(
-            f"User quota: {user_quota['quota']}, Remaining quota: {user_quota['remaining_quota']}, "
-            f"Reset date: {user_quota['quota_reset_date']}"
+            f"Weekly quota: {user_quota['weekly_quota']}, Remaining weekly quota: {user_quota['remaining_weekly_quota']}, "
+            f"Weekly quota reset date: {user_quota['quota_reset_date']}\n"
+            f"Lifetime quota: {lifetime_quota}, Remaining lifetime quota: {remaining_lifetime_quota} "
         )
 
     def __get_async_sharded_request_callback(
@@ -445,10 +448,15 @@ class CASClient:
         :param cell_count: Number of cells in the input data
         """
         user_quota = self.cas_api_service.get_user_quota()
-        if cell_count > user_quota["remaining_quota"]:
+        if user_quota["remaining_lifetime_quota"] is not None and cell_count > user_quota["remaining_lifetime_quota"]:
             raise exceptions.QuotaExceededError(
-                f"Number of cells in the input data ({cell_count}) exceeds the user's remaining quota ({user_quota['remaining_quota']}).  "
-                f"The user's quota will be reset to {user_quota['quota']} on {user_quota['quota_reset_date']}."
+                f"Number of cells in the input data ({cell_count}) exceeds the user's remaining lifetime quota ({user_quota['remaining_lifetime_quota']}).  "
+                f"If you would like to discuss removing your lifetime quota, please reach out to cas-support@cellarium.ai"
+            )
+        elif cell_count > user_quota["remaining_weekly_quota"]:
+            raise exceptions.QuotaExceededError(
+                f"Number of cells in the input data ({cell_count}) exceeds the user's remaining quota ({user_quota['remaining_weekly_quota']}).  "
+                f"The user's quota will be reset to {user_quota['weekly_quota']} on {user_quota['quota_reset_date']}."
             )
 
     def __prepare_input_for_sharded_request(
