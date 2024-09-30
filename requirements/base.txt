@@ -10,4 +10,5 @@ tqdm~=4.66
 typing_extensions~=4.7.1
 owlready2
 networkx
-pydantic==2.5.3
+pydantic==2.5.3;python_version<="3.7"
+pydantic==2.9.0;python_version>"3.7"
