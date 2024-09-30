@@ -6,7 +6,7 @@ import networkx as nx
 import owlready2
 from scipy import sparse as sp
 
-from cellarium.cas import settings
+from cellarium.cas import settings # noqa
 from cellarium.cas._io import suppress_stderr
 
 # Used in CZ CELLxGENE schema v5:
