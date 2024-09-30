@@ -1,4 +1,4 @@
-Pillow~=9.5
+Pillow>=10.3.0
 Sphinx~=7.4
 sphinx_gallery~=0.14
 sphinx_rtd_theme~=2.0
