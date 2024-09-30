@@ -41,6 +41,19 @@ runs:
       run: tox -e docs
       shell: bash
 
+    - name: Run pip-audit command through GHA
+      # Check dependencies for security vulnerabilities.
+      # Only run on a single python version (the one that does doc builds)
+      if: ${{ env.DO_DOC_BUILD == 'true' }}
+      uses: pypa/gh-action-pip-audit@v1.0.8
+      with:
+        inputs: |
+          requirements/base.txt
+          requirements/dev.txt
+          requirements/docs.txt
+          requirements/test.txt
+          requirements/vis.txt
+
     - name: Run unit tests
       # Run tox using the version of Python in `PATH`
       run: tox -e unit
