@@ -1,3 +1,4 @@
+setuptools==65.5.1
 aiohttp[speedups]>=3.8,<4
 requests>=2.31,<2.33
 anndata>=0.8,<0.9
