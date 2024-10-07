@@ -314,7 +314,7 @@ def get_most_granular_top_k_calls(
     )
     trunc_list = sorted_score_and_depth_list[:top_k]
     # pad with root node if necessary
-    for _ in range(len(trunc_list) - top_k):
+    for _ in range(top_k - len(trunc_list)):
         trunc_list.append((1.0, 0, root_note))
     return trunc_list
 
