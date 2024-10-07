@@ -8,8 +8,9 @@ AIOHTTP_TOTAL_TIMEOUT_SECONDS = 750
 AIOHTTP_READ_TIMEOUT_SECONDS = 730
 MAX_CHUNK_SIZE_SEARCH_METHOD = 500
 CELLARIUM_CLOUD_BACKEND_URL = "https://cellarium-cloud-api.cellarium.ai"
-
-logging.basicConfig(level=logging.INFO, format="* [%(asctime)s.%(msecs)03d] %(message)s", datefmt="%H:%M:%S")
+LOGGING_LEVEL = logging.INFO
+LOGGING_FORMAT = "* [%(asctime)s.%(msecs)03d] %(message)s"
+LOGGING_DATE_FORMAT = "%H:%M:%S"
 
 
 def is_interactive_environment() -> bool:

@@ -1,4 +1,4 @@
-import logging
+from cellarium.cas.logging import logger
 
 try:
     from .circular_tree_plot_umap_dash_app.app import CASCircularTreePlotUMAPDashApp  # noqa
@@ -6,7 +6,7 @@ try:
 
     __all__ = ["CASCircularTreePlotUMAPDashApp", "find_and_kill_process"]
 except ImportError:
-    logging.warn(
+    logger.warning(
         """
 Visualization dependencies not installed.
 To install the Cellarium CAS Client with visualation dependencies, please run:

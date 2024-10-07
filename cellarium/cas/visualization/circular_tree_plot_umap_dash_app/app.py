@@ -14,7 +14,7 @@ from dash.dependencies import Input, Output
 from dash.development.base_component import Component
 from plotly.express.colors import sample_colorscale
 
-from cellarium.cas import settings  # noqa
+from cellarium.cas.logging import logger
 from cellarium.cas.postprocessing import (
     CAS_CL_SCORES_ANNDATA_OBSM_KEY,
     CAS_METADATA_ANNDATA_UNS_KEY,
@@ -264,7 +264,7 @@ class CASCircularTreePlotUMAPDashApp:
         :param port: The port on which to run the Dash application. |br|
             `Default:` ``8050``
         """
-        logging.info(f"Starting Dash application on port {port}...")
+        logger.info(f"Starting Dash application on port {port}...")
         try:
             self.app.run_server(port=port, jupyter_mode=jupyter_mode, jupyter_height=self.height + 100, **kwargs)
         except OSError:  # Dash raises OSError if the port is already in use
