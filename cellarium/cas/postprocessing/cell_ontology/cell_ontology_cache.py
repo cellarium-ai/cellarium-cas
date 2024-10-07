@@ -1,13 +1,13 @@
-import logging
 import typing as t
 from functools import lru_cache
-from logging import log
 
 import networkx as nx
 import owlready2
 from scipy import sparse as sp
 
+from cellarium.cas import settings  # noqa
 from cellarium.cas._io import suppress_stderr
+from cellarium.cas.logging import logger
 
 # Used in CZ CELLxGENE schema v5:
 # https://github.com/chanzuckerberg/single-cell-curation/blob/main/schema/5.0.0/schema.md
@@ -56,7 +56,7 @@ class CellOntologyCache:
         """
 
         with suppress_stderr():
-            log(logging.INFO, f"Loading cell ontology OWL from:\n{cl_owl_path}")
+            logger.info(f"Loading cell ontology OWL from: {cl_owl_path}")
             cl = owlready2.get_ontology(cl_owl_path).load()
 
         # only keep CL classes with a singleton label

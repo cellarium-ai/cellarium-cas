@@ -14,6 +14,7 @@ import anndata
 from anndata import ImplicitModificationWarning
 from deprecated import deprecated
 
+from cellarium.cas.logging import logger
 from cellarium.cas.service import action_context_manager
 
 from . import _io, constants, exceptions, models, preprocessing, service, settings, version
@@ -70,7 +71,7 @@ class CASClient:
             api_token=api_token, api_url=api_url, client_session_id=self.client_session_id
         )
 
-        self.__print(f"Connecting to the Cellarium Cloud backend with session {self.client_session_id}...")
+        logger.info(f"Connecting to the Cellarium Cloud backend with session {self.client_session_id}...")
         self.user_info = self.cas_api_service.validate_token()
         username = self.user_info["username"]
         self.__print(f"User is {username}")

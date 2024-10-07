@@ -1,3 +1,5 @@
+import logging
+
 NUM_ATTEMPTS_PER_CHUNK_DEFAULT = 7
 MAX_NUM_REQUESTS_AT_A_TIME = 8
 START_RETRY_DELAY = 5
@@ -6,6 +8,9 @@ AIOHTTP_TOTAL_TIMEOUT_SECONDS = 750
 AIOHTTP_READ_TIMEOUT_SECONDS = 730
 MAX_CHUNK_SIZE_SEARCH_METHOD = 500
 CELLARIUM_CLOUD_BACKEND_URL = "https://cellarium-cloud-api.cellarium.ai"
+LOGGING_LEVEL = logging.INFO
+LOGGING_FORMAT = "* [%(asctime)s.%(msecs)03d] %(message)s"
+LOGGING_DATE_FORMAT = "%H:%M:%S"
 
 
 def is_interactive_environment() -> bool:

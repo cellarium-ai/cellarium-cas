@@ -1,9 +1,7 @@
-import logging
 import os
 import tempfile
 import typing as t
 from collections import OrderedDict
-from logging import log
 
 import dash_bootstrap_components as dbc
 import numpy as np
@@ -15,18 +13,18 @@ from dash.dependencies import Input, Output
 from dash.development.base_component import Component
 from plotly.express.colors import sample_colorscale
 
-from cellarium.cas.models import CellTypeOntologyAwareResults
+from cellarium.cas.logging import logger
 from cellarium.cas.postprocessing import (
     CAS_CL_SCORES_ANNDATA_OBSM_KEY,
+    CAS_METADATA_ANNDATA_UNS_KEY,
     CellOntologyScoresAggregationDomain,
     CellOntologyScoresAggregationOp,
     convert_aggregated_cell_ontology_scores_to_rooted_tree,
     generate_phyloxml_from_scored_cell_ontology_tree,
     get_aggregated_cas_ontology_aware_scores,
     get_obs_indices_for_cluster,
-    insert_cas_ontology_aware_response_into_adata,
 )
-from cellarium.cas.postprocessing.cell_ontology import CL_EUKARYOTIC_CELL_ROOT_NODE, CellOntologyCache
+from cellarium.cas.postprocessing.cell_ontology import CL_CELL_ROOT_NODE, CellOntologyCache
 from cellarium.cas.visualization._components.circular_tree_plot import CircularTreePlot
 from cellarium.cas.visualization.ui_utils import ConfigValue, find_and_kill_process
 
@@ -176,7 +174,6 @@ class CASCircularTreePlotUMAPDashApp:
     def __init__(
         self,
         adata: AnnData,
-        cas_ontology_aware_response: CellTypeOntologyAwareResults,
         cluster_label_obs_column: t.Optional[str] = None,
         aggregation_op: CellOntologyScoresAggregationOp = CellOntologyScoresAggregationOp.MEAN,
         aggregation_domain: CellOntologyScoresAggregationDomain = CellOntologyScoresAggregationDomain.OVER_THRESHOLD,
@@ -195,6 +192,7 @@ class CASCircularTreePlotUMAPDashApp:
         circular_tree_start_angle: int = 180,
         circular_tree_end_angle: int = 360,
         figure_height: int = 400,
+        root_node: str = CL_CELL_ROOT_NODE,
         hidden_cl_names_set: set[str] = DEFAULT_HIDDEN_CL_NAMES_SET,
         shown_cl_names_set: set[str] = DEFAULT_SHOWN_CL_NAMES_SET,
         score_colorscale: t.Union[str, list] = "Viridis",
@@ -217,11 +215,19 @@ class CASCircularTreePlotUMAPDashApp:
         self.circular_tree_start_angle = circular_tree_start_angle
         self.circular_tree_end_angle = circular_tree_end_angle
         self.height = figure_height
+        self.root_node = root_node
         self.hidden_cl_names_set = hidden_cl_names_set
         self.shown_cl_names_set = shown_cl_names_set
         self.score_colorscale = score_colorscale
 
-        assert "X_umap" in adata.obsm, "UMAP coordinates not found in adata.obsm['X_umap']"
+        assert "X_umap" in adata.obsm, (
+            "UMAP coordinates not found in adata.obsm['X_umap']. "
+            "This visualisation requires precomputed UMAP coordinates."
+        )
+        assert (CAS_CL_SCORES_ANNDATA_OBSM_KEY in adata.obsm) and (CAS_METADATA_ANNDATA_UNS_KEY in adata.uns), (
+            "Cell type ontology scores not found in the provided AnnData file. Please please run "
+            "`cellarium.cas.insert_cas_ontology_aware_response_into_adata` prior to running this visualisation."
+        )
 
         # setup cell domains
         self.cell_domain_map = OrderedDict()
@@ -243,9 +249,6 @@ class CASCircularTreePlotUMAPDashApp:
         # instantiate the cell type ontology cache
         self.cl = CellOntologyCache()
 
-        # insert CA ontology-aware response into adata
-        insert_cas_ontology_aware_response_into_adata(cas_ontology_aware_response, adata, self.cl)
-
         # instantiate the Dash app
         self.app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP])
         self.server = self.app.server
@@ -253,19 +256,19 @@ class CASCircularTreePlotUMAPDashApp:
         self.__setup_initialization()
         self.__setup_callbacks()
 
-    def run(self, port: int = 8050, **kwargs):
+    def run(self, port: int = 8050, jupyter_mode: str = "inline", **kwargs):
         """
         Run the Dash application on the specified port.
 
         :param port: The port on which to run the Dash application. |br|
             `Default:` ``8050``
         """
-        log(logging.INFO, "Starting Dash application on port {port}...")
+        logger.info(f"Starting Dash application on port {port}...")
         try:
-            self.app.run_server(port=port, jupyter_mode="inline", jupyter_height=self.height + 100, **kwargs)
+            self.app.run_server(port=port, jupyter_mode=jupyter_mode, jupyter_height=self.height + 100, **kwargs)
         except OSError:  # Dash raises OSError if the port is already in use
             find_and_kill_process(port)
-            self.app.run_server(port=port, jupyter_mode="inline", jupyter_height=self.height + 100, **kwargs)
+            self.app.run_server(port=port, jupyter_mode=jupyter_mode, jupyter_height=self.height + 100, **kwargs)
 
     def __instantiate_circular_tree_plot(self) -> CircularTreePlot:
         # reduce scores over the provided cells
@@ -284,7 +287,7 @@ class CASCircularTreePlotUMAPDashApp:
         rooted_tree = convert_aggregated_cell_ontology_scores_to_rooted_tree(
             aggregated_scores=aggregated_scores,
             cl=self.cl,
-            root_cl_name=CL_EUKARYOTIC_CELL_ROOT_NODE,
+            root_cl_name=self.root_node,
             min_fraction=self.min_cell_fraction.get(),
             hidden_cl_names_set=self.hidden_cl_names_set,
         )
