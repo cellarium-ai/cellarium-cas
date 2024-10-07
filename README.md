@@ -1,4 +1,5 @@
-<img src="https://cellarium.ai/wp-content/uploads/2024/07/cellarium-logo-medium.png" alt="Cellarium Logo" width="250">
+<img src="https://cellarium.ai/wp-content/uploads/2024/07/cellarium-logo-medium.png" alt="Cellarium Logo" width="180">
+
 # Cellarium Cell Annotation Service (CAS) Client Library
 This codebase contains the Python client library for using Cellarium Cell Annotation Service (CAS).
 
