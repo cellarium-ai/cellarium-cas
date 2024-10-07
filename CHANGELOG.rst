@@ -21,6 +21,18 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
   Fixed
   ~~~~~
 
+1.6.0 - 2024-10-08
+------------------
+
+Changed
+~~~~~~~
+- Added ability to enforce lifetime quotas
+- Dependency vulnerability checks are performed by unit testing github action
+- Improved handling of different root nodes in the circular tree plot visualization Dash App
+
+Fixed
+~~~~~
+- Logging now uses Python logging 
 
 1.5.1 - 2024-09-09
 ------------------
