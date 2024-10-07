@@ -14,7 +14,7 @@ from dash.dependencies import Input, Output
 from dash.development.base_component import Component
 from plotly.express.colors import sample_colorscale
 
-from cellarium.cas import settings
+from cellarium.cas import settings  # noqa
 from cellarium.cas.postprocessing import (
     CAS_CL_SCORES_ANNDATA_OBSM_KEY,
     CAS_METADATA_ANNDATA_UNS_KEY,
