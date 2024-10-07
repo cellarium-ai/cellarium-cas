@@ -3,11 +3,12 @@
 Usage
 #####
 
-API Token and the CAS Early Access Program
-------------------------------------------
-In order to use the CAS API, you will need to join the Cell Annotation Service Early Access program.  To join the program,
-please fill out the form at https://cellarium.ai/cell-annotation-service-cas-early-access/ and we will notify you
-when your account is created, and provide you with an API token to use with the CAS API.
+API Token and the CAS Public Beta Program
+-----------------------------------------
+In order to use the CAS API, you will need to join the CAS Public Beta program. To obtain your unique API token to join
+the public beta program, please navigate to the CAS webpage at `cellarium.ai <https://cellarium.ai/tool/cellarium-cell-annotation-service-cas/>`_,
+scroll to the bottom of the page, and `sign up <https://cellarium.ai/cell-annotation-service-cas-access/>`_. We will contact
+you with your unique API key as soon as the public beta is available.
 
 Initialization
 --------------

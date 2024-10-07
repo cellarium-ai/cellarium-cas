@@ -19,7 +19,7 @@ $ pip install cellarium-cas[vis]
 ```
 
 # Obtaining an API Token
-You need an API token to use CAS. We are offerring a free public beta for a limited time to try CAS and explore ways it can enhance your cell biology research. To obtain your unique API token to join the public beta release, please navigate to [cellarium.ai](https://cellarium.ai/tool/cellarium-cell-annotation-service-cas/), scroll to the bottom of the page, and [sign up](https://cellarium.ai/cell-annotation-service-cas-access/). We will contact you shortly as soon as the public beta is available with your unique API key.
+You need an API token to use CAS. We are offerring a free public beta program for a limited time to try CAS and explore ways it can enhance your cell biology research. To obtain your unique API token to join the public beta program, please navigate to the CAS webpage at [cellarium.ai](https://cellarium.ai/tool/cellarium-cell-annotation-service-cas/), scroll to the bottom of the page, and [sign up](https://cellarium.ai/cell-annotation-service-cas-access/). We will contact you with your unique API key as soon as the public beta is available.
 
 # Quickstart Tutorial
 The fastest way to get started with using CAS is to follow the quickstart tutorial:
