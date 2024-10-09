@@ -2,6 +2,9 @@
 #
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
+import os
+import shutil
+import glob
 import time
 
 from setuptools_git_versioning import get_tag
@@ -10,8 +13,8 @@ from setuptools_git_versioning import get_tag
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = "Cellarium CAS"
-copyright = f"{time.strftime('%Y')}, Cellarium AI"
-author = "Cellarium AI"
+copyright = f"{time.strftime('%Y')}, Cellarium AI Lab"
+author = "Cellarium AI Lab"
 version = get_tag() or "<no version>"
 release = get_tag() or "<no release>"
 
@@ -19,6 +22,10 @@ release = get_tag() or "<no release>"
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
+    'nbsphinx',
+    'sphinx.ext.mathjax',
+    'sphinx.ext.autodoc',
+    'sphinx.ext.viewcode',
     "sphinx_rtd_theme",
     "sphinx.ext.autodoc",
     "sphinx.ext.napoleon",
@@ -26,7 +33,10 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx_substitution_extensions",
     "sphinxcontrib.autodoc_pydantic",
+    "IPython.sphinxext.ipython_console_highlighting",
 ]
+
+exclude_patterns = ['_build', '**.ipynb_checkpoints']
 
 # Provide substitutions for common values
 rst_prolog = f"""
@@ -60,3 +70,9 @@ nitpick_ignore_regex = [
 
 # The JSON schema is a bit much in the docs
 autodoc_pydantic_model_show_json = False
+
+if not os.path.exists("notebooks"):
+    os.makedirs("notebooks")
+
+for src_file in glob.glob("../../notebooks/*.ipynb"):
+    shutil.copy(src_file, "notebooks/")
