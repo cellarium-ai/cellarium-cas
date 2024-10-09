@@ -33,6 +33,7 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx_substitution_extensions",
     "sphinxcontrib.autodoc_pydantic",
+    "IPython.sphinxext.ipython_console_highlighting",
 ]
 
 exclude_patterns = ['_build', '**.ipynb_checkpoints']
