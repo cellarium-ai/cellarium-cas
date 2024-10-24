@@ -134,7 +134,14 @@ class CASClient:
                 # only import IPython if we are in an interactive environment
                 from IPython.display import HTML, display
 
-                display(HTML(LOW_QUOTA_FEEDBACK_TEMPLATE.format(remaining_quota = remaining_lifetime_quota, link=self.cas_api_service.get_feedback_answer_link())))
+                display(
+                    HTML(
+                        LOW_QUOTA_FEEDBACK_TEMPLATE.format(
+                            remaining_quota=remaining_lifetime_quota,
+                            link=self.cas_api_service.get_feedback_answer_link(),
+                        )
+                    )
+                )
         except ModuleNotFoundError:
             pass
 
@@ -256,7 +263,11 @@ class CASClient:
             f"Weekly quota reset date: {user_quota['quota_reset_date']}\n"
             f"Lifetime quota: {lifetime_quota}, Remaining lifetime quota: {remaining_lifetime_quota} "
         )
-        if not user_quota["quota_increased"] and user_quota["remaining_lifetime_quota"] is not None and user_quota["remaining_lifetime_quota"] < 25000:
+        if (
+            not user_quota["quota_increased"]
+            and user_quota["remaining_lifetime_quota"] is not None
+            and user_quota["remaining_lifetime_quota"] < 25000
+        ):
             self.__render_low_quota_feedback_link(user_quota["remaining_lifetime_quota"])
 
     def __get_async_sharded_request_callback(

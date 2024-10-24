@@ -329,6 +329,19 @@ class TestCasClient:
             response_body={"is_valid": True, "min_version": "1.4.0"},
             method="post",
         )
+        self.__mock_response(
+            url=f"{TEST_URL}/api/cellarium-general/quota",
+            status_code=200,
+            response_body={
+                "user_id": 0,
+                "weekly_quota": 1000,
+                "remaining_weekly_quota": 1000,
+                "lifetime_quota": 10000,
+                "remaining_lifetime_quota": 10000,
+                "quota_reset_date": datetime.datetime.today() + 7 * datetime.timedelta(days=1),
+                "quota_increased": False,
+            },
+        )
 
     def __mock_annotate_matrix_cell_type_summary_statistics_strategy_calls(
         self,
