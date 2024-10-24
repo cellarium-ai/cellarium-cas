@@ -32,7 +32,10 @@ CHUNK_SIZE_SEARCH_DEFAULT = 500
 DEFAULT_PRUNE_THRESHOLD = 0.05
 DEFAULT_WEIGHTING_PREFACTOR = 1.0
 
+LOW_QUOTA_WARNING_THRESHOLD = 25000
+
 FEEDBACK_TEMPLATE = pkgutil.get_data(__name__, "resources/feedback_template.html").decode("utf-8")
+LOW_QUOTA_FEEDBACK_TEMPLATE = pkgutil.get_data(__name__, "resources/low_quota_feedback_template.html").decode("utf-8")
 
 
 class CASClient:
@@ -97,6 +100,8 @@ class CASClient:
 
         self.__print_models(self.model_objects_list)
 
+        self.print_user_quota()
+
     @property
     def allowed_models_list(self):
         """
@@ -115,7 +120,7 @@ class CASClient:
     def __print(self, str_to_print: str) -> None:
         print(f"* [{self.__get_timestamp()}] {str_to_print}")
 
-    def __render_feedback_link(self):
+    def __render_feedback_link(self) -> None:
         try:
             if settings.is_interactive_environment() and self.should_show_feedback:
                 # only import IPython if we are in an interactive environment
@@ -125,10 +130,22 @@ class CASClient:
         except ModuleNotFoundError:
             pass
 
-    def feedback_opt_out(self):
-        self.should_show_feedback = False
-        self.user_info = self.cas_api_service.feedback_opt_out()
-        self.__print("Successfully opted out. You will no longer receive requests to provide feedback.")
+    def __render_low_quota_feedback_link(self, remaining_lifetime_quota: int) -> None:
+        try:
+            if settings.is_interactive_environment() and self.should_show_feedback:
+                # only import IPython if we are in an interactive environment
+                from IPython.display import HTML, display
+
+                display(
+                    HTML(
+                        LOW_QUOTA_FEEDBACK_TEMPLATE.format(
+                            remaining_quota=remaining_lifetime_quota,
+                            link=self.cas_api_service.get_feedback_answer_link(),
+                        )
+                    )
+                )
+        except ModuleNotFoundError:
+            pass
 
     def validate_version(self):
         """
@@ -240,6 +257,12 @@ class CASClient:
             f"Weekly quota reset date: {user_quota['quota_reset_date']}\n"
             f"Lifetime quota: {lifetime_quota}, Remaining lifetime quota: {remaining_lifetime_quota} "
         )
+        if (
+            not user_quota["quota_increased"]
+            and user_quota["remaining_lifetime_quota"] is not None
+            and user_quota["remaining_lifetime_quota"] < LOW_QUOTA_WARNING_THRESHOLD
+        ):
+            self.__render_low_quota_feedback_link(user_quota["remaining_lifetime_quota"])
 
     def __get_async_sharded_request_callback(
         self,
@@ -450,6 +473,9 @@ class CASClient:
         """
         user_quota = self.cas_api_service.get_user_quota()
         if user_quota["remaining_lifetime_quota"] is not None and cell_count > user_quota["remaining_lifetime_quota"]:
+            # If the user hasn't had a quota increase yet, show the feedback link
+            if not user_quota["quota_increased"]:
+                self.__render_low_quota_feedback_link(user_quota["remaining_lifetime_quota"])
             raise exceptions.QuotaExceededError(
                 f"Number of cells in the input data ({cell_count}) exceeds the user's remaining lifetime quota ({user_quota['remaining_lifetime_quota']}).  "
                 f"If you would like to discuss removing your lifetime quota, please reach out to cas-support@cellarium.ai"

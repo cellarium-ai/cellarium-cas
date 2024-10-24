@@ -111,6 +111,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+casp-venv/
 
 # Spyder project settings
 .spyderproject
