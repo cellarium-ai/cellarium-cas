@@ -32,6 +32,8 @@ CHUNK_SIZE_SEARCH_DEFAULT = 500
 DEFAULT_PRUNE_THRESHOLD = 0.05
 DEFAULT_WEIGHTING_PREFACTOR = 1.0
 
+LOW_QUOTA_WARNING_THRESHOLD = 25000
+
 FEEDBACK_TEMPLATE = pkgutil.get_data(__name__, "resources/feedback_template.html").decode("utf-8")
 LOW_QUOTA_FEEDBACK_TEMPLATE = pkgutil.get_data(__name__, "resources/low_quota_feedback_template.html").decode("utf-8")
 
@@ -266,7 +268,7 @@ class CASClient:
         if (
             not user_quota["quota_increased"]
             and user_quota["remaining_lifetime_quota"] is not None
-            and user_quota["remaining_lifetime_quota"] < 25000
+            and user_quota["remaining_lifetime_quota"] < LOW_QUOTA_WARNING_THRESHOLD
         ):
             self.__render_low_quota_feedback_link(user_quota["remaining_lifetime_quota"])
 
