@@ -120,7 +120,7 @@ class CASClient:
     def __print(self, str_to_print: str) -> None:
         print(f"* [{self.__get_timestamp()}] {str_to_print}")
 
-    def __render_feedback_link(self):
+    def __render_feedback_link(self) -> None:
         try:
             if settings.is_interactive_environment() and self.should_show_feedback:
                 # only import IPython if we are in an interactive environment
@@ -130,7 +130,7 @@ class CASClient:
         except ModuleNotFoundError:
             pass
 
-    def __render_low_quota_feedback_link(self, remaining_lifetime_quota):
+    def __render_low_quota_feedback_link(self, remaining_lifetime_quota: int) -> None:
         try:
             if settings.is_interactive_environment() and self.should_show_feedback:
                 # only import IPython if we are in an interactive environment
