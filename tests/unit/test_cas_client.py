@@ -493,6 +493,7 @@ class TestCasClient:
                 "lifetime_quota": None if remaining_lifetime_quota is None else 10000,
                 "remaining_lifetime_quota": remaining_lifetime_quota,
                 "quota_reset_date": datetime.datetime.today() + 7 * datetime.timedelta(days=1),
+                "quota_increased": False,
             },
         )
 
