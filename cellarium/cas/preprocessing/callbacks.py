@@ -25,7 +25,6 @@ def ensure_matrix_is_float32(adata: anndata.AnnData, count_matrix_input: constan
         adata_raw_restored = adata.raw.to_adata()
         adata_raw_restored.X = adata_raw_restored.X.astype(np.float32)
         adata.raw = adata_raw_restored
-        del adata_raw_restored
 
 
 def calculate_total_mrna_umis(adata: anndata.AnnData, count_matrix_input: constants.CountMatrixInput) -> None:
