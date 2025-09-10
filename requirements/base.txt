@@ -11,7 +11,8 @@ certifi==2024.7.4
 Deprecated~=1.2
 tqdm~=4.66
 typing_extensions~=4.7.1
-owlready2<0.5
+owlready2==0.46; python_version < "3.10"
+owlready2<=0.50; python_version >= "3.10"
 networkx<=3.5
 pydantic==2.5.3;python_version<="3.7"
 pydantic==2.9.0;python_version>"3.7"
