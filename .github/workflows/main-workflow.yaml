@@ -19,11 +19,11 @@ on:
         type: boolean
 jobs:
   unit-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     if: ${{ !github.event.inputs.skip-unit-tests }}
     strategy:
       matrix:
-        python-version: [ '3.7', '3.8', '3.9', '3.10' ]
+        python-version: [ '3.7', '3.8', '3.9', '3.10', '3.11', '3.12' ]
     steps:
       - uses: actions/checkout@v4
       - name: Install pandoc
@@ -35,7 +35,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
   publish-to-pypi:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs:
       - unit-tests
     if: |
