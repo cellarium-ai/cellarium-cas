@@ -396,7 +396,7 @@ class CASCircularTreePlotUMAPDashApp:
                                         style={
                                             "width": "100%",
                                             "display": "inline-block",
-                                            "height": f"{self.height-10}px",
+                                            "height": f"{self.height - 10}px",
                                         },
                                         # Zoom is very choppy with this enabled.  Users should use selection zoom
                                         config={"scrollZoom": False},
