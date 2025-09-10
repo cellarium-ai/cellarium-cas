@@ -10,7 +10,8 @@ nest_asyncio~=1.5
 certifi==2024.7.4
 Deprecated~=1.2
 tqdm~=4.66
-typing_extensions~=4.7.1
+typing_extensions~=4.7.1; python_version < "3.10"
+typing-extensions>=4.10,<5; python_version >= "3.10"
 owlready2==0.46; python_version < "3.10"
 owlready2<=0.50; python_version >= "3.10"
 networkx<=3.5

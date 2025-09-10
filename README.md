@@ -4,7 +4,7 @@
 This codebase contains the Python client library for using Cellarium Cell Annotation Service (CAS).
 
 # Installation
-The cellarium-cas package officially supports Python versions between 3.7 and 3.10.  We recommend using Python 3.10.
+The cellarium-cas package officially supports Python versions between 3.7 and 3.12.  We recommend using Python 3.10+.
 You can install CAS from PyPI using `pip`. To install the latest version, please run the following command:
 ```
 $ pip install cellarium-cas
