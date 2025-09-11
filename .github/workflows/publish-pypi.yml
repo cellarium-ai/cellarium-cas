@@ -1,11 +1,8 @@
 name: Build & Publish CAS
+
 on:
   workflow_dispatch:
     inputs:
-      tag:
-        description: "Git tag to publish (e.g., v1.7.2 or v1.7.2-test)"
-        required: true
-        type: string
       pypi-type:
         description: "Target index"
         required: true
@@ -16,24 +13,30 @@ on:
 jobs:
   publish-to-pypi:
     runs-on: ubuntu-22.04
-    if: ${{ inputs.pypi-type != 'none' }}
     permissions:
       id-token: write
       contents: read
     environment:
       name: ${{ inputs.pypi-type == 'prod' && 'pypi' || 'test-pypi' }}
-      url:  ${{ inputs.pypi-type == 'prod' && 'https://pypi.org/p/cellarium-cas' || 'https://test.pypi.org/p/cellarium-cas' }}
+      url:  ${{ inputs.pypi-type == 'prod'
+                 && 'https://pypi.org/p/cellarium-cas'
+                 || 'https://test.pypi.org/p/cellarium-cas' }}
+
     steps:
+      - name: Verify git environment
+        run: |
+          if [ "${{ github.ref_type }}" == "tag" ]; then
+            echo "Building and publishing package for tag ${{ github.ref }}."
+          else
+            echo "::error::This action can only be run on a tag."
+            exit 1
+          fi
+        shell: bash
+
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ github.ref_name }}
           fetch-depth: 0
-
-      - name: Verify tag exists
-        run: |
-          git fetch --tags --quiet
-          git rev-parse --verify --quiet "refs/tags/${{ inputs.tag }}" >/dev/null \
-            || { echo "::error::Tag '${{ inputs.tag }}' not found"; exit 1; }
 
       - uses: actions/setup-python@v5
         with:
@@ -48,5 +51,4 @@ jobs:
       - name: Publish to selected index (Trusted Publishing)
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          # empty string = PyPI; non-empty = TestPyPI
           repository-url: ${{ inputs.pypi-type == 'test' && 'https://test.pypi.org/legacy/' || '' }}
