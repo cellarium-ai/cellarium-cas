@@ -3,75 +3,51 @@ name: Build & Publish CAS
 on:
   workflow_dispatch:
     inputs:
-      pypi-type:
-        description: 'The type of PyPI deployment to perform or none'
+      tag:
+        description: "Git tag to publish (e.g., v1.7.2 or v1.7.2-test)"
         required: true
-        default: 'none'
+        type: string
+      pypi-type:
+        description: "Target index"
+        required: true
+        default: "test"
         type: choice
-        options:
-          - none
-          - test
-          - prod
-#      skip-unit-tests:
-#        description: 'Skip the unit tests'
-#        required: false
-#        default: false
-#        type: boolean
-#  workflow_run:
-#    workflows: [ "Cellarium CAS Repository Update Workflow" ]
-#    types: [ completed ]
+        options: [test, prod]
 
 jobs:
-  build-and-publish:
-    # Run only if the main workflow succeeded AND the source ref is a tag (we use 'v*')
-#    if: >
-#      ${{
-#        github.event.workflow_run.conclusion == 'success' &&
-#        startsWith(github.event.workflow_run.head_branch || '', 'v')
-#      }}
+  publish-to-pypi:
     runs-on: ubuntu-22.04
+    if: ${{ inputs.pypi-type != 'none' }}
     permissions:
-      id-token: write
+      id-token: write     # required for Trusted Publishing
       contents: read
+    environment:
+      name: ${{ inputs.pypi-type == 'prod' && 'pypi' || 'test-pypi' }}
+      url:  ${{ inputs.pypi-type == 'prod' && 'https://pypi.org/p/cellarium-cas' || 'https://test.pypi.org/p/cellarium-cas' }}
     steps:
-      - name: Check out the tagged ref
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          # head_branch is the tag name for workflow_run (e.g., v1.7.2 or v1.7.2-test)
-          ref: ${{ github.event.workflow_run.head_branch }}
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
 
-      - name: Decide target index (tags with '-test' -> TestPyPI)
-        id: idx
+      - name: Verify tag exists
         run: |
-          TAG="${{ github.event.workflow_run.head_branch }}"
-          if echo "$TAG" | grep -qi -- "-test"; then
-            echo "repo_url=https://test.pypi.org/legacy/" >> "$GITHUB_OUTPUT"
-            echo "env_name=test-pypi" >> "$GITHUB_OUTPUT"
-          else
-            echo "repo_url="           >> "$GITHUB_OUTPUT"   # empty means PyPI default
-            echo "env_name=pypi"       >> "$GITHUB_OUTPUT"
-          fi
-          echo "Publishing tag: $TAG"
+          git fetch --tags --quiet
+          git rev-parse --verify --quiet "refs/tags/${{ inputs.tag }}" >/dev/null \
+            || { echo "::error::Tag '${{ inputs.tag }}' not found"; exit 1; }
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Build distributions (sdist + wheel)
+      - name: Build dists (sdist + wheel)
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements/base.txt build
           python -m build
 
-      - name: Publish to chosen index (Trusted Publishing)
+      - name: Publish to selected index (Trusted Publishing)
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          # Empty string = PyPI default. Non-empty uses TestPyPI.
-          repository-url: ${{ steps.idx.outputs.repo_url }}
-
-    # Show environment & package page link in the run UI
-    environment:
-      name: ${{ steps.idx.outputs.env_name }}
-      url: ${{ steps.idx.outputs.repo_url == '' && 'https://pypi.org/p/cellarium-cas'
-        || 'https://test.pypi.org/p/cellarium-cas' }}
+          # empty string = PyPI; non-empty = TestPyPI
+          repository-url: ${{ inputs.pypi-type == 'test' && 'https://test.pypi.org/legacy/' || '' }}

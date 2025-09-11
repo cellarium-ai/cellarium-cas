@@ -1,5 +1,5 @@
 name: Cellarium CAS Repository Update Workflow
-on: 
+on:
   push:
   workflow_dispatch:
     inputs:
@@ -34,28 +34,3 @@ jobs:
           TEST_API_URL: ${{ secrets.TEST_API_URL }}
         with:
           python-version: ${{ matrix.python-version }}
-  publish-to-pypi:
-    runs-on: ubuntu-22.04
-    container: python:3.11
-    needs:
-      - unit-tests
-    if: |
-      always()
-      && !cancelled()
-      && contains(fromJson('["skipped", "success"]'), needs.unit-tests.result)
-      && github.event_name == 'workflow_dispatch'
-      && github.event.inputs.pypi-type != 'none'
-    permissions:
-      id-token: write
-      contents: read
-      packages: read
-    environment:
-      name: ${{ inputs.pypi-type == 'prod' && 'pypi' || 'test-pypi'}}
-      url: ${{ inputs.pypi-type == 'prod' && 'https://pypi.org/p/cellarium-cas' || 'https://test.pypi.org/p/cellarium-cas'}}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/pypi-deploy
-        with:
-          python-version: '3.11'
-          pypi-type: ${{ inputs.pypi-type }}
-          
