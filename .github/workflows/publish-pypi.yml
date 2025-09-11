@@ -1,0 +1,77 @@
+name: Build & Publish CAS
+
+on:
+  workflow_dispatch:
+    inputs:
+      pypi-type:
+        description: 'The type of PyPI deployment to perform or none'
+        required: true
+        default: 'none'
+        type: choice
+        options:
+          - none
+          - test
+          - prod
+#      skip-unit-tests:
+#        description: 'Skip the unit tests'
+#        required: false
+#        default: false
+#        type: boolean
+#  workflow_run:
+#    workflows: [ "Cellarium CAS Repository Update Workflow" ]
+#    types: [ completed ]
+
+jobs:
+  build-and-publish:
+    # Run only if the main workflow succeeded AND the source ref is a tag (we use 'v*')
+#    if: >
+#      ${{
+#        github.event.workflow_run.conclusion == 'success' &&
+#        startsWith(github.event.workflow_run.head_branch || '', 'v')
+#      }}
+    runs-on: ubuntu-22.04
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Check out the tagged ref
+        uses: actions/checkout@v4
+        with:
+          # head_branch is the tag name for workflow_run (e.g., v1.7.2 or v1.7.2-test)
+          ref: ${{ github.event.workflow_run.head_branch }}
+
+      - name: Decide target index (tags with '-test' -> TestPyPI)
+        id: idx
+        run: |
+          TAG="${{ github.event.workflow_run.head_branch }}"
+          if echo "$TAG" | grep -qi -- "-test"; then
+            echo "repo_url=https://test.pypi.org/legacy/" >> "$GITHUB_OUTPUT"
+            echo "env_name=test-pypi" >> "$GITHUB_OUTPUT"
+          else
+            echo "repo_url="           >> "$GITHUB_OUTPUT"   # empty means PyPI default
+            echo "env_name=pypi"       >> "$GITHUB_OUTPUT"
+          fi
+          echo "Publishing tag: $TAG"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build distributions (sdist + wheel)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements/base.txt build
+          python -m build
+
+      - name: Publish to chosen index (Trusted Publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # Empty string = PyPI default. Non-empty uses TestPyPI.
+          repository-url: ${{ steps.idx.outputs.repo_url }}
+
+    # Show environment & package page link in the run UI
+    environment:
+      name: ${{ steps.idx.outputs.env_name }}
+      url: ${{ steps.idx.outputs.repo_url == '' && 'https://pypi.org/p/cellarium-cas'
+        || 'https://test.pypi.org/p/cellarium-cas' }}
