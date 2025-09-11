@@ -1,5 +1,4 @@
 name: Build & Publish CAS
-
 on:
   workflow_dispatch:
     inputs:
@@ -19,7 +18,7 @@ jobs:
     runs-on: ubuntu-22.04
     if: ${{ inputs.pypi-type != 'none' }}
     permissions:
-      id-token: write     # required for Trusted Publishing
+      id-token: write
       contents: read
     environment:
       name: ${{ inputs.pypi-type == 'prod' && 'pypi' || 'test-pypi' }}
