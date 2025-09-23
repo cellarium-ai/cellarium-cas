@@ -1,4 +1,4 @@
-name: Build & Publish CAS
+name: Publish to PyPi
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ on:
         required: true
         default: "test"
         type: choice
-        options: [test, prod]
+        options: [ test, prod ]
 
 jobs:
   publish-to-pypi:
@@ -18,9 +18,9 @@ jobs:
       contents: read
     environment:
       name: ${{ inputs.pypi-type == 'prod' && 'pypi' || 'test-pypi' }}
-      url:  ${{ inputs.pypi-type == 'prod'
-                 && 'https://pypi.org/p/cellarium-cas'
-                 || 'https://test.pypi.org/p/cellarium-cas' }}
+      url: ${{ inputs.pypi-type == 'prod'
+        && 'https://pypi.org/p/cellarium-cas'
+        || 'https://test.pypi.org/p/cellarium-cas' }}
 
     steps:
       - name: Verify git environment

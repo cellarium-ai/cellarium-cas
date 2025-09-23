@@ -1,22 +1,5 @@
-name: Cellarium CAS Repository Update Workflow
-on:
-  push:
-  workflow_dispatch:
-    inputs:
-      pypi-type:
-        description: 'The type of PyPI deployment to perform or none'
-        required: true
-        default: 'none'
-        type: choice
-        options:
-          - none
-          - test
-          - prod
-      skip-unit-tests:
-        description: 'Skip the unit tests'
-        required: false
-        default: false
-        type: boolean
+name: CAS Main Workflow
+on: [push]
 jobs:
   unit-tests:
     runs-on: ubuntu-22.04
