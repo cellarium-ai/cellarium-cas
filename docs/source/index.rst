@@ -57,3 +57,24 @@ Related Projects
     * `Cellarium ML Library <https://cellarium-ai.github.io/cellarium-ml/index.html>`_
     * `Cellarium Cloud (Backend) <https://github.com/cellarium-ai/cellarium-cloud>`_
 
+
+Citation
+========
+
+If the Cellarium Cell Annotation Service (CAS) contributes to your research, please cite our preprint to help others discover the project. You can reference it as follows:
+
+Williams, Stephen R., Grab, Fedor, Kamath, Govinda M., Ordabayev, Yerdos, Mellen, Jeff, Roelli, Patrick, Cibulskis, Kristian, Lehnert, Erik, Xie, Fen, Covarrubias, Miguel, Rahman, Nur-Taz, Tickle, Timothy, Erhan, Emre, Malfroy-Camine, Nicolas, Lydon, Kevin, Babadi, Mehrtash, and Delaney, Nigel F. 2025. *Accelerating scRNA-seq Analysis: Automated cell type annotation using representation learning and vector search.* bioRxiv. https://doi.org/10.1101/2025.10.06.680787
+
+BibTeX users can cite CAS with:
+
+.. code-block:: text
+
+   @article{cellarium_10x_cas,
+     author = {Williams, Stephen R. and Grab, Fedor and Kamath, Govinda M. and Ordabayev, Yerdos and Mellen, Jeff and Roelli, Patrick and Cibulskis, Kristian and Lehnert, Erik and Xie, Fen and Covarrubias, Miguel and Rahman, Nur-Taz and Tickle, Timothy and Erhan, Emre and Malfroy-Camine, Nicolas and Lydon, Kevin and Babadi, Mehrtash and Delaney, Nigel F.},
+     title = {Accelerating scRNA-seq Analysis: Automated cell type annotation using representation learning and vector search},
+     journal = {bioRxiv},
+     year = {2025},
+     doi = {10.1101/2025.10.06.680787},
+     url = {https://www.biorxiv.org/content/10.1101/2025.10.06.680787v1}
+   }
+
