@@ -63,7 +63,7 @@ Citation
 
 If the Cellarium Cell Annotation Service (CAS) contributes to your research, please cite our preprint to help others discover the project. You can reference it as follows:
 
-Williams, Stephen R., Grab, Fedor, Kamath, Govinda M., Ordabayev, Yerdos, Mellen, Jeff, Roelli, Patrick, Cibulskis, Kristian, Lehnert, Erik, Xie, Fen, Covarrubias, Miguel, Rahman, Nur-Taz, Tickle, Timothy, Erhan, Emre, Malfroy-Camine, Nicolas, Lydon, Kevin, Babadi, Mehrtash, and Delaney, Nigel F. 2025. *Accelerating scRNA-seq Analysis: Automated cell type annotation using representation learning and vector search.* bioRxiv. https://doi.org/10.1101/2025.10.06.680787
+Stephen R Williams, Fedor Grab, Govinda M Kamath, Yerdos Ordabayev, Jeff Mellen, Patrick Roelli, Kristian Cibulskis, Erik Lehnert, Fen Xie, Miguel Covarrubias, Nur-Taz Rahman, Timothy Tickle, Emre Erhan, Nicolas Malfroy-Camine, Kevin Lydon, Mehrtash Babadi, Nigel F. Delaney. 2025. *Accelerating scRNA-seq Analysis: Automated cell type annotation using representation learning and vector search.* bioRxiv. https://doi.org/10.1101/2025.10.06.680787
 
 BibTeX users can cite CAS with:
 
