@@ -20,6 +20,8 @@ runs:
 
     - name: Run linting
       # Run tox using the version of Python in `PATH`
+      # Only run on Python 3.12 to avoid duplicate lint failures across the matrix
+      if: ${{ inputs.python-version == '3.12' }}
       run: tox -e lint
       shell: bash
 

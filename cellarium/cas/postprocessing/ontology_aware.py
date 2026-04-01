@@ -65,7 +65,7 @@ def convert_cas_ontology_aware_response_to_score_matrix(
 def insert_cas_ontology_aware_response_into_adata(
     cas_ontology_aware_response: CellTypeOntologyAwareResults,
     adata: AnnData,
-    cl: CellOntologyCache = CellOntologyCache(),
+    cl: t.Optional[CellOntologyCache] = None,
 ) -> None:
     """
     Inserts Cellarium CAS ontology aware response into `obsm` property of a provided AnnData file as a
@@ -82,6 +82,8 @@ def insert_cas_ontology_aware_response_into_adata(
 
     :return: None
     """
+    if cl is None:
+        cl = CellOntologyCache()
     adata.obsm[CAS_CL_SCORES_ANNDATA_OBSM_KEY] = convert_cas_ontology_aware_response_to_score_matrix(
         adata, cas_ontology_aware_response, cl
     )
@@ -300,19 +302,21 @@ def get_most_granular_top_k_calls(
     top_k: int = 1,
     root_note: str = CL_CELL_ROOT_NODE,
 ) -> t.List[tuple]:
-    depth_list = list(map(cl.get_longest_path_lengths_from_target(root_note).get, aggregated_scores.cl_names))
-    sorted_score_and_depth_list = sorted(
-        list(
-            (score, depth, cl_name)
-            for score, depth, cl_name in zip(
-                aggregated_scores.aggregated_scores_c, depth_list, aggregated_scores.cl_names
-            )
-            if score >= min_acceptable_score
-        ),
-        key=itemgetter(1),
-        reverse=True,
-    )
-    trunc_list = sorted_score_and_depth_list[:top_k]
+    depth_map = cl.get_longest_path_lengths_from_target(root_note)
+    depth_list = list(map(depth_map.get, aggregated_scores.cl_names))
+
+    # Group qualifying terms by depth, keeping only the highest-scoring term per depth level.
+    # This ensures each position in the returned list represents a distinct granularity level
+    # (e.g., label_1 = most specific, label_2 = broader parent, label_3 = even broader).
+    best_per_depth: t.Dict[float, tuple] = {}
+    for score, depth, cl_name in zip(aggregated_scores.aggregated_scores_c, depth_list, aggregated_scores.cl_names):
+        if score >= min_acceptable_score:
+            if depth not in best_per_depth or score > best_per_depth[depth][0]:
+                best_per_depth[depth] = (score, depth, cl_name)
+
+    # Sort depth levels from most specific (deepest) to broadest (shallowest)
+    trunc_list = sorted(best_per_depth.values(), key=itemgetter(1), reverse=True)[:top_k]
+
     # pad with root node if necessary
     for _ in range(top_k - len(trunc_list)):
         trunc_list.append((1.0, 0, root_note))

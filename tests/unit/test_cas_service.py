@@ -1,6 +1,5 @@
 import typing as t
 
-import aiohttp
 import pytest
 import requests
 from mockito import mock, unstub, when
@@ -99,7 +98,7 @@ class TestCasService:
             self.cas_service.get_feature_schema_by(name="schema1")
 
     def _mock_response(self, url: str, token: str, status_code: int, response_body: t.Union[dict, list]):
-        response = mock(aiohttp.ClientResponse)
+        response = mock(requests.Response)
         response.status_code = status_code
         when(response).json().thenReturn(response_body)
         when(requests).get(url=url, headers={"Authorization": f"Bearer {token}"}).thenReturn(response)

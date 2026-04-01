@@ -15,7 +15,7 @@ from parameterized import parameterized
 
 from cellarium.cas import constants, exceptions
 from cellarium.cas.client import CASClient
-from tests.unit.test_utils import async_context_manager_decorator, async_return
+from tests.unit.test_utils import async_context_manager_decorator
 
 TEST_TOKEN = "test_token"
 TEST_URL = "https://cas-host.io"
@@ -524,7 +524,7 @@ class TestCasClient:
         method: str = "get",
         post_data: t.Union[dict, list] = None,
     ):
-        response = mock(aiohttp.ClientResponse)
+        response = mock(requests.Response)
         response.status_code = status_code
         when(response).json().thenReturn(response_body)
 
@@ -542,7 +542,11 @@ class TestCasClient:
         # Mock response
         response = mock(aiohttp.ClientResponse)
         response.status = status_code
-        when(response).json().thenReturn(async_return(response_body))
+
+        async def json_coro():
+            return response_body
+
+        when(response).json().thenAnswer(json_coro)
         response = async_context_manager_decorator(response)
 
         # Mock the session
