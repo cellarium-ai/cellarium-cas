@@ -46,9 +46,18 @@ runs:
     - name: Run pip-audit command through GHA
       # Check dependencies for security vulnerabilities.
       # Only run on a single python version (the one that does doc builds)
+      # CVE-2026-25645 (requests): fix version 2.33.0 not yet released.
+      # CVE-2026-27205 (flask) and CVE-2025-66221, CVE-2026-21860, CVE-2026-27199 (werkzeug):
+      # cannot be fixed until dash drops its Flask<3.1 constraint (currently dash==2.17.1).
       if: ${{ env.DO_DOC_BUILD == 'true' }}
       uses: pypa/gh-action-pip-audit@v1.0.8
       with:
+        ignore-vulns: |
+          CVE-2026-25645
+          CVE-2026-27205
+          CVE-2025-66221
+          CVE-2026-21860
+          CVE-2026-27199
         inputs: |
           requirements/base.txt
           requirements/dev.txt
