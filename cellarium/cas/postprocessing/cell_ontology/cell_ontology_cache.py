@@ -143,3 +143,18 @@ class CellOntologyCache:
                         distances[neighbor] = distances[node] + 1
 
         return distances
+
+    @lru_cache(maxsize=None)
+    def get_shortest_path_lengths_from_target(self, target: str) -> t.Dict[str, float]:
+        topo_order = list(nx.topological_sort(self.cl_graph))
+
+        distances = {node: float("inf") for node in self.cl_graph.nodes()}
+        distances[target] = 0
+
+        for node in topo_order:
+            if distances[node] != float("inf"):
+                for neighbor in self.cl_graph.successors(node):
+                    if distances[neighbor] > distances[node] + 1:
+                        distances[neighbor] = distances[node] + 1
+
+        return distances

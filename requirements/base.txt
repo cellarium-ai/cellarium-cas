@@ -1,5 +1,5 @@
 aiohttp[speedups]>=3.8,<4
-requests>=2.31,<2.33
+requests>=2.31
 anndata>=0.8,<0.9; python_version < "3.12"
 anndata>=0.10,<0.13; python_version >= "3.12"
 numpy>=1.21,<1.26; python_version < "3.12"
