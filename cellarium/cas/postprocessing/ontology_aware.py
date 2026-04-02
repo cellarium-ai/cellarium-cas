@@ -301,25 +301,22 @@ def get_most_granular_top_k_calls(
     min_acceptable_score: float,
     top_k: int = 1,
     root_note: str = CL_CELL_ROOT_NODE,
+    use_shortest_path: bool = True,
 ) -> t.List[tuple]:
-    depth_map = cl.get_longest_path_lengths_from_target(root_note)
-    depth_list = list(map(depth_map.get, aggregated_scores.cl_names))
-
-    # Group qualifying terms by depth, keeping only the highest-scoring term per depth level.
-    # This ensures each position in the returned list represents a distinct granularity level
-    # (e.g., label_1 = most specific, label_2 = broader parent, label_3 = even broader).
-    best_per_depth: t.Dict[float, tuple] = {}
-    for score, depth, cl_name in zip(aggregated_scores.aggregated_scores_c, depth_list, aggregated_scores.cl_names):
-        if score >= min_acceptable_score:
-            if depth not in best_per_depth or score > best_per_depth[depth][0]:
-                best_per_depth[depth] = (score, depth, cl_name)
-
-    # Sort depth levels from most specific (deepest) to broadest (shallowest)
-    trunc_list = sorted(best_per_depth.values(), key=itemgetter(1), reverse=True)[:top_k]
-
-    # pad with root node if necessary
-    for _ in range(top_k - len(trunc_list)):
-        trunc_list.append((1.0, 0, root_note))
+    if use_shortest_path:
+        depth_map = cl.get_shortest_path_lengths_from_target(root_note)
+    else:
+        depth_map = cl.get_longest_path_lengths_from_target(root_note)
+    trunc_list = sorted(
+        (
+            (score, depth_map[cl_name], cl_name)
+            for score, cl_name in zip(aggregated_scores.aggregated_scores_c, aggregated_scores.cl_names)
+            if score >= min_acceptable_score
+        ),
+        key=itemgetter(1, 0),
+        reverse=True,
+    )[:top_k]
+    trunc_list += [(1.0, 0, root_note)] * (top_k - len(trunc_list))
     return trunc_list
 
 
@@ -330,6 +327,7 @@ def compute_most_granular_top_k_calls_single(
     top_k: int = 3,
     obs_prefix: str = "cas_cell_type",
     root_note: str = CL_CELL_ROOT_NODE,
+    use_shortest_path: bool = True,
 ):
     top_k_calls_dict = defaultdict(list)
     scores_array_nc = adata.obsm[CAS_CL_SCORES_ANNDATA_OBSM_KEY].toarray()
@@ -339,27 +337,17 @@ def compute_most_granular_top_k_calls_single(
         aggregation_op=CellOntologyScoresAggregationOp.MEAN,
         aggregation_domain=CellOntologyScoresAggregationDomain.ALL_CELLS,
         threshold=0.0,
-        aggregated_scores_c=np.zeros(
-            (
-                len(
-                    cl.cl_names,
-                )
-            )
-        ),
-        fraction_over_threshold_c=np.ones(
-            (
-                len(
-                    cl.cl_names,
-                )
-            )
-        ),
+        aggregated_scores_c=np.zeros((len(cl.cl_names))),
+        fraction_over_threshold_c=np.ones((len(cl.cl_names))),
         cl_labels=cl.cl_labels,
         cl_names=cl.cl_names,
     )
 
     for i_cell in range(adata.n_obs):
         aggregated_scores.aggregated_scores_c = scores_array_nc[i_cell]
-        top_k_output = get_most_granular_top_k_calls(aggregated_scores, cl, min_acceptable_score, top_k, root_note)
+        top_k_output = get_most_granular_top_k_calls(
+            aggregated_scores, cl, min_acceptable_score, top_k, root_note, use_shortest_path
+        )
         for k in range(top_k):
             top_k_calls_dict[f"{obs_prefix}_score_{k + 1}"].append(top_k_output[k][0])
             top_k_calls_dict[f"{obs_prefix}_name_{k + 1}"].append(top_k_output[k][2])
@@ -380,6 +368,7 @@ def compute_most_granular_top_k_calls_cluster(
     top_k: int = 3,
     obs_prefix: str = "cas_cell_type",
     root_note: str = CL_CELL_ROOT_NODE,
+    use_shortest_path: bool = True,
 ):
     top_k_calls_dict = dict()
     for k in range(top_k):
@@ -396,7 +385,9 @@ def compute_most_granular_top_k_calls_cluster(
         aggregated_scores = get_aggregated_cas_ontology_aware_scores(
             adata, obs_indices, aggregation_op, aggregation_domain, aggregation_score_threshod
         )
-        top_k_output = get_most_granular_top_k_calls(aggregated_scores, cl, min_acceptable_score, top_k, root_note)
+        top_k_output = get_most_granular_top_k_calls(
+            aggregated_scores, cl, min_acceptable_score, top_k, root_note, use_shortest_path
+        )
         for k in range(top_k):
             _update_list(top_k_calls_dict[f"{obs_prefix}_score_{k + 1}"], obs_indices, top_k_output[k][0])
             _update_list(top_k_calls_dict[f"{obs_prefix}_name_{k + 1}"], obs_indices, top_k_output[k][2])
