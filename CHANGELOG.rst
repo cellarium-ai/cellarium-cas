@@ -21,6 +21,70 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
   Fixed
   ~~~~~
 
+1.7.5 - 2026-04-03
+------------------
+
+Changed
+~~~~~~~
+- Sorting of top-k calls now uses ``(depth, score)`` as the sort key, ensuring ties in depth are broken by score
+- ``get_most_granular_top_k_calls``, ``compute_most_granular_top_k_calls_single``, and ``compute_most_granular_top_k_calls_cluster`` now accept a ``use_shortest_path`` parameter (default ``True``) to control whether shortest or longest ontology path lengths are used when ranking cell type calls
+- Added ``get_shortest_path_lengths_from_target`` method to ``CellOntologyCache`` for computing shortest-path depths in the cell ontology graph
+- Relaxed upper bound on ``requests`` dependency (``>=2.31``)
+- Updated ``biopython`` dependency to ``>=1.87``
+- Linting is now only run on Python 3.12 in the CI matrix to avoid duplicate failures
+- Fixed mutable default argument in ``insert_cas_ontology_aware_response_into_adata`` (``CellOntologyCache`` is now instantiated lazily)
+
+Fixed
+~~~~~
+- Fixed incorrect mock type in unit tests (``aiohttp.ClientResponse`` replaced with ``requests.Response`` where appropriate)
+
+1.7.4 - 2025-09-23
+------------------
+
+Changed
+~~~~~~~
+- Refactored PyPI publishing into a dedicated ``publish-pypi.yaml`` workflow; removed the old ``pypi-deploy`` composite action
+- Simplified the main CI workflow (``main-workflow.yaml``) to remove manual PyPI dispatch options
+
+1.7.3 - 2025-09-11
+------------------
+
+Fixed
+~~~~~
+- Pinned ``scanpy`` per Python version (``<1.10.0`` for Python < 3.12, ``<1.12.0`` for Python >= 3.12)
+- Pinned ``biopython==1.85`` for reproducible visualization installs
+
+1.7.2 - 2025-09-10
+------------------
+
+Changed
+~~~~~~~
+- Added Python 3.12 support; split dependency pins by Python version for ``anndata``, ``numpy``, ``pandas``, ``typing-extensions``, and ``owlready2``
+- Pinned ``dash==2.17.1`` and ``dash-bootstrap-components==1.6.0`` in visualization requirements
+- Simplified tox configuration to a single ``py`` environment
+- Removed unused Python version entries from ``gh-actions`` tox config
+
+Fixed
+~~~~~
+- Fixed float32 conversion for ``adata.raw.X`` by restoring via ``raw.to_adata()`` before casting
+
+1.7.1 - 2024-10-25
+------------------
+
+Changed
+~~~~~~~
+- Improved quota status message formatting: weekly quota, reset date, and lifetime quota are now printed on separate lines
+
+1.7.0 - 2024-10-25
+------------------
+
+Changed
+~~~~~~~
+- Client now displays user quota on initialization
+- Added low-quota warning feedback link when remaining lifetime quota falls below threshold
+- Feedback link is also shown when a quota-exceeded error is raised for users without a quota increase
+- Added ``quota_increased`` field handling throughout quota checks
+
 1.6.0 - 2024-10-08
 ------------------
 
