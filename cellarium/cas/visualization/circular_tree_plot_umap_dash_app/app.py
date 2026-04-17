@@ -24,7 +24,7 @@ from cellarium.cas.postprocessing import (
     get_aggregated_cas_ontology_aware_scores,
     get_obs_indices_for_cluster,
 )
-from cellarium.cas.postprocessing.cell_ontology import CL_CELL_ROOT_NODE, CellOntologyCache
+from cellarium.cas.postprocessing.cell_ontology import CL_CELL_ROOT_NODE
 from cellarium.cas.visualization._components.circular_tree_plot import CircularTreePlot
 from cellarium.cas.visualization.ui_utils import ConfigValue, find_and_kill_process
 
@@ -46,56 +46,56 @@ class DomainSelectionConstants:
 
 # cell type ontology terms to always show as text labels in the visualization
 DEFAULT_SHOWN_CL_NAMES_SET = {
-    "CL_0000236",
-    "CL_0000084",
-    "CL_0000789",
-    "CL_0000798",
-    "CL_0002420",
-    "CL_0002419",
-    "CL_0000786",
-    "CL_0000576",
-    "CL_0001065",
-    "CL_0000451",
-    "CL_0000094",
-    "CL_0000235",
-    "CL_0000097",
-    "CL_0000814",
-    "CL_0000827",
-    "CL_0000066",
-    "CL_0000163",
-    "CL_0000151",
-    "CL_0000064",
-    "CL_0000322",
-    "CL_0000076",
-    "CL_0005006",
-    "CL_0000148",
-    "CL_0000646",
-    "CL_0009004",
-    "CL_0000115",
-    "CL_0000125",
-    "CL_0002319",
-    "CL_0000187",
-    "CL_0000057",
-    "CL_0008034",
-    "CL_0000092",
-    "CL_0000058",
-    "CL_0000060",
-    "CL_0000136",
-    "CL_0000499",
-    "CL_0000222",
-    "CL_0007005",
-    "CL_0000039",
-    "CL_0000019",
-    "CL_0000223",
-    "CL_0008019",
-    "CL_0005026",
-    "CL_0000182",
-    "CL_0000023",
-    "CL_0000679",
-    "CL_0000126",
-    "CL_0000540",
-    "CL_0000127",
-    "CL_0011005",
+    "CL:0000236",
+    "CL:0000084",
+    "CL:0000789",
+    "CL:0000798",
+    "CL:0002420",
+    "CL:0002419",
+    "CL:0000786",
+    "CL:0000576",
+    "CL:0001065",
+    "CL:0000451",
+    "CL:0000094",
+    "CL:0000235",
+    "CL:0000097",
+    "CL:0000814",
+    "CL:0000827",
+    "CL:0000066",
+    "CL:0000163",
+    "CL:0000151",
+    "CL:0000064",
+    "CL:0000322",
+    "CL:0000076",
+    "CL:0005006",
+    "CL:0000148",
+    "CL:0000646",
+    "CL:0009004",
+    "CL:0000115",
+    "CL:0000125",
+    "CL:0002319",
+    "CL:0000187",
+    "CL:0000057",
+    "CL:0008034",
+    "CL:0000092",
+    "CL:0000058",
+    "CL:0000060",
+    "CL:0000136",
+    "CL:0000499",
+    "CL:0000222",
+    "CL:0007005",
+    "CL:0000039",
+    "CL:0000019",
+    "CL:0000223",
+    "CL:0008019",
+    "CL:0005026",
+    "CL:0000182",
+    "CL:0000023",
+    "CL:0000679",
+    "CL:0000126",
+    "CL:0000540",
+    "CL:0000127",
+    "CL:0011005",
 }
 
 
@@ -174,6 +174,8 @@ class CASCircularTreePlotUMAPDashApp:
     def __init__(
         self,
         adata: AnnData,
+        cas_client: t.Optional[t.Any] = None,
+        cl: t.Optional[t.Any] = None,
         cluster_label_obs_column: t.Optional[str] = None,
         aggregation_op: CellOntologyScoresAggregationOp = CellOntologyScoresAggregationOp.MEAN,
         aggregation_domain: CellOntologyScoresAggregationDomain = CellOntologyScoresAggregationDomain.OVER_THRESHOLD,
@@ -247,7 +249,20 @@ class CASCircularTreePlotUMAPDashApp:
         self.selected_cl_name = None
 
         # instantiate the cell type ontology cache
-        self.cl = CellOntologyCache()
+        if cl is not None:
+            self.cl = cl
+        elif cas_client is not None:
+            resource_name = adata.uns.get(CAS_METADATA_ANNDATA_UNS_KEY, {}).get("ontology_resource_name")
+            if resource_name is None:
+                raise ValueError(
+                    "'ontology_resource_name' not found in adata.uns['cas_metadata']. "
+                    "Please use `cas.insert_ontology_aware_response(response, adata)` before launching the app."
+                )
+            self.cl = cas_client._get_ontology_cache(resource_name)
+        else:
+            raise ValueError(
+                "Either `cas_client` or `cl` (CellOntologyCache) must be provided to CASCircularTreePlotUMAPDashApp."
+            )
 
         # instantiate the Dash app
         self.app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP])
