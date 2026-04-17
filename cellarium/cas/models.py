@@ -71,6 +71,8 @@ class CellTypeOntologyAwareResults(BaseModel):
     Represents the data object returned by the CAS API for a ontology-aware annotations.
     """
 
+    model_config = {"protected_namespaces": ()}
+
     class Match(BaseModel):
         score: float = Field(description="The score of the match", examples=[0.789])
         cell_type_ontology_term_id: str = Field(
@@ -94,6 +96,7 @@ class CellTypeOntologyAwareResults(BaseModel):
         )
 
     data: t.List["CellTypeOntologyAwareResults.OntologyAwareAnnotation"] = Field(description="The annotations found")
+    model_name: t.Optional[str] = Field(default=None, description="The model name used to produce this response")
 
 
 CellTypeOntologyAwareResults.model_rebuild()
