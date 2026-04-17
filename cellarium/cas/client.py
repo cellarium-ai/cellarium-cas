@@ -135,7 +135,6 @@ class CASClient:
         self,
         cas_ontology_aware_response: "models.CellTypeOntologyAwareResults",
         adata: "anndata.AnnData",
-        cas_model_name: t.Optional[str] = None,
     ) -> None:
         """
         Insert a CAS ontology-aware response into the provided AnnData object.
@@ -145,9 +144,8 @@ class CASClient:
 
         :param cas_ontology_aware_response: The response from :meth:`annotate_matrix_cell_type_ontology_aware_strategy`.
         :param adata: The AnnData object to insert the response into.
-        :param cas_model_name: Model name used for annotation. Defaults to the default model.
         """
-        resource_name = self._resolve_ontology_resource_name(cas_model_name)
+        resource_name = self._resolve_ontology_resource_name(cas_ontology_aware_response.model_name)
         cl = self._get_ontology_cache(resource_name)
         insert_cas_ontology_aware_response_into_adata(
             cas_ontology_aware_response, adata, cl=cl, ontology_resource_name=resource_name
@@ -157,7 +155,6 @@ class CASClient:
         self,
         adata: "anndata.AnnData",
         min_acceptable_score: float,
-        cas_model_name: t.Optional[str] = None,
         top_k: int = 3,
         obs_prefix: str = "cas_cell_type",
         use_shortest_path: bool = True,
@@ -167,14 +164,14 @@ class CASClient:
 
         :param adata: AnnData object with ``cas_cl_scores`` already inserted via :meth:`insert_ontology_aware_response`.
         :param min_acceptable_score: Minimum evidence score for a cell type call to be considered.
-        :param cas_model_name: Model name used for annotation. Defaults to the default model.
         :param top_k: Number of top calls to make per cell.
         :param obs_prefix: Prefix for the ``.obs`` columns to write results into.
         :param use_shortest_path: Whether to use shortest (True) or longest (False) path depth for ranking.
         """
-        resource_name = adata.uns.get(CAS_METADATA_ANNDATA_UNS_KEY, {}).get(
-            "ontology_resource_name"
-        ) or self._resolve_ontology_resource_name(cas_model_name)
+        resource_name = (
+            adata.uns.get(CAS_METADATA_ANNDATA_UNS_KEY, {}).get("ontology_resource_name")
+            or self._resolve_ontology_resource_name()
+        )
         cl = self._get_ontology_cache(resource_name)
         _pp_ontology_aware.compute_most_granular_top_k_calls_single(
             adata=adata,
@@ -190,7 +187,6 @@ class CASClient:
         adata: "anndata.AnnData",
         min_acceptable_score: float,
         cluster_label_obs_column: str,
-        cas_model_name: t.Optional[str] = None,
         top_k: int = 3,
         obs_prefix: str = "cas_cell_type",
         use_shortest_path: bool = True,
@@ -201,14 +197,14 @@ class CASClient:
         :param adata: AnnData object with ``cas_cl_scores`` already inserted via :meth:`insert_ontology_aware_response`.
         :param min_acceptable_score: Minimum evidence score for a cell type call to be considered.
         :param cluster_label_obs_column: The ``.obs`` column name containing cluster labels.
-        :param cas_model_name: Model name used for annotation. Defaults to the default model.
         :param top_k: Number of top calls to make per cluster.
         :param obs_prefix: Prefix for the ``.obs`` columns to write results into.
         :param use_shortest_path: Whether to use shortest (True) or longest (False) path depth for ranking.
         """
-        resource_name = adata.uns.get(CAS_METADATA_ANNDATA_UNS_KEY, {}).get(
-            "ontology_resource_name"
-        ) or self._resolve_ontology_resource_name(cas_model_name)
+        resource_name = (
+            adata.uns.get(CAS_METADATA_ANNDATA_UNS_KEY, {}).get("ontology_resource_name")
+            or self._resolve_ontology_resource_name()
+        )
         cl = self._get_ontology_cache(resource_name)
         _pp_ontology_aware.compute_most_granular_top_k_calls_cluster(
             adata=adata,
@@ -959,7 +955,7 @@ class CASClient:
         )
         result = self.__postprocess_annotations(results, matrix)
         # cast the object to the correct type
-        result = models.CellTypeOntologyAwareResults(data=result)
+        result = models.CellTypeOntologyAwareResults(data=result, model_name=cas_model_name)
         self.__print(f"Total wall clock time: {f'{time.time() - start:10.4f}'} seconds")
         self.__render_feedback_link()
         return result
