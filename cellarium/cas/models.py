@@ -186,3 +186,33 @@ class CellQueryResults(BaseModel):
 
 
 CellQueryResults.model_rebuild()
+
+
+class CellOntologyResource(BaseModel):
+    """
+    Represents the precomputed cell ontology resource served by the CAS backend.
+    """
+
+    cl_names: t.List[str] = Field(description="Ordered list of cell ontology term IDs")
+    cell_ontology_term_id_to_cell_type: t.Dict[str, str] = Field(
+        description="Mapping from cell ontology term ID to human-readable cell type name"
+    )
+    children_dictionary: t.Dict[str, t.List[str]] = Field(
+        description="Mapping from each term ID to its direct children term IDs"
+    )
+    shortest_path_lengths_from_cell_root: t.Dict[str, int] = Field(
+        description="Shortest path length from CL_0000000 to each term"
+    )
+    longest_path_lengths_from_cell_root: t.Dict[str, int] = Field(
+        description="Longest path length from CL_0000000 to each term"
+    )
+
+
+class OntologicalColumnInfo(BaseModel):
+    """
+    Represents ontological column metadata for a CAS model.
+    """
+
+    ontology_resource_name: str
+    column_name: str
+    description: t.Optional[str] = None

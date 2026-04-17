@@ -11,6 +11,7 @@ GET_SCHEMA_BY_NAME = f"{_API_GENERAL_ENDPOINT_PREFIX}/feature-schema/{{schema_na
 LIST_MODELS = f"{_API_GENERAL_ENDPOINT_PREFIX}/list-models"
 GET_USER_QUOTA = f"{_API_GENERAL_ENDPOINT_PREFIX}/quota"
 VALIDATE_VERSION = f"{_API_GENERAL_ENDPOINT_PREFIX}/validate-client-version"
+CELL_ONTOLOGY_RESOURCE = f"{_API_GENERAL_ENDPOINT_PREFIX}/cell-ontology-resource/{{name}}"
 # Cell Analysis
 ANNOTATE_CELL_TYPE_SUMMARY_STATS_STRATEGY = (
     f"{_API_CELL_OPERATIONS_ENDPOINT_PREFIX}/annotate-cell-type-summary-statistics-strategy"

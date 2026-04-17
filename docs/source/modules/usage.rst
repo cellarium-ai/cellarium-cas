@@ -43,3 +43,56 @@ Anndata File instance
 
     adata = anndata.read("you_anndata_file.h5ad")
     response = cas.annotate_anndata(adata)
+
+Ontology-aware annotation
+--------------------------
+
+Use the ontology-aware strategy to get per-cell relevance scores across the Cell Ontology hierarchy::
+
+    cas_ontology_aware_response = cas.annotate_matrix_cell_type_ontology_aware_strategy(
+        matrix=adata,
+        chunk_size=500,
+        feature_ids_column_name="gene_ids",
+        feature_names_column_name="index",
+    )
+
+Insert the response into the AnnData object. This call fetches the required cell ontology
+resource from the backend and stores scores in ``adata.obsm['cas_cl_scores']`` and metadata
+in ``adata.uns['cas_metadata']``::
+
+    cas.insert_ontology_aware_response(cas_ontology_aware_response, adata)
+
+Best cell type label assignment
+---------------------------------
+
+Assign the most granular top-k cell type calls to individual cells::
+
+    cas.compute_most_granular_top_k_calls_single(
+        adata=adata,
+        min_acceptable_score=0.2,
+        top_k=3,
+        obs_prefix="cas_cell_type",
+    )
+
+Or assign calls per cluster::
+
+    cas.compute_most_granular_top_k_calls_cluster(
+        adata=adata,
+        min_acceptable_score=0.2,
+        cluster_label_obs_column="cluster_label",
+        top_k=3,
+        obs_prefix="cas_cell_type_cluster",
+    )
+
+Interactive visualization
+--------------------------
+
+Launch the interactive circular tree / UMAP Dash application::
+
+    from cellarium.cas.visualization import CASCircularTreePlotUMAPDashApp
+
+    CASCircularTreePlotUMAPDashApp(
+        adata=adata,
+        cas_client=cas,
+        cluster_label_obs_column="cluster_label",
+    ).run(port=8050)

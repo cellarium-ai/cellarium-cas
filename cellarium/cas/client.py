@@ -18,6 +18,9 @@ from cellarium.cas.logging import logger
 from cellarium.cas.service import action_context_manager
 
 from . import _io, constants, exceptions, models, preprocessing, service, settings, version
+from .postprocessing import ontology_aware as _pp_ontology_aware
+from .postprocessing.cell_ontology.cell_ontology_cache import CellOntologyCache
+from .postprocessing.ontology_aware import CAS_METADATA_ANNDATA_UNS_KEY, insert_cas_ontology_aware_response_into_adata
 
 
 @contextmanager
@@ -94,6 +97,7 @@ class CASClient:
 
         self.feature_schemas = self.cas_api_service.get_feature_schemas()
         self._feature_schemas_cache = {}
+        self._ontology_cache: t.Dict[str, t.Any] = {}
 
         self.num_attempts_per_chunk = num_attempts_per_chunk
         self.__print(f"Authenticated in Cellarium Cloud v. {application_info['application_version']}")
@@ -108,6 +112,113 @@ class CASClient:
         List of models in Cellarium CAS that can be used to annotate.
         """
         return self.__allowed_models_list
+
+    def _resolve_ontology_resource_name(self, cas_model_name: t.Optional[str] = None) -> str:
+        """Resolve the ontology resource name for a given model."""
+        cas_model_name = cas_model_name or self.default_model_name
+        model_obj = self._model_name_obj_map.get(cas_model_name, {})
+        ontological_columns = model_obj.get("ontological_columns", [])
+        if not ontological_columns:
+            raise ValueError(
+                f"Model '{cas_model_name}' has no ontological columns. " "Cannot resolve cell ontology resource."
+            )
+        return ontological_columns[0]["ontology_resource_name"]
+
+    def _get_ontology_cache(self, ontology_resource_name: str) -> CellOntologyCache:
+        """Fetch and cache a CellOntologyCache for the given resource name."""
+        if ontology_resource_name not in self._ontology_cache:
+            resource = self.cas_api_service.get_cell_ontology_resource(ontology_resource_name)
+            self._ontology_cache[ontology_resource_name] = CellOntologyCache(resource)
+        return self._ontology_cache[ontology_resource_name]
+
+    def insert_ontology_aware_response(
+        self,
+        cas_ontology_aware_response: "models.CellTypeOntologyAwareResults",
+        adata: "anndata.AnnData",
+        cas_model_name: t.Optional[str] = None,
+    ) -> None:
+        """
+        Insert a CAS ontology-aware response into the provided AnnData object.
+
+        Fetches and caches the cell ontology resource for the model automatically.
+        Stores scores in ``adata.obsm['cas_cl_scores']`` and metadata in ``adata.uns['cas_metadata']``.
+
+        :param cas_ontology_aware_response: The response from :meth:`annotate_matrix_cell_type_ontology_aware_strategy`.
+        :param adata: The AnnData object to insert the response into.
+        :param cas_model_name: Model name used for annotation. Defaults to the default model.
+        """
+        resource_name = self._resolve_ontology_resource_name(cas_model_name)
+        cl = self._get_ontology_cache(resource_name)
+        insert_cas_ontology_aware_response_into_adata(
+            cas_ontology_aware_response, adata, cl=cl, ontology_resource_name=resource_name
+        )
+
+    def compute_most_granular_top_k_calls_single(
+        self,
+        adata: "anndata.AnnData",
+        min_acceptable_score: float,
+        cas_model_name: t.Optional[str] = None,
+        top_k: int = 3,
+        obs_prefix: str = "cas_cell_type",
+        use_shortest_path: bool = True,
+    ) -> None:
+        """
+        Assign the most granular top-k cell type calls to individual cells in ``adata.obs``.
+
+        :param adata: AnnData object with ``cas_cl_scores`` already inserted via :meth:`insert_ontology_aware_response`.
+        :param min_acceptable_score: Minimum evidence score for a cell type call to be considered.
+        :param cas_model_name: Model name used for annotation. Defaults to the default model.
+        :param top_k: Number of top calls to make per cell.
+        :param obs_prefix: Prefix for the ``.obs`` columns to write results into.
+        :param use_shortest_path: Whether to use shortest (True) or longest (False) path depth for ranking.
+        """
+        resource_name = adata.uns.get(CAS_METADATA_ANNDATA_UNS_KEY, {}).get(
+            "ontology_resource_name"
+        ) or self._resolve_ontology_resource_name(cas_model_name)
+        cl = self._get_ontology_cache(resource_name)
+        _pp_ontology_aware.compute_most_granular_top_k_calls_single(
+            adata=adata,
+            cl=cl,
+            min_acceptable_score=min_acceptable_score,
+            top_k=top_k,
+            obs_prefix=obs_prefix,
+            use_shortest_path=use_shortest_path,
+        )
+
+    def compute_most_granular_top_k_calls_cluster(
+        self,
+        adata: "anndata.AnnData",
+        min_acceptable_score: float,
+        cluster_label_obs_column: str,
+        cas_model_name: t.Optional[str] = None,
+        top_k: int = 3,
+        obs_prefix: str = "cas_cell_type",
+        use_shortest_path: bool = True,
+    ) -> None:
+        """
+        Assign the most granular top-k cell type calls per cluster in ``adata.obs``.
+
+        :param adata: AnnData object with ``cas_cl_scores`` already inserted via :meth:`insert_ontology_aware_response`.
+        :param min_acceptable_score: Minimum evidence score for a cell type call to be considered.
+        :param cluster_label_obs_column: The ``.obs`` column name containing cluster labels.
+        :param cas_model_name: Model name used for annotation. Defaults to the default model.
+        :param top_k: Number of top calls to make per cluster.
+        :param obs_prefix: Prefix for the ``.obs`` columns to write results into.
+        :param use_shortest_path: Whether to use shortest (True) or longest (False) path depth for ranking.
+        """
+        resource_name = adata.uns.get(CAS_METADATA_ANNDATA_UNS_KEY, {}).get(
+            "ontology_resource_name"
+        ) or self._resolve_ontology_resource_name(cas_model_name)
+        cl = self._get_ontology_cache(resource_name)
+        _pp_ontology_aware.compute_most_granular_top_k_calls_cluster(
+            adata=adata,
+            cl=cl,
+            min_acceptable_score=min_acceptable_score,
+            cluster_label_obs_column=cluster_label_obs_column,
+            top_k=top_k,
+            obs_prefix=obs_prefix,
+            use_shortest_path=use_shortest_path,
+        )
 
     @staticmethod
     def __get_number_of_chunks(adata, chunk_size):

@@ -20,6 +20,38 @@ from tests.unit.test_utils import async_context_manager_decorator
 TEST_TOKEN = "test_token"
 TEST_URL = "https://cas-host.io"
 TEST_SCHEMA = "schema1"
+TEST_ONTOLOGY_RESOURCE_NAME = "human_cl_v2024"
+
+# CL names that appear in the mocked ontology-aware annotation response
+TEST_CL_NAMES = ["CL:0000000", "CL:0000540", "CL:0000255", "CL:0000404"]
+TEST_CL_LABELS = {
+    "CL:0000000": "cell",
+    "CL:0000540": "neuron",
+    "CL:0000255": "eukaryotic cell",
+    "CL:0000404": "electrically signaling cell",
+}
+TEST_ONTOLOGY_RESOURCE = {
+    "cl_names": TEST_CL_NAMES,
+    "cell_ontology_term_id_to_cell_type": TEST_CL_LABELS,
+    "children_dictionary": {
+        "CL:0000000": ["CL:0000255"],
+        "CL:0000255": ["CL:0000540", "CL:0000404"],
+        "CL:0000540": [],
+        "CL:0000404": [],
+    },
+    "shortest_path_lengths_from_cell_root": {
+        "CL:0000000": 0,
+        "CL:0000255": 1,
+        "CL:0000540": 2,
+        "CL:0000404": 2,
+    },
+    "longest_path_lengths_from_cell_root": {
+        "CL:0000000": 0,
+        "CL:0000255": 1,
+        "CL:0000540": 2,
+        "CL:0000404": 2,
+    },
+}
 
 NP_RANDOM_STATE = np.random.RandomState(0)
 
@@ -313,6 +345,9 @@ class TestCasClient:
                     "is_default_model": True,
                     "embedding_dimension": 512,
                     "description": "",
+                    "ontological_columns": [
+                        {"ontology_resource_name": TEST_ONTOLOGY_RESOURCE_NAME, "column_name": "cl_scores"}
+                    ],
                 }
             ],
         )
@@ -409,12 +444,12 @@ class TestCasClient:
                 {
                     "query_cell_id": f"cell{i}",
                     "matches": [
-                        {"score": 1, "cell_type_ontology_term_id": "CL_0000000", "cell_type": "cell"},
-                        {"score": 0.9, "cell_type_ontology_term_id": "CL_0000540", "cell_type": "neuron"},
-                        {"score": 0.6, "cell_type_ontology_term_id": "CL_0000255", "cell_type": "eukaryotic cell"},
+                        {"score": 1, "cell_type_ontology_term_id": "CL:0000000", "cell_type": "cell"},
+                        {"score": 0.9, "cell_type_ontology_term_id": "CL:0000540", "cell_type": "neuron"},
+                        {"score": 0.6, "cell_type_ontology_term_id": "CL:0000255", "cell_type": "eukaryotic cell"},
                         {
                             "score": 0.5,
-                            "cell_type_ontology_term_id": "CL_0000404",
+                            "cell_type_ontology_term_id": "CL:0000404",
                             "cell_type": "electrically signaling cell",
                         },
                     ],
@@ -425,6 +460,98 @@ class TestCasClient:
                 for i in range(num_cells)
             ],
         )
+
+    def __mock_cell_ontology_resource(self):
+        """
+        Mocks the GET call for the cell ontology resource endpoint.
+        """
+        self.__mock_response(
+            url=f"{TEST_URL}/api/cellarium-general/cell-ontology-resource/{TEST_ONTOLOGY_RESOURCE_NAME}",
+            status_code=200,
+            response_body=TEST_ONTOLOGY_RESOURCE,
+        )
+
+    def test_insert_ontology_aware_response(self):
+        num_cells = 10
+        self.__mock_constructor_calls()
+        self.__mock_annotate_matrix_cell_type_ontology_aware_strategy_calls(num_cells=num_cells)
+        self.__mock_cell_ontology_resource()
+
+        cas_client = CASClient(api_token=TEST_TOKEN, api_url=TEST_URL)
+        adata = self.__mock_anndata_matrix(num_cells=num_cells)
+        response = cas_client.annotate_matrix_cell_type_ontology_aware_strategy(matrix=adata, chunk_size=10)
+        cas_client.insert_ontology_aware_response(response, adata)
+
+        from cellarium.cas.postprocessing.ontology_aware import (
+            CAS_CL_SCORES_ANNDATA_OBSM_KEY,
+            CAS_METADATA_ANNDATA_UNS_KEY,
+        )
+
+        assert CAS_CL_SCORES_ANNDATA_OBSM_KEY in adata.obsm
+        assert CAS_METADATA_ANNDATA_UNS_KEY in adata.uns
+        assert adata.uns[CAS_METADATA_ANNDATA_UNS_KEY]["ontology_resource_name"] == TEST_ONTOLOGY_RESOURCE_NAME
+        assert adata.obsm[CAS_CL_SCORES_ANNDATA_OBSM_KEY].shape == (num_cells, len(TEST_CL_NAMES))
+
+    def test_ontology_cache_is_reused(self):
+        """Verify that get_cell_ontology_resource is only called once even when _get_ontology_cache is called twice."""
+        self.__mock_constructor_calls()
+        self.__mock_cell_ontology_resource()
+
+        cas_client = CASClient(api_token=TEST_TOKEN, api_url=TEST_URL)
+        cl1 = cas_client._get_ontology_cache(TEST_ONTOLOGY_RESOURCE_NAME)
+        cl2 = cas_client._get_ontology_cache(TEST_ONTOLOGY_RESOURCE_NAME)
+
+        assert cl1 is cl2
+        verify(requests, times=1).get(
+            url=f"{TEST_URL}/api/cellarium-general/cell-ontology-resource/{TEST_ONTOLOGY_RESOURCE_NAME}",
+            headers=ANY,
+        )
+
+    def test_compute_most_granular_top_k_calls_single(self):
+        num_cells = 10
+        self.__mock_constructor_calls()
+        self.__mock_annotate_matrix_cell_type_ontology_aware_strategy_calls(num_cells=num_cells)
+        self.__mock_cell_ontology_resource()
+
+        cas_client = CASClient(api_token=TEST_TOKEN, api_url=TEST_URL)
+        adata = self.__mock_anndata_matrix(num_cells=num_cells)
+        response = cas_client.annotate_matrix_cell_type_ontology_aware_strategy(matrix=adata, chunk_size=10)
+        cas_client.insert_ontology_aware_response(response, adata)
+        cas_client.compute_most_granular_top_k_calls_single(adata=adata, min_acceptable_score=0.2, top_k=3)
+
+        for k in range(1, 4):
+            assert f"cas_cell_type_score_{k}" in adata.obs
+            assert f"cas_cell_type_name_{k}" in adata.obs
+            assert f"cas_cell_type_label_{k}" in adata.obs
+        assert len(adata.obs) == num_cells
+
+    def test_compute_most_granular_top_k_calls_cluster(self):
+        import pandas as pd
+
+        num_cells = 10
+        self.__mock_constructor_calls()
+        self.__mock_annotate_matrix_cell_type_ontology_aware_strategy_calls(num_cells=num_cells)
+        self.__mock_cell_ontology_resource()
+
+        cas_client = CASClient(api_token=TEST_TOKEN, api_url=TEST_URL)
+        adata = self.__mock_anndata_matrix(num_cells=num_cells)
+        # add a categorical cluster_label column required by compute_most_granular_top_k_calls_cluster
+        adata.obs["cluster_label"] = pd.Categorical(["A"] * 5 + ["B"] * 5)
+
+        response = cas_client.annotate_matrix_cell_type_ontology_aware_strategy(matrix=adata, chunk_size=10)
+        cas_client.insert_ontology_aware_response(response, adata)
+        cas_client.compute_most_granular_top_k_calls_cluster(
+            adata=adata,
+            min_acceptable_score=0.2,
+            cluster_label_obs_column="cluster_label",
+            top_k=3,
+            obs_prefix="cas_cluster_type",
+        )
+
+        for k in range(1, 4):
+            assert f"cas_cluster_type_score_{k}" in adata.obs
+            assert f"cas_cluster_type_name_{k}" in adata.obs
+            assert f"cas_cluster_type_label_{k}" in adata.obs
 
     def __mock_search_nearest_neighbor_by_matrix_calls(self, num_cells: int = 3, num_features: int = 3):
         """
