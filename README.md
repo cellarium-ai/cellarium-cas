@@ -30,3 +30,21 @@ It is even easier to go through the quickstart tutorial on Google Colab. Remembe
 
 # Documentation
 Please visit the project's [ReadTheDocs page](https://cellarium-cas.readthedocs.io/) for additional documentation.
+
+# Citation
+If the Cellarium Cell Annotation Service (CAS) contributes to your research, please cite our preprint to help others discover the project. You can reference it as follows:
+
+> Stephen R Williams, Fedor Grab, Govinda M Kamath, Yerdos Ordabayev, Jeff Mellen, Patrick Roelli, Kristian Cibulskis, Erik Lehnert, Fen Xie, Miguel Covarrubias, Nur-Taz Rahman, Timothy Tickle, Emre Erhan, Nicolas Malfroy-Camine, Kevin Lydon, Mehrtash Babadi, Nigel F. Delaney. 2025. *Accelerating scRNA-seq Analysis: Automated cell type annotation using representation learning and vector search.* bioRxiv. https://doi.org/10.1101/2025.10.06.680787
+
+BibTeX users can cite CAS with:
+
+```
+@article{cellarium_10x_cas,
+  author = {Williams, Stephen R. and Grab, Fedor and Kamath, Govinda M. and Ordabayev, Yerdos and Mellen, Jeff and Roelli, Patrick and Cibulskis, Kristian and Lehnert, Erik and Xie, Fen and Covarrubias, Miguel and Rahman, Nur-Taz and Tickle, Timothy and Erhan, Emre and Malfroy-Camine, Nicolas and Lydon, Kevin and Babadi, Mehrtash and Delaney, Nigel F.},
+  title = {Accelerating scRNA-seq Analysis: Automated cell type annotation using representation learning and vector search},
+  journal = {bioRxiv},
+  year = {2025},
+  doi = {10.1101/2025.10.06.680787},
+  url = {https://www.biorxiv.org/content/10.1101/2025.10.06.680787v1}
+}
+```
