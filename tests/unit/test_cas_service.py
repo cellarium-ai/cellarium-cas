@@ -97,6 +97,37 @@ class TestCasService:
         with pytest.raises(exceptions.HTTPError403, match="Unauthorized"):
             self.cas_service.get_feature_schema_by(name="schema1")
 
+    def test_get_cell_ontology_resource(self):
+        resource_name = "human_cl_v2024"
+        response_body = {
+            "cl_names": ["CL:0000000", "CL:0000540"],
+            "cell_ontology_term_id_to_cell_type": {"CL:0000000": "cell", "CL:0000540": "neuron"},
+            "children_dictionary": {"CL:0000000": ["CL:0000540"], "CL:0000540": []},
+            "shortest_path_lengths_from_cell_root": {"CL:0000000": 0, "CL:0000540": 1},
+            "longest_path_lengths_from_cell_root": {"CL:0000000": 0, "CL:0000540": 1},
+        }
+        self._mock_response(
+            url=f"{TEST_URL}/api/cellarium-general/cell-ontology-resource/{resource_name}",
+            token=TEST_TOKEN,
+            status_code=200,
+            response_body=response_body,
+        )
+
+        result = self.cas_service.get_cell_ontology_resource(resource_name)
+        assert result == response_body
+
+    def test_get_cell_ontology_resource_not_found(self):
+        resource_name = "nonexistent_resource"
+        self._mock_response(
+            url=f"{TEST_URL}/api/cellarium-general/cell-ontology-resource/{resource_name}",
+            token=TEST_TOKEN,
+            status_code=404,
+            response_body={"detail": "Not found"},
+        )
+
+        with pytest.raises(exceptions.HTTPError404, match="Not found"):
+            self.cas_service.get_cell_ontology_resource(resource_name)
+
     def _mock_response(self, url: str, token: str, status_code: int, response_body: t.Union[dict, list]):
         response = mock(requests.Response)
         response.status_code = status_code

@@ -65,7 +65,8 @@ def convert_cas_ontology_aware_response_to_score_matrix(
 def insert_cas_ontology_aware_response_into_adata(
     cas_ontology_aware_response: CellTypeOntologyAwareResults,
     adata: AnnData,
-    cl: t.Optional[CellOntologyCache] = None,
+    cl: CellOntologyCache,
+    ontology_resource_name: t.Optional[str] = None,
 ) -> None:
     """
     Inserts Cellarium CAS ontology aware response into `obsm` property of a provided AnnData file as a
@@ -80,14 +81,18 @@ def insert_cas_ontology_aware_response_into_adata(
     :param cl: The CellOntologyCache object containing cell ontology term names and labels.
     :type cl: CellOntologyCache
 
+    :param ontology_resource_name: Optional name of the ontology resource, stored in adata.uns for later use.
+    :type ontology_resource_name: str, optional
+
     :return: None
     """
-    if cl is None:
-        cl = CellOntologyCache()
     adata.obsm[CAS_CL_SCORES_ANNDATA_OBSM_KEY] = convert_cas_ontology_aware_response_to_score_matrix(
         adata, cas_ontology_aware_response, cl
     )
-    adata.uns[CAS_METADATA_ANNDATA_UNS_KEY] = {"cl_names": cl.cl_names, "cl_labels": cl.cl_labels}
+    cas_metadata = {"cl_names": cl.cl_names, "cl_labels": cl.cl_labels}
+    if ontology_resource_name is not None:
+        cas_metadata["ontology_resource_name"] = ontology_resource_name
+    adata.uns[CAS_METADATA_ANNDATA_UNS_KEY] = cas_metadata
 
 
 class CellOntologyScoresAggregationOp(Enum):
@@ -225,7 +230,7 @@ def convert_aggregated_cell_ontology_scores_to_rooted_tree(
         if fraction_dict[node_name] <= min_fraction:
             return node_dict
         node_dict[node_name] = {"score": score_dict[node_name], "fraction": fraction_dict[node_name]}
-        children_nodes = list(cl.cl_graph.successors(node_name))
+        children_nodes = cl.children_dict.get(node_name, [])
         if len(children_nodes) > 0:
             node_dict[node_name]["children"] = OrderedDict()
             for children_node_name in children_nodes:

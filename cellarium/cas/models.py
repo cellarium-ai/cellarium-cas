@@ -71,6 +71,8 @@ class CellTypeOntologyAwareResults(BaseModel):
     Represents the data object returned by the CAS API for a ontology-aware annotations.
     """
 
+    model_config = {"protected_namespaces": ()}
+
     class Match(BaseModel):
         score: float = Field(description="The score of the match", examples=[0.789])
         cell_type_ontology_term_id: str = Field(
@@ -94,6 +96,7 @@ class CellTypeOntologyAwareResults(BaseModel):
         )
 
     data: t.List["CellTypeOntologyAwareResults.OntologyAwareAnnotation"] = Field(description="The annotations found")
+    model_name: t.Optional[str] = Field(default=None, description="The model name used to produce this response")
 
 
 CellTypeOntologyAwareResults.model_rebuild()
@@ -186,3 +189,33 @@ class CellQueryResults(BaseModel):
 
 
 CellQueryResults.model_rebuild()
+
+
+class CellOntologyResource(BaseModel):
+    """
+    Represents the precomputed cell ontology resource served by the CAS backend.
+    """
+
+    cl_names: t.List[str] = Field(description="Ordered list of cell ontology term IDs")
+    cell_ontology_term_id_to_cell_type: t.Dict[str, str] = Field(
+        description="Mapping from cell ontology term ID to human-readable cell type name"
+    )
+    children_dictionary: t.Dict[str, t.List[str]] = Field(
+        description="Mapping from each term ID to its direct children term IDs"
+    )
+    shortest_path_lengths_from_cell_root: t.Dict[str, int] = Field(
+        description="Shortest path length from CL_0000000 to each term"
+    )
+    longest_path_lengths_from_cell_root: t.Dict[str, int] = Field(
+        description="Longest path length from CL_0000000 to each term"
+    )
+
+
+class OntologicalColumnInfo(BaseModel):
+    """
+    Represents ontological column metadata for a CAS model.
+    """
+
+    ontology_resource_name: str
+    column_name: str
+    description: t.Optional[str] = None
