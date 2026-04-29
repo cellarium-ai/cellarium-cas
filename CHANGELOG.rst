@@ -21,6 +21,24 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
   Fixed
   ~~~~~
 
+1.8.0 - 2026-04-29
+------------------
+
+Added
+~~~~~
+- Added ``insert_ontology_aware_response``, ``compute_most_granular_top_k_calls_single``, and ``compute_most_granular_top_k_calls_cluster`` convenience methods to ``CASClient`` that automatically fetch and cache the cell ontology resource for the active model
+- Added ``get_cell_ontology_resource`` method to ``CASAPIService`` to retrieve precomputed cell ontology resources from the backend by name
+- Added new ``CELL_ONTOLOGY_RESOURCE`` endpoint constant
+- Added ``CellOntologyResource`` and ``OntologicalColumnInfo`` Pydantic models
+- Added ``model_name`` field to ``CellTypeOntologyAwareResults``
+
+Changed
+~~~~~~~
+- ``CellOntologyCache`` now accepts a precomputed resource dictionary from the backend instead of loading an OWL file; removed ``owlready2`` and ``networkx`` runtime dependencies
+- Removed ``owlready2`` and ``networkx`` from ``requirements/base.txt``
+- Increased ``MAX_NUM_REQUESTS_AT_A_TIME`` from 8 to 15
+- Removed ``cas_model_name`` parameter from postprocessing methods; model name is now carried in ``CellTypeOntologyAwareResults.model_name``
+
 1.7.5 - 2026-04-03
 ------------------
 
