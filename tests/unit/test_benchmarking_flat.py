@@ -110,43 +110,44 @@ def test_compute_flat_metrics_perfect_predictions_accuracy_1(perfect_predictions
     gts, preds = perfect_predictions
     df = compute_flat_metrics(gts, preds, top_k=1)
     assert len(df) == 1
-    assert df.loc[0, "k"] == 1
-    assert df.loc[0, "accuracy"] == pytest.approx(1.0)
+    assert df.loc[0, "top_1_accuracy"] == pytest.approx(1.0)
 
 
 def test_compute_flat_metrics_all_wrong_accuracy_0_at_k1(all_wrong_predictions):
     gts, preds = all_wrong_predictions
     df = compute_flat_metrics(gts, preds, top_k=1)
-    assert df.loc[0, "accuracy"] == pytest.approx(0.0)
+    assert df.loc[0, "top_1_accuracy"] == pytest.approx(0.0)
 
 
 def test_compute_flat_metrics_top2_hit_accuracy_at_k2(top2_hit_predictions):
     gts, preds = top2_hit_predictions
     df = compute_flat_metrics(gts, preds, top_k=2)
     # At k=1: all wrong (GT is at rank-2)
-    assert df.loc[df["k"] == 1, "accuracy"].values[0] == pytest.approx(0.0)
+    assert df.loc[0, "top_1_accuracy"] == pytest.approx(0.0)
     # At k=2: all correct
-    assert df.loc[df["k"] == 2, "accuracy"].values[0] == pytest.approx(1.0)
+    assert df.loc[0, "top_2_accuracy"] == pytest.approx(1.0)
 
 
-def test_compute_flat_metrics_returns_all_k_rows(perfect_predictions):
+def test_compute_flat_metrics_returns_all_k_columns(perfect_predictions):
     gts, preds = perfect_predictions
     df = compute_flat_metrics(gts, preds, top_k=3)
-    assert list(df["k"]) == [1, 2, 3]
+    assert len(df) == 1
+    for k in range(1, 4):
+        assert f"top_{k}_accuracy" in df.columns
 
 
 def test_compute_flat_metrics_columns_present(perfect_predictions):
     gts, preds = perfect_predictions
     df = compute_flat_metrics(gts, preds, top_k=1)
     expected_cols = {
-        "k",
-        "accuracy",
-        "macro_f1",
-        "weighted_f1",
-        "macro_precision",
-        "weighted_precision",
-        "macro_recall",
-        "weighted_recall",
+        "n_cells",
+        "top_1_accuracy",
+        "top_1_macro_f1",
+        "top_1_weighted_f1",
+        "top_1_macro_precision",
+        "top_1_weighted_precision",
+        "top_1_macro_recall",
+        "top_1_weighted_recall",
     }
     assert expected_cols.issubset(set(df.columns))
 
@@ -154,7 +155,10 @@ def test_compute_flat_metrics_columns_present(perfect_predictions):
 def test_compute_flat_metrics_top_k_inferred_when_none(perfect_predictions):
     gts, preds = perfect_predictions
     df = compute_flat_metrics(gts, preds)  # top_k=None → infer from min pred length
-    assert len(df) == 3  # all pred lists have length 3
+    assert len(df) == 1
+    # all pred lists have length 3, so top_1 through top_3 columns should exist
+    for k in range(1, 4):
+        assert f"top_{k}_accuracy" in df.columns
 
 
 def test_compute_flat_metrics_length_mismatch_raises():

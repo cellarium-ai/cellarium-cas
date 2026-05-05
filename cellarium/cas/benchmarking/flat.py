@@ -85,8 +85,10 @@ def compute_flat_metrics(
         correct/incorrect flags at each k.
 
     :return:
-        - Summary (``cell_level=False``): DataFrame with columns
-          ``k, accuracy, macro_f1, weighted_f1, macro_precision, weighted_precision, macro_recall, weighted_recall``.
+        - Summary (``cell_level=False``): DataFrame with a single row and columns
+          ``n_cells``, ``top_{k}_accuracy``, ``top_{k}_macro_f1``, ``top_{k}_weighted_f1``,
+          ``top_{k}_macro_precision``, ``top_{k}_weighted_precision``, ``top_{k}_macro_recall``,
+          ``top_{k}_weighted_recall`` for k in 1..``top_k``.
         - Cell-level (``cell_level=True``): DataFrame with columns
           ``cell_index, ground_truth, k, effective_prediction, correct``.
 
@@ -122,23 +124,20 @@ def compute_flat_metrics(
                 )
         return pd.DataFrame(rows)
 
-    summary_rows = []
+    summary: t.Dict[str, t.Any] = {"n_cells": n_cells}
     for k in range(1, top_k + 1):
         gts, effective_preds = _effective_predictions_at_k(ground_truths, predictions, k)
-
         accuracy = sum(gt in preds[:k] for gt, preds in zip(ground_truths, predictions)) / n_cells
-
-        summary_rows.append(
-            {
-                "k": k,
-                "accuracy": accuracy,
-                "macro_f1": f1_score(gts, effective_preds, average="macro", zero_division=0),
-                "weighted_f1": f1_score(gts, effective_preds, average="weighted", zero_division=0),
-                "macro_precision": precision_score(gts, effective_preds, average="macro", zero_division=0),
-                "weighted_precision": precision_score(gts, effective_preds, average="weighted", zero_division=0),
-                "macro_recall": recall_score(gts, effective_preds, average="macro", zero_division=0),
-                "weighted_recall": recall_score(gts, effective_preds, average="weighted", zero_division=0),
-            }
+        summary[f"top_{k}_accuracy"] = accuracy
+        summary[f"top_{k}_macro_f1"] = f1_score(gts, effective_preds, average="macro", zero_division=0)
+        summary[f"top_{k}_weighted_f1"] = f1_score(gts, effective_preds, average="weighted", zero_division=0)
+        summary[f"top_{k}_macro_precision"] = precision_score(gts, effective_preds, average="macro", zero_division=0)
+        summary[f"top_{k}_weighted_precision"] = precision_score(
+            gts, effective_preds, average="weighted", zero_division=0
+        )
+        summary[f"top_{k}_macro_recall"] = recall_score(gts, effective_preds, average="macro", zero_division=0)
+        summary[f"top_{k}_weighted_recall"] = recall_score(
+            gts, effective_preds, average="weighted", zero_division=0
         )
 
-    return pd.DataFrame(summary_rows)
+    return pd.DataFrame([summary])
