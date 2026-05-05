@@ -78,7 +78,7 @@ Retrieve it from the backend with the same model that produced the response:
 
 ``ontology_resource`` is a plain dictionary with keys ``cl_names``,
 ``children_dictionary``, and others — exactly the format expected by
-:func:`~cellarium.cas.benchmarking.compute_ontology_aware_metrics`.
+``compute_ontology_aware_metrics``.
 
 Run the metric
 --------------
