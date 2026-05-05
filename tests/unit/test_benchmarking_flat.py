@@ -178,18 +178,18 @@ def test_compute_flat_metrics_empty_returns_empty_df():
 def test_compute_flat_metrics_cell_level_shape(perfect_predictions):
     gts, preds = perfect_predictions
     df = compute_flat_metrics(gts, preds, top_k=2, cell_level=True)
-    # 4 cells × 2 k values = 8 rows
-    assert len(df) == 8
+    # one row per cell
+    assert len(df) == 4
 
 
 def test_compute_flat_metrics_cell_level_columns(perfect_predictions):
     gts, preds = perfect_predictions
     df = compute_flat_metrics(gts, preds, top_k=1, cell_level=True)
-    assert set(df.columns) == {"cell_index", "ground_truth", "k", "effective_prediction", "correct"}
+    assert set(df.columns) == {"cell_index", "ground_truth", "top_1_effective_prediction", "top_1_correct"}
 
 
 def test_compute_flat_metrics_cell_level_correct_flags(perfect_predictions):
     gts, preds = perfect_predictions
     df = compute_flat_metrics(gts, preds, top_k=1, cell_level=True)
     # All top-1 are correct for perfect_predictions
-    assert df["correct"].all()
+    assert df["top_1_correct"].all()

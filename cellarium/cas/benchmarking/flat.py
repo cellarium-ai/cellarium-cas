@@ -90,7 +90,8 @@ def compute_flat_metrics(
           ``top_{k}_macro_precision``, ``top_{k}_weighted_precision``, ``top_{k}_macro_recall``,
           ``top_{k}_weighted_recall`` for k in 1..``top_k``.
         - Cell-level (``cell_level=True``): DataFrame with columns
-          ``cell_index, ground_truth, k, effective_prediction, correct``.
+          ``cell_index``, ``ground_truth``, ``top_{k}_effective_prediction``, ``top_{k}_correct``
+          for k in 1..``top_k``.
 
     :raises ValueError: If ``len(ground_truths) != len(predictions)``.
     """
@@ -109,20 +110,15 @@ def compute_flat_metrics(
         top_k = min(pred_lengths) if pred_lengths else 1
 
     if cell_level:
-        rows = []
+        cell_rows: t.List[t.Dict[str, t.Any]] = [
+            {"cell_index": i, "ground_truth": gt} for i, gt in enumerate(ground_truths)
+        ]
         for k in range(1, top_k + 1):
             _, effective_preds = _effective_predictions_at_k(ground_truths, predictions, k)
             for i, (gt, eff_pred) in enumerate(zip(ground_truths, effective_preds)):
-                rows.append(
-                    {
-                        "cell_index": i,
-                        "ground_truth": gt,
-                        "k": k,
-                        "effective_prediction": eff_pred,
-                        "correct": gt == eff_pred,
-                    }
-                )
-        return pd.DataFrame(rows)
+                cell_rows[i][f"top_{k}_effective_prediction"] = eff_pred
+                cell_rows[i][f"top_{k}_correct"] = gt == eff_pred
+        return pd.DataFrame(cell_rows)
 
     summary: t.Dict[str, t.Any] = {"n_cells": n_cells}
     for k in range(1, top_k + 1):
@@ -136,8 +132,6 @@ def compute_flat_metrics(
             gts, effective_preds, average="weighted", zero_division=0
         )
         summary[f"top_{k}_macro_recall"] = recall_score(gts, effective_preds, average="macro", zero_division=0)
-        summary[f"top_{k}_weighted_recall"] = recall_score(
-            gts, effective_preds, average="weighted", zero_division=0
-        )
+        summary[f"top_{k}_weighted_recall"] = recall_score(gts, effective_preds, average="weighted", zero_division=0)
 
     return pd.DataFrame([summary])
