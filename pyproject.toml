@@ -37,5 +37,8 @@ readme = {file = ["README.md"], content-type = "text/markdown"}
 [tool.setuptools-git-versioning]
 enabled = true
 
+[project.scripts]
+cellarium-cas = "cellarium.cas.cli.main:cli"
+
 [tool.black]
 line-length = 120
