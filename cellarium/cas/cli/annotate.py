@@ -74,8 +74,9 @@ def annotate(
         ``output_dir``, ``ontology_response_path``, and optionally
         ``ontology_resource_path``, ``inferred_labels_path``, ``metadata_path``.
     """
-    import anndata
     import pandas as pd
+
+    from cellarium.cas._io import read_h5_or_h5ad
 
     output_dir_path = Path(output_dir)
     output_dir_path.mkdir(parents=True, exist_ok=True)
@@ -84,7 +85,7 @@ def annotate(
         count_matrix_input.upper() if count_matrix_input != "raw.X" else count_matrix_input
     ]
 
-    adata = anndata.read_h5ad(input_path)
+    adata = read_h5_or_h5ad(input_path)
 
     client_kwargs: t.Dict[str, t.Any] = {"api_token": cas_api_token}
     if cas_api_url is not None:
@@ -131,7 +132,7 @@ def annotate(
 
     if save_metadata:
         metadata_dict = {
-            "input_path": str(Path(input_path).resolve()),
+            "input_path": str(input_path),
             "model_name": resolved_model_name,
             "n_cells": len(adata),
             "ontology_resource_name": ontology_resource_name,
@@ -143,7 +144,10 @@ def annotate(
 
 @click.command("annotate")
 @click.option(
-    "--input-path", required=True, type=click.Path(exists=True, dir_okay=False), help="Path to input .h5ad file."
+    "--input-path",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False),
+    help="Path to input .h5ad or .h5 (Cell Ranger HDF5) file.",
 )
 @click.option(
     "--output-dir", required=True, type=click.Path(file_okay=False), help="Directory to write output files into."

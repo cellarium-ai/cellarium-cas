@@ -30,10 +30,10 @@ from ._io import (
 
 
 def run_flat_benchmark(
-        annotate_dirs: t.Union[str, Path],
-        gt_column_name: str,
-        output_dir: t.Union[str, Path],
-        save_cell_level: bool = False,
+    annotate_dirs: t.Union[str, Path],
+    gt_column_name: str,
+    output_dir: t.Union[str, Path],
+    save_cell_level: bool = False,
 ) -> t.Dict[str, t.Any]:
     """
     Compute flat classification metrics across one or more annotate output directories.
@@ -102,11 +102,11 @@ def run_flat_benchmark(
 
 
 def run_ontology_aware_benchmark(
-        annotate_dirs: t.Union[str, Path],
-        gt_cl_column_name: str,
-        output_dir: t.Union[str, Path],
-        num_hops: int = 4,
-        save_cell_level: bool = False,
+    annotate_dirs: t.Union[str, Path],
+    gt_cl_column_name: str,
+    output_dir: t.Union[str, Path],
+    num_hops: int = 4,
+    save_cell_level: bool = False,
 ) -> t.Dict[str, t.Any]:
     """
     Compute ontology-aware metrics across one or more annotate output directories.
@@ -231,8 +231,8 @@ def benchmark_group() -> None:
     required=True,
     type=click.Path(exists=True),
     help=(
-            "Path to a parent directory whose subdirectories are annotate output dirs, "
-            "or a .txt file listing one annotate output directory path per line."
+        "Path to a parent directory whose subdirectories are annotate output dirs, "
+        "or a .txt file listing one annotate output directory path per line."
     ),
 )
 @click.option(
@@ -251,10 +251,10 @@ def benchmark_group() -> None:
     help="Also save per-directory cell-level metric CSVs.",
 )
 def flat_command(
-        annotate_dirs: str,
-        gt_column_name: str,
-        output_dir: str,
-        save_cell_level: bool,
+    annotate_dirs: str,
+    gt_column_name: str,
+    output_dir: str,
+    save_cell_level: bool,
 ) -> None:
     """Compute flat classification metrics across one or more annotate output directories."""
     try:
@@ -276,8 +276,8 @@ def flat_command(
     required=True,
     type=click.Path(exists=True),
     help=(
-            "Path to a parent directory whose subdirectories are annotate output dirs, "
-            "or a .txt file listing one annotate output directory path per line."
+        "Path to a parent directory whose subdirectories are annotate output dirs, "
+        "or a .txt file listing one annotate output directory path per line."
     ),
 )
 @click.option(
@@ -299,11 +299,11 @@ def flat_command(
     help="Also save per-directory cell-level metric CSVs.",
 )
 def ontology_aware_command(
-        annotate_dirs: str,
-        gt_cl_column_name: str,
-        output_dir: str,
-        num_hops: int,
-        save_cell_level: bool,
+    annotate_dirs: str,
+    gt_cl_column_name: str,
+    output_dir: str,
+    num_hops: int,
+    save_cell_level: bool,
 ) -> None:
     """Compute ontology-aware metrics across one or more annotate output directories."""
     try:
