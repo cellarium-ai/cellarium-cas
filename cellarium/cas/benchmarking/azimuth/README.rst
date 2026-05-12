@@ -93,7 +93,7 @@ Save it locally, e.g. as ``crosswalk.csv``.
 **Step 4 — Convert Azimuth labels to CAS inferred_labels format**
 ::
 
-    python benchmarking/azimuth/helpers/map_azimuth_to_cas_labels.py \
+    python cellarium/cas/benchmarking/azimuth/helpers/map_azimuth_to_cas_labels.py \
         --azimuth-csv            /data/azimuth_output.csv \
         --h5ad-path              /data/my_dataset.h5ad \
         --output-dir             /data/azimuth_annotate_dir \
@@ -116,7 +116,7 @@ This step requires an ``ontology_resource.json`` file, which is saved by
 ``cellarium-cas annotate --save-ontology-resource`` for the same CAS model used in
 your benchmarking run::
 
-    python benchmarking/azimuth/helpers/build_ontology_response.py \
+    python cellarium/cas/benchmarking/azimuth/helpers/build_ontology_response.py \
         --azimuth-csv            /data/azimuth_output.csv \
         --h5ad-path              /data/my_dataset.h5ad \
         --output-path            /data/azimuth_annotate_dir/ontology_response.json \

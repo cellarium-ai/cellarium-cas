@@ -7,7 +7,7 @@ Usage
 -----
 ::
 
-    python helpers/map_azimuth_to_cas_labels.py \\
+    python cellarium/cas/benchmarking/azimuth/helpers/map_azimuth_to_cas_labels.py \\
         --azimuth-csv      /data/azimuth_output.csv \\
         --h5ad-path        /data/my_dataset.h5ad \\
         --output-dir       /data/azimuth_annotate_dir \\
@@ -82,8 +82,7 @@ def map_azimuth_to_cas_labels(
     if missing_barcodes:
         sample = sorted(missing_barcodes)[:5]
         raise ValueError(
-            f"{len(missing_barcodes)} barcodes from h5ad not found in Azimuth CSV "
-            f"(first {len(sample)}): {sample}"
+            f"{len(missing_barcodes)} barcodes from h5ad not found in Azimuth CSV " f"(first {len(sample)}): {sample}"
         )
     azimuth_df = azimuth_df.reindex(obs_names)
 
@@ -91,8 +90,7 @@ def map_azimuth_to_cas_labels(
     for col in (crosswalk_azimuth_col, crosswalk_cl_id_col):
         if col not in crosswalk_df.columns:
             raise ValueError(
-                f"Column '{col}' not found in crosswalk CSV. "
-                f"Available columns: {list(crosswalk_df.columns)}"
+                f"Column '{col}' not found in crosswalk CSV. " f"Available columns: {list(crosswalk_df.columns)}"
             )
     crosswalk_map: t.Dict[str, str] = dict(
         zip(crosswalk_df[crosswalk_azimuth_col].astype(str), crosswalk_df[crosswalk_cl_id_col].astype(str))
@@ -121,7 +119,7 @@ def map_azimuth_to_cas_labels(
                     )
                     warned_missing.add(label_str)
 
-            score = float(azimuth_score) if azimuth_score is not None and azimuth_score == azimuth_score else None
+            score = float(azimuth_score) if azimuth_score is not None and not pd.isna(azimuth_score) else None
 
             row[f"cas_cell_type_label_{rank}"] = cl_id
             row[f"cas_cell_type_score_{rank}"] = score

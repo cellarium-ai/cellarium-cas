@@ -4,7 +4,7 @@ Convert a .h5ad file to 10x Genomics sparse matrix format (matrix.mtx.gz,
 barcodes.tsv.gz, features.tsv.gz) for consumption by Seurat / Azimuth.
 
 Usage:
-    python helpers/convert_h5ad.py <input_h5ad_path> <output_dir>
+    python cellarium/cas/benchmarking/azimuth/helpers/convert_h5ad.py <input_h5ad_path> <output_dir>
 """
 
 import gzip

@@ -22,7 +22,7 @@ Usage
 -----
 ::
 
-    python helpers/build_ontology_response.py \\
+    python cellarium/cas/benchmarking/azimuth/helpers/build_ontology_response.py \\
         --azimuth-csv            /data/azimuth_output.csv \\
         --h5ad-path              /data/my_dataset.h5ad \\
         --output-path            /data/azimuth_annotate_dir/ontology_response.json \\
@@ -49,9 +49,9 @@ import warnings
 from pathlib import Path
 
 import click
+
 from cellarium.cas.models import CellTypeOntologyAwareResults
 from cellarium.cas.postprocessing.cell_ontology.cell_ontology_cache import CellOntologyCache
-
 
 
 def _build_parents_map(children_dict: t.Dict[str, t.List[str]]) -> t.Dict[str, t.List[str]]:
@@ -119,8 +119,7 @@ def build_ontology_response(
     if missing_barcodes:
         sample = sorted(missing_barcodes)[:5]
         raise ValueError(
-            f"{len(missing_barcodes)} barcodes from h5ad not found in Azimuth CSV "
-            f"(first {len(sample)}): {sample}"
+            f"{len(missing_barcodes)} barcodes from h5ad not found in Azimuth CSV " f"(first {len(sample)}): {sample}"
         )
     azimuth_df = azimuth_df.reindex(obs_names)
 
@@ -128,8 +127,7 @@ def build_ontology_response(
     for col in (crosswalk_azimuth_col, crosswalk_cl_id_col):
         if col not in crosswalk_df.columns:
             raise ValueError(
-                f"Column '{col}' not found in crosswalk CSV. "
-                f"Available columns: {list(crosswalk_df.columns)}"
+                f"Column '{col}' not found in crosswalk CSV. " f"Available columns: {list(crosswalk_df.columns)}"
             )
     crosswalk_map: t.Dict[str, str] = dict(
         zip(crosswalk_df[crosswalk_azimuth_col].astype(str), crosswalk_df[crosswalk_cl_id_col].astype(str))
@@ -159,10 +157,10 @@ def build_ontology_response(
             azimuth_label = azimuth_df.at[barcode, label_col] if label_col in azimuth_df.columns else None
             azimuth_score = azimuth_df.at[barcode, score_col] if score_col in azimuth_df.columns else None
 
-            score = float(azimuth_score) if azimuth_score is not None and azimuth_score == azimuth_score else 0.0
+            score = float(azimuth_score) if azimuth_score is not None and not pd.isna(azimuth_score) else 0.0
             cl_id: t.Optional[str] = None
 
-            if azimuth_label is not None and azimuth_label == azimuth_label:  # not NaN
+            if azimuth_label is not None and not pd.isna(azimuth_label):
                 label_str = str(azimuth_label)
                 cl_id = crosswalk_map.get(label_str)
                 if cl_id is None:
