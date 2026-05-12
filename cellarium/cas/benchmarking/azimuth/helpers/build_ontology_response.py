@@ -23,21 +23,12 @@ Usage
 ::
 
     python cellarium/cas/benchmarking/azimuth/helpers/build_ontology_response.py \\
-        --azimuth-csv            /data/azimuth_output.csv \\
-        --h5ad-path              /data/my_dataset.h5ad \\
+        --inferred-labels-path   /data/azimuth_annotate_dir/inferred_labels.csv \\
         --output-path            /data/azimuth_annotate_dir/ontology_response.json \\
-        --crosswalk-csv          crosswalk.csv \\
-        --crosswalk-azimuth-col  tool_cell_label \\
-        --crosswalk-cl-id-col    cl_id \\
         --ontology-resource-path /path/to/ontology_resource.json \\
-        --azimuth-ref-name       pbmcref \\
-        --level predicted.celltype.l3:predicted.celltype.l3.score \\
-        --level predicted.celltype.l2:predicted.celltype.l2.score \\
-        --level predicted.celltype.l1:predicted.celltype.l1.score
+        --azimuth-ref-name       pbmcref
 
-``--level`` arguments must be ordered **most granular first**.  Each value is
-``<azimuth_label_column>:<azimuth_score_column>`` as they appear in the Azimuth
-output CSV.
+Run ``map_azimuth_to_cas_labels.py`` first to produce ``inferred_labels.csv``.
 
 The ``--ontology-resource-path`` is the ``ontology_resource.json`` saved by
 ``cellarium-cas annotate --save-ontology-resource``.
@@ -77,26 +68,23 @@ def _get_node_and_ancestors(cl_id: str, parents_map: t.Dict[str, t.List[str]]) -
 
 
 def build_ontology_response(
-    azimuth_csv_path: str,
-    h5ad_path: str,
-    crosswalk_csv_path: str,
-    crosswalk_azimuth_col: str,
-    crosswalk_cl_id_col: str,
-    level_specs: t.List[t.Tuple[str, str]],
+    inferred_labels_path: str,
     cell_ontology_cache: CellOntologyCache,
     azimuth_ref_name: str,
     output_path: str,
 ) -> CellTypeOntologyAwareResults:
     """
-    Build a CAS-compatible ``CellTypeOntologyAwareResults`` from Azimuth annotations.
+    Build a CAS-compatible ``CellTypeOntologyAwareResults`` from an ``inferred_labels.csv``
+    produced by :func:`map_azimuth_to_cas_labels`.
 
-    :param azimuth_csv_path: Path to the Azimuth metadata CSV (row index = barcodes).
-    :param h5ad_path: Path to the source ``.h5ad`` file; used for authoritative cell ordering.
-    :param crosswalk_csv_path: Path to the HRA crosswalk CSV mapping Azimuth labels to CL IDs.
-    :param crosswalk_azimuth_col: Column in the crosswalk containing Azimuth cell type labels.
-    :param crosswalk_cl_id_col: Column in the crosswalk containing CL ontology term IDs.
-    :param level_specs: List of ``(azimuth_label_col, azimuth_score_col)`` tuples ordered
-        **most granular first**.
+    Reads ``cas_cell_type_label_k`` and ``cas_cell_type_score_k`` columns (rank 1 = most
+    granular) and propagates each mapped CL term's score to all its ontology ancestors
+    using ``max``-merge, so ancestor nodes reflect the highest-confidence prediction that
+    flows through them.
+
+    :param inferred_labels_path: Path to ``inferred_labels.csv`` from
+        :func:`map_azimuth_to_cas_labels` (row index = barcodes, columns
+        ``cas_cell_type_label_k`` / ``cas_cell_type_score_k``).
     :param cell_ontology_cache: :class:`~cellarium.cas.postprocessing.cell_ontology.CellOntologyCache`
         instance for ancestor traversal and label lookup.
     :param azimuth_ref_name: Azimuth reference name (e.g. ``"pbmcref"``), written into
@@ -104,34 +92,25 @@ def build_ontology_response(
     :param output_path: Path to write ``ontology_response.json``.
 
     :returns: The constructed :class:`~cellarium.cas.models.CellTypeOntologyAwareResults`.
-    :raises ValueError: If barcodes in the h5ad are missing from the Azimuth CSV, or if
-        required columns are absent from either input CSV.
+    :raises ValueError: If no ``cas_cell_type_label_k`` columns are found.
     """
-    import anndata
+    import re
+
     import pandas as pd
 
-    # --- load inputs ---
-    adata = anndata.read_h5ad(h5ad_path)
-    obs_names = list(adata.obs_names)
+    # --- load inferred labels ---
+    labels_df = pd.read_csv(inferred_labels_path, index_col=0)
+    obs_names = list(labels_df.index)
 
-    azimuth_df = pd.read_csv(azimuth_csv_path, index_col=0)
-    missing_barcodes = set(obs_names) - set(azimuth_df.index)
-    if missing_barcodes:
-        sample = sorted(missing_barcodes)[:5]
-        raise ValueError(
-            f"{len(missing_barcodes)} barcodes from h5ad not found in Azimuth CSV " f"(first {len(sample)}): {sample}"
-        )
-    azimuth_df = azimuth_df.reindex(obs_names)
-
-    crosswalk_df = pd.read_csv(crosswalk_csv_path)
-    for col in (crosswalk_azimuth_col, crosswalk_cl_id_col):
-        if col not in crosswalk_df.columns:
-            raise ValueError(
-                f"Column '{col}' not found in crosswalk CSV. " f"Available columns: {list(crosswalk_df.columns)}"
-            )
-    crosswalk_map: t.Dict[str, str] = dict(
-        zip(crosswalk_df[crosswalk_azimuth_col].astype(str), crosswalk_df[crosswalk_cl_id_col].astype(str))
+    top_k = max(
+        (int(m.group(1)) for col in labels_df.columns if (m := re.match(r"^cas_cell_type_label_(\d+)$", col))),
+        default=0,
     )
+    if top_k == 0:
+        raise ValueError(
+            f"No 'cas_cell_type_label_k' columns found in {inferred_labels_path}. "
+            "Run map_azimuth_to_cas_labels.py first."
+        )
 
     # --- pre-build ancestor traversal structures ---
     parents_map = _build_parents_map(cell_ontology_cache.children_dict)
@@ -144,35 +123,27 @@ def build_ontology_response(
         return ancestors_cache[cl_id]
 
     # --- per-cell processing ---
-    warned_missing_labels: t.Set[str] = set()
     warned_missing_cl_ids: t.Set[str] = set()
     warned_nonlinear_pairs: t.Set[t.Tuple[str, str]] = set()
 
     annotations: t.List[CellTypeOntologyAwareResults.OntologyAwareAnnotation] = []
 
-    for barcode in obs_names:
-        # Resolve (cl_id, score) for each level; None cl_id means unmapped
+    for barcode, row in labels_df.iterrows():
+        # Collect (cl_id, score) per rank; rank 1 = most granular
         level_cl_ids: t.List[t.Tuple[t.Optional[str], float]] = []
-        for label_col, score_col in level_specs:
-            azimuth_label = azimuth_df.at[barcode, label_col] if label_col in azimuth_df.columns else None
-            azimuth_score = azimuth_df.at[barcode, score_col] if score_col in azimuth_df.columns else None
+        for k in range(1, top_k + 1):
+            raw_cl_id = row.get(f"cas_cell_type_label_{k}")
+            raw_score = row.get(f"cas_cell_type_score_{k}")
 
-            score = float(azimuth_score) if azimuth_score is not None and not pd.isna(azimuth_score) else 0.0
+            score = float(raw_score) if raw_score is not None and not pd.isna(raw_score) else 0.0
             cl_id: t.Optional[str] = None
 
-            if azimuth_label is not None and not pd.isna(azimuth_label):
-                label_str = str(azimuth_label)
-                cl_id = crosswalk_map.get(label_str)
-                if cl_id is None:
-                    if label_str not in warned_missing_labels:
-                        warnings.warn(
-                            f"Azimuth label '{label_str}' (column '{label_col}') not found in crosswalk — skipped."
-                        )
-                        warned_missing_labels.add(label_str)
-                elif cl_id not in known_cl_ids:
+            if raw_cl_id is not None and not pd.isna(raw_cl_id):
+                cl_id = str(raw_cl_id)
+                if cl_id not in known_cl_ids:
                     if cl_id not in warned_missing_cl_ids:
                         warnings.warn(
-                            f"CL ID '{cl_id}' from crosswalk is not present in the cell ontology cache — skipped."
+                            f"CL ID '{cl_id}' (rank {k}) is not present in the cell ontology cache — skipped."
                         )
                         warned_missing_cl_ids.add(cl_id)
                     cl_id = None
@@ -238,28 +209,14 @@ def build_ontology_response(
     return result
 
 
-def _parse_level(value: str, param: t.Any, ctx: t.Any) -> t.Tuple[str, str]:
-    parts = value.split(":", 1)
-    if len(parts) != 2:
-        raise click.BadParameter(f"must be in the form LABEL_COL:SCORE_COL, got: '{value}'")
-    return parts[0].strip(), parts[1].strip()
-
-
 @click.command("build-ontology-response")
-@click.option("--azimuth-csv", required=True, type=click.Path(exists=True), help="Path to Azimuth metadata CSV.")
-@click.option("--h5ad-path", required=True, type=click.Path(exists=True), help="Path to source .h5ad file.")
+@click.option(
+    "--inferred-labels-path",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to inferred_labels.csv produced by map_azimuth_to_cas_labels.py.",
+)
 @click.option("--output-path", required=True, type=click.Path(), help="Path to write ontology_response.json.")
-@click.option("--crosswalk-csv", required=True, type=click.Path(exists=True), help="Path to HRA crosswalk CSV.")
-@click.option(
-    "--crosswalk-azimuth-col",
-    required=True,
-    help="Column in crosswalk containing Azimuth cell type labels.",
-)
-@click.option(
-    "--crosswalk-cl-id-col",
-    required=True,
-    help="Column in crosswalk containing CL ontology term IDs.",
-)
 @click.option(
     "--ontology-resource-path",
     required=True,
@@ -274,42 +231,20 @@ def _parse_level(value: str, param: t.Any, ctx: t.Any) -> t.Tuple[str, str]:
     required=True,
     help="Azimuth reference name (e.g. pbmcref). Written into model_name as azimuth_<ref_name>.",
 )
-@click.option(
-    "--level",
-    "levels",
-    multiple=True,
-    required=True,
-    metavar="LABEL_COL:SCORE_COL",
-    callback=lambda ctx, param, values: [_parse_level(v, param, ctx) for v in values],
-    help=(
-        "Azimuth label and score column pair for one annotation level, as "
-        "LABEL_COL:SCORE_COL. Repeat for each level, most granular first."
-    ),
-)
 def main(
-    azimuth_csv: str,
-    h5ad_path: str,
+    inferred_labels_path: str,
     output_path: str,
-    crosswalk_csv: str,
-    crosswalk_azimuth_col: str,
-    crosswalk_cl_id_col: str,
     ontology_resource_path: str,
     azimuth_ref_name: str,
-    levels: t.Tuple[t.Tuple[str, str], ...],
 ) -> None:
-    """Build a CAS-compatible ontology_response.json from Azimuth annotations."""
+    """Build a CAS-compatible ontology_response.json from an inferred_labels.csv."""
     with open(ontology_resource_path) as f:
         ontology_resource = json.load(f)
     cell_ontology_cache = CellOntologyCache(ontology_resource)
 
     try:
         build_ontology_response(
-            azimuth_csv_path=azimuth_csv,
-            h5ad_path=h5ad_path,
-            crosswalk_csv_path=crosswalk_csv,
-            crosswalk_azimuth_col=crosswalk_azimuth_col,
-            crosswalk_cl_id_col=crosswalk_cl_id_col,
-            level_specs=list(levels),
+            inferred_labels_path=inferred_labels_path,
             cell_ontology_cache=cell_ontology_cache,
             azimuth_ref_name=azimuth_ref_name,
             output_path=output_path,

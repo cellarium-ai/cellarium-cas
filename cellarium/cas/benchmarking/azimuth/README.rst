@@ -112,28 +112,15 @@ This produces ``inferred_labels.csv`` and ``metadata.json`` inside the output di
 
 **Step 5 — Build the CAS-compatible ontology response**
 
-This step requires an ``ontology_resource.json`` file, which is saved by
-``cellarium-cas annotate --save-ontology-resource`` for the same CAS model used in
-your benchmarking run::
+This step requires an ``ontology_resource.json`` file (saved by
+``cellarium-cas annotate --save-ontology-resource``) and the
+``inferred_labels.csv`` produced in Step 4::
 
     python cellarium/cas/benchmarking/azimuth/helpers/build_ontology_response.py \
-        --azimuth-csv            /data/azimuth_output.csv \
-        --h5ad-path              /data/my_dataset.h5ad \
+        --inferred-labels-path   /data/azimuth_annotate_dir/inferred_labels.csv \
         --output-path            /data/azimuth_annotate_dir/ontology_response.json \
-        --crosswalk-csv          crosswalk.csv \
-        --crosswalk-azimuth-col  tool_cell_label \
-        --crosswalk-cl-id-col    cl_id \
         --ontology-resource-path /path/to/ontology_resource.json \
-        --azimuth-ref-name       pbmcref \
-        --level predicted.celltype.l3:predicted.celltype.l3.score \
-        --level predicted.celltype.l2:predicted.celltype.l2.score \
-        --level predicted.celltype.l1:predicted.celltype.l1.score
-
-Each Azimuth CL term is propagated to all its ontology ancestors (using the same
-ontology resource as CAS).  Scores are merged with ``max`` so that every ancestor
-reflects the highest-confidence prediction that flows through it.  Crosswalk
-hierarchy violations (where a less-granular term is not a true ancestor of a more-
-granular term) are logged as warnings and propagated independently.
+        --azimuth-ref-name       pbmcref
 
 **Step 6 — Run the benchmark**
 
