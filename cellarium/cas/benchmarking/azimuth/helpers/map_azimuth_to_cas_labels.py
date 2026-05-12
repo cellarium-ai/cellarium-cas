@@ -26,7 +26,8 @@ output CSV.
 Outputs
 -------
 - ``<output_dir>/inferred_labels.csv`` — one row per cell, columns
-  ``cas_cell_type_label_k`` and ``cas_cell_type_score_k`` for each level k.
+  ``cas_cell_type_label_k``, ``cas_cell_type_name_k``, and ``cas_cell_type_score_k``
+  for each level k (matching the CAS annotate output format).
 - ``<output_dir>/metadata.json`` — provenance info (input path, model name, cell count).
 """
 
@@ -47,6 +48,7 @@ def map_azimuth_to_cas_labels(
     crosswalk_cl_id_col: str,
     level_specs: t.List[t.Tuple[str, str]],
     azimuth_ref_name: str,
+    crosswalk_cl_name_col: t.Optional[str] = None,
 ) -> t.Dict[str, str]:
     """
     Convert Azimuth annotations to CAS-compatible ``inferred_labels.csv`` and ``metadata.json``.
@@ -62,6 +64,9 @@ def map_azimuth_to_cas_labels(
         annotation level.
     :param azimuth_ref_name: Azimuth reference name (e.g. ``"pbmcref"``), used to build
         the ``model_name`` field as ``azimuth_<ref_name>``.
+    :param crosswalk_cl_name_col: Optional column in the crosswalk containing the human-readable
+        CL term name (e.g. ``"cl_label"``).  Written to ``cas_cell_type_name_k`` columns.
+        If ``None``, the Azimuth label string is used as the cell type name.
 
     :returns: Dict with ``inferred_labels_path`` and ``metadata_path``.
     :raises ValueError: If barcodes in the h5ad are missing from the Azimuth CSV, or if
@@ -86,6 +91,15 @@ def map_azimuth_to_cas_labels(
         )
     azimuth_df = azimuth_df.reindex(obs_names)
 
+    missing_level_cols = [
+        col for label_col, score_col in level_specs for col in (label_col, score_col) if col not in azimuth_df.columns
+    ]
+    if missing_level_cols:
+        raise ValueError(
+            f"The following level columns are not present in the Azimuth CSV: {missing_level_cols}. "
+            f"Available columns: {list(azimuth_df.columns)}"
+        )
+
     crosswalk_df = pd.read_csv(crosswalk_csv_path)
     for col in (crosswalk_azimuth_col, crosswalk_cl_id_col):
         if col not in crosswalk_df.columns:
@@ -95,9 +109,24 @@ def map_azimuth_to_cas_labels(
     crosswalk_map: t.Dict[str, str] = dict(
         zip(crosswalk_df[crosswalk_azimuth_col].astype(str), crosswalk_df[crosswalk_cl_id_col].astype(str))
     )
+    if crosswalk_cl_name_col is not None:
+        if crosswalk_cl_name_col not in crosswalk_df.columns:
+            raise ValueError(
+                f"Column '{crosswalk_cl_name_col}' not found in crosswalk CSV. "
+                f"Available columns: {list(crosswalk_df.columns)}"
+            )
+        crosswalk_name_map: t.Dict[str, str] = dict(
+            zip(crosswalk_df[crosswalk_azimuth_col].astype(str), crosswalk_df[crosswalk_cl_name_col].astype(str))
+        )
+    else:
+        crosswalk_name_map = {}
 
     # --- build label rows ---
     warned_missing: t.Set[str] = set()
+    top_k = len(level_specs)
+    label_cols = [f"cas_cell_type_label_{k}" for k in range(1, top_k + 1)]
+    name_cols = [f"cas_cell_type_name_{k}" for k in range(1, top_k + 1)]
+    score_cols = [f"cas_cell_type_score_{k}" for k in range(1, top_k + 1)]
     rows: t.List[t.Dict[str, t.Any]] = []
 
     for barcode in obs_names:
@@ -107,9 +136,8 @@ def map_azimuth_to_cas_labels(
             azimuth_score = azimuth_df.at[barcode, score_col] if score_col in azimuth_df.columns else None
 
             cl_id = None
-            if azimuth_label is not None and not (
-                isinstance(azimuth_label, float) and azimuth_label != azimuth_label  # NaN check
-            ):
+            cl_name = None
+            if azimuth_label is not None and not pd.isna(azimuth_label):
                 label_str = str(azimuth_label)
                 cl_id = crosswalk_map.get(label_str)
                 if cl_id is None and label_str not in warned_missing:
@@ -118,15 +146,20 @@ def map_azimuth_to_cas_labels(
                         f"— cell type will be missing for rank {rank}."
                     )
                     warned_missing.add(label_str)
+                else:
+                    cl_name = crosswalk_name_map.get(label_str, label_str)
 
             score = float(azimuth_score) if azimuth_score is not None and not pd.isna(azimuth_score) else None
 
             row[f"cas_cell_type_label_{rank}"] = cl_id
+            row[f"cas_cell_type_name_{rank}"] = cl_name
             row[f"cas_cell_type_score_{rank}"] = score
 
         rows.append(row)
 
-    labels_df = pd.DataFrame(rows, index=pd.Index(obs_names, name="cell_id"))
+    # Column order matches CAS annotate output: label_1..k, name_1..k, score_1..k
+    ordered_cols = label_cols + name_cols + score_cols
+    labels_df = pd.DataFrame(rows, index=pd.Index(obs_names, name=None))[ordered_cols]
     labels_path = output_dir_path / "inferred_labels.csv"
     labels_df.to_csv(labels_path)
 
@@ -175,6 +208,16 @@ def _parse_level(value: str) -> t.Tuple[str, str]:
     help="Column in crosswalk containing CL ontology term IDs.",
 )
 @click.option(
+    "--crosswalk-cl-name-col",
+    default=None,
+    show_default=True,
+    help=(
+        "Column in crosswalk containing human-readable CL term names. "
+        "Written to cas_cell_type_name_k columns. "
+        "If omitted, the Azimuth label string is used as the cell type name."
+    ),
+)
+@click.option(
     "--azimuth-ref-name",
     required=True,
     help="Azimuth reference name (e.g. pbmcref). Written into model_name as azimuth_<ref_name>.",
@@ -197,6 +240,7 @@ def main(
     crosswalk_csv: str,
     crosswalk_azimuth_col: str,
     crosswalk_cl_id_col: str,
+    crosswalk_cl_name_col: t.Optional[str],
     azimuth_ref_name: str,
     levels: t.Tuple[str, ...],
 ) -> None:
@@ -212,6 +256,7 @@ def main(
             crosswalk_cl_id_col=crosswalk_cl_id_col,
             level_specs=level_specs,
             azimuth_ref_name=azimuth_ref_name,
+            crosswalk_cl_name_col=crosswalk_cl_name_col,
         )
     except ValueError as e:
         raise click.UsageError(str(e)) from e
