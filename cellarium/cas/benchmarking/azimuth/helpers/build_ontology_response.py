@@ -100,7 +100,8 @@ def build_ontology_response(
 
     # --- load inferred labels ---
     labels_df = pd.read_csv(inferred_labels_path, index_col=0)
-    obs_names = list(labels_df.index)
+    labels_df.index = labels_df.index.astype(str)
+    obs_names = labels_df.index.tolist()
 
     top_k = max(
         (int(m.group(1)) for col in labels_df.columns if (m := re.match(r"^cas_cell_type_label_(\d+)$", col))),

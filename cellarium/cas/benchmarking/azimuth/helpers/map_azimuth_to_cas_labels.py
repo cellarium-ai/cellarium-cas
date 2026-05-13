@@ -80,9 +80,11 @@ def map_azimuth_to_cas_labels(
 
     # --- load inputs ---
     adata = anndata.read_h5ad(h5ad_path)
-    obs_names = list(adata.obs_names)
-
+    obs_names = adata.obs_names.astype(str).tolist()
+    
     azimuth_df = pd.read_csv(azimuth_csv_path, index_col=0)
+    azimuth_df.index = azimuth_df.index.astype(str)
+    
     missing_barcodes = set(obs_names) - set(azimuth_df.index)
     if missing_barcodes:
         sample = sorted(missing_barcodes)[:5]
