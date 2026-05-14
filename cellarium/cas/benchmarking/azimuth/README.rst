@@ -91,24 +91,32 @@ Download the HRA crosswalk CSV from::
 Save it locally, e.g. as ``crosswalk.csv``.
 
 **Step 4 — Convert Azimuth labels to CAS inferred_labels format**
-::
 
-    python cellarium/cas/benchmarking/azimuth/helpers/map_azimuth_to_cas_labels.py \
-        --azimuth-csv            /data/azimuth_output.csv \
-        --h5ad-path              /data/my_dataset.h5ad \
-        --output-dir             /data/azimuth_annotate_dir \
-        --crosswalk-csv          crosswalk.csv \
-        --crosswalk-azimuth-col  tool_cell_label \
-        --crosswalk-cl-id-col    cl_id \
-        --azimuth-ref-name       pbmcref \
-        --level predicted.celltype.l3:predicted.celltype.l3.score \
-        --level predicted.celltype.l2:predicted.celltype.l2.score \
-        --level predicted.celltype.l1:predicted.celltype.l1.score
+Run from the project root (``cellarium-cas`` must be installed)::
 
-List ``--level`` arguments from **most granular to least granular**.  Each value is
-``<label_column>:<score_column>`` as they appear in the Azimuth output CSV.
+    from cellarium.cas.benchmarking.azimuth.helpers.map_azimuth_to_cas_labels import map_azimuth_to_cas_labels
 
-This produces ``inferred_labels.csv`` and ``metadata.json`` inside the output directory.
+    map_azimuth_to_cas_labels(
+        azimuth_csv_path="/data/azimuth_output.csv",
+        h5ad_path="/data/my_dataset.h5ad",
+        output_dir="/data/azimuth_annotate_dir",
+        crosswalk_csv_path="crosswalk.csv",
+        crosswalk_azimuth_col="tool_cell_label",
+        crosswalk_cl_id_col="cl_id",
+        crosswalk_cl_name_col="cl_label",      # optional but recommended
+        azimuth_ref_name="pbmcref",
+        level_specs=[
+            ("predicted.celltype.l3", "predicted.celltype.l3.score"),
+            ("predicted.celltype.l2", "predicted.celltype.l2.score"),
+            ("predicted.celltype.l1", "predicted.celltype.l1.score"),
+        ],
+    )
+
+List ``level_specs`` from **most granular to least granular**. This produces
+``inferred_labels.csv`` and ``metadata.json`` inside the output directory.
+
+Alternatively, use :func:`~cellarium.cas.benchmarking.azimuth.helpers.azimuth_to_cas_annotation.azimuth_to_cas_annotation`
+to run Steps 4 and 5 together (see below).
 
 **Step 5 — Build the CAS-compatible ontology response**
 
@@ -116,11 +124,34 @@ This step requires an ``ontology_resource.json`` file (saved by
 ``cellarium-cas annotate --save-ontology-resource``) and the
 ``inferred_labels.csv`` produced in Step 4::
 
-    python cellarium/cas/benchmarking/azimuth/helpers/build_ontology_response.py \
-        --inferred-labels-path   /data/azimuth_annotate_dir/inferred_labels.csv \
-        --output-path            /data/azimuth_annotate_dir/ontology_response.json \
-        --ontology-resource-path /path/to/ontology_resource.json \
-        --azimuth-ref-name       pbmcref
+    from cellarium.cas.benchmarking.azimuth.helpers.build_ontology_response import build_ontology_response
+
+    build_ontology_response(
+        inferred_labels_path="/data/azimuth_annotate_dir/inferred_labels.csv",
+        ontology_resource_path="/path/to/ontology_resource.json",
+        azimuth_ref_name="pbmcref",
+        output_dir="/data/azimuth_annotate_dir",
+    )
+
+Or run Steps 4 and 5 together with the combined helper::
+
+    from cellarium.cas.benchmarking.azimuth.helpers.azimuth_to_cas_annotation import azimuth_to_cas_annotation
+
+    azimuth_to_cas_annotation(
+        azimuth_csv_path="/data/azimuth_output.csv",
+        h5ad_path="/data/my_dataset.h5ad",
+        crosswalk_csv_path="crosswalk.csv",
+        crosswalk_azimuth_col="tool_cell_label",
+        crosswalk_cl_id_col="cl_id",
+        level_specs=[
+            ("predicted.celltype.l3", "predicted.celltype.l3.score"),
+            ("predicted.celltype.l2", "predicted.celltype.l2.score"),
+            ("predicted.celltype.l1", "predicted.celltype.l1.score"),
+        ],
+        azimuth_ref_name="pbmcref",
+        ontology_resource_path="/path/to/ontology_resource.json",
+        output_dir="/data/azimuth_annotate_dir",
+    )
 
 **Step 6 — Run the benchmark**
 

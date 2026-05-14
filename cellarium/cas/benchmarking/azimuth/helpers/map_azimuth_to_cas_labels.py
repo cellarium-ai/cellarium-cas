@@ -1,42 +1,7 @@
-#!/usr/bin/env python3
-"""
-Convert Azimuth cell type annotations to the CAS-compatible ``inferred_labels.csv``
-and ``metadata.json`` format consumed by ``cellarium-cas benchmark flat``.
-
-Usage
------
-::
-
-    python cellarium/cas/benchmarking/azimuth/helpers/map_azimuth_to_cas_labels.py \\
-        --azimuth-csv      /data/azimuth_output.csv \\
-        --h5ad-path        /data/my_dataset.h5ad \\
-        --output-dir       /data/azimuth_annotate_dir \\
-        --crosswalk-csv    crosswalk.csv \\
-        --crosswalk-azimuth-col  tool_cell_label \\
-        --crosswalk-cl-id-col    cl_id \\
-        --azimuth-ref-name pbmcref \\
-        --level predicted.celltype.l3:predicted.celltype.l3.score \\
-        --level predicted.celltype.l2:predicted.celltype.l2.score \\
-        --level predicted.celltype.l1:predicted.celltype.l1.score
-
-``--level`` arguments must be ordered **most granular first**.  Each value is
-``<azimuth_label_column>:<azimuth_score_column>`` as they appear in the Azimuth
-output CSV.
-
-Outputs
--------
-- ``<output_dir>/inferred_labels.csv`` — one row per cell, columns
-  ``cas_cell_type_label_k``, ``cas_cell_type_name_k``, and ``cas_cell_type_score_k``
-  for each level k (matching the CAS annotate output format).
-- ``<output_dir>/metadata.json`` — provenance info (input path, model name, cell count).
-"""
-
 import json
 import typing as t
 import warnings
 from pathlib import Path
-
-import click
 
 
 def map_azimuth_to_cas_labels(
@@ -81,10 +46,10 @@ def map_azimuth_to_cas_labels(
     # --- load inputs ---
     adata = anndata.read_h5ad(h5ad_path)
     obs_names = adata.obs_names.astype(str).tolist()
-    
+
     azimuth_df = pd.read_csv(azimuth_csv_path, index_col=0)
     azimuth_df.index = azimuth_df.index.astype(str)
-    
+
     missing_barcodes = set(obs_names) - set(azimuth_df.index)
     if missing_barcodes:
         sample = sorted(missing_barcodes)[:5]
@@ -142,12 +107,15 @@ def map_azimuth_to_cas_labels(
             if azimuth_label is not None and not pd.isna(azimuth_label):
                 label_str = str(azimuth_label)
                 cl_id = crosswalk_map.get(label_str)
-                if cl_id is None and label_str not in warned_missing:
-                    warnings.warn(
-                        f"Azimuth label '{label_str}' (column '{label_col}') not found in crosswalk "
-                        f"— cell type will be missing for rank {rank}."
-                    )
-                    warned_missing.add(label_str)
+                if cl_id is None:
+                    if label_str not in warned_missing:
+                        warnings.warn(
+                            f"Azimuth label '{label_str}' (column '{label_col}') not found in crosswalk "
+                            f"— filling with 'unknown' for rank {rank}."
+                        )
+                        warned_missing.add(label_str)
+                    cl_id = "unknown"
+                    cl_name = "unknown"
                 else:
                     cl_name = crosswalk_name_map.get(label_str, label_str)
 
@@ -180,92 +148,3 @@ def map_azimuth_to_cas_labels(
         "inferred_labels_path": str(labels_path),
         "metadata_path": str(metadata_path),
     }
-
-
-def _parse_level(value: str) -> t.Tuple[str, str]:
-    parts = value.split(":", 1)
-    if len(parts) != 2:
-        raise click.BadParameter(f"must be in the form LABEL_COL:SCORE_COL, got: '{value}'")
-    return parts[0].strip(), parts[1].strip()
-
-
-@click.command("map-azimuth-to-cas-labels")
-@click.option("--azimuth-csv", required=True, type=click.Path(exists=True), help="Path to Azimuth metadata CSV.")
-@click.option("--h5ad-path", required=True, type=click.Path(exists=True), help="Path to source .h5ad file.")
-@click.option(
-    "--output-dir",
-    required=True,
-    type=click.Path(file_okay=False),
-    help="Directory to write output files into.",
-)
-@click.option("--crosswalk-csv", required=True, type=click.Path(exists=True), help="Path to HRA crosswalk CSV.")
-@click.option(
-    "--crosswalk-azimuth-col",
-    required=True,
-    help="Column in crosswalk containing Azimuth cell type labels.",
-)
-@click.option(
-    "--crosswalk-cl-id-col",
-    required=True,
-    help="Column in crosswalk containing CL ontology term IDs.",
-)
-@click.option(
-    "--crosswalk-cl-name-col",
-    default=None,
-    show_default=True,
-    help=(
-        "Column in crosswalk containing human-readable CL term names. "
-        "Written to cas_cell_type_name_k columns. "
-        "If omitted, the Azimuth label string is used as the cell type name."
-    ),
-)
-@click.option(
-    "--azimuth-ref-name",
-    required=True,
-    help="Azimuth reference name (e.g. pbmcref). Written into model_name as azimuth_<ref_name>.",
-)
-@click.option(
-    "--level",
-    "levels",
-    multiple=True,
-    required=True,
-    metavar="LABEL_COL:SCORE_COL",
-    help=(
-        "Azimuth label and score column pair for one annotation level, as "
-        "LABEL_COL:SCORE_COL. Repeat for each level, most granular first."
-    ),
-)
-def main(
-    azimuth_csv: str,
-    h5ad_path: str,
-    output_dir: str,
-    crosswalk_csv: str,
-    crosswalk_azimuth_col: str,
-    crosswalk_cl_id_col: str,
-    crosswalk_cl_name_col: t.Optional[str],
-    azimuth_ref_name: str,
-    levels: t.Tuple[str, ...],
-) -> None:
-    """Convert Azimuth annotations to CAS-compatible inferred_labels.csv and metadata.json."""
-    level_specs = [_parse_level(lv) for lv in levels]
-    try:
-        result = map_azimuth_to_cas_labels(
-            azimuth_csv_path=azimuth_csv,
-            h5ad_path=h5ad_path,
-            output_dir=output_dir,
-            crosswalk_csv_path=crosswalk_csv,
-            crosswalk_azimuth_col=crosswalk_azimuth_col,
-            crosswalk_cl_id_col=crosswalk_cl_id_col,
-            level_specs=level_specs,
-            azimuth_ref_name=azimuth_ref_name,
-            crosswalk_cl_name_col=crosswalk_cl_name_col,
-        )
-    except ValueError as e:
-        raise click.UsageError(str(e)) from e
-
-    click.echo(f"Saved inferred labels  → {result['inferred_labels_path']}")
-    click.echo(f"Saved metadata         → {result['metadata_path']}")
-
-
-if __name__ == "__main__":
-    main()

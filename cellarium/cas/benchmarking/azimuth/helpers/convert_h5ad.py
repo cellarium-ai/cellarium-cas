@@ -6,6 +6,7 @@ barcodes.tsv.gz, features.tsv.gz) for consumption by Seurat / Azimuth.
 Usage:
     python cellarium/cas/benchmarking/azimuth/helpers/convert_h5ad.py <input_h5ad_path> <output_dir>
 """
+
 import gzip
 import os
 import shutil
@@ -54,7 +55,7 @@ def convert_h5ad_to_10x(input_path: str, output_dir: str) -> None:
         gene_ids = _as_clean_str_series(adata.var["gene_ids"])
     else:
         gene_ids = _as_clean_str_series(adata.var_names)
-        
+
     if "feature_name" in adata.var.columns:
         gene_names = _as_clean_str_series(adata.var["feature_name"])
     elif "gene_symbol" in adata.var.columns:
@@ -63,7 +64,7 @@ def convert_h5ad_to_10x(input_path: str, output_dir: str) -> None:
         gene_names = _as_clean_str_series(adata.var["gene_symbols"])
     else:
         gene_names = _as_clean_str_series(adata.var_names)
-        
+
     # fallback if some IDs are empty
     gene_ids = gene_ids.mask(gene_ids == "", gene_names)
 

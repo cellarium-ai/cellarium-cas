@@ -22,15 +22,17 @@ Usage
 -----
 ::
 
-    python cellarium/cas/benchmarking/azimuth/helpers/build_ontology_response.py \\
-        --inferred-labels-path   /data/azimuth_annotate_dir/inferred_labels.csv \\
-        --output-path            /data/azimuth_annotate_dir/ontology_response.json \\
-        --ontology-resource-path /path/to/ontology_resource.json \\
-        --azimuth-ref-name       pbmcref
+    from cellarium.cas.benchmarking.azimuth.helpers.build_ontology_response import build_ontology_response
 
-Run ``map_azimuth_to_cas_labels.py`` first to produce ``inferred_labels.csv``.
+    build_ontology_response(
+        inferred_labels_path="/data/azimuth_annotate_dir/inferred_labels.csv",
+        ontology_resource_path="/path/to/ontology_resource.json",
+        azimuth_ref_name="pbmcref",
+        output_dir="/data/azimuth_annotate_dir",
+    )
 
-The ``--ontology-resource-path`` is the ``ontology_resource.json`` saved by
+Run :func:`map_azimuth_to_cas_labels` first to produce ``inferred_labels.csv``.
+The ontology resource is the ``ontology_resource.json`` saved by
 ``cellarium-cas annotate --save-ontology-resource``.
 """
 
@@ -38,8 +40,6 @@ import json
 import typing as t
 import warnings
 from pathlib import Path
-
-import click
 
 from cellarium.cas.models import CellTypeOntologyAwareResults
 from cellarium.cas.postprocessing.cell_ontology.cell_ontology_cache import CellOntologyCache
@@ -69,9 +69,9 @@ def _get_node_and_ancestors(cl_id: str, parents_map: t.Dict[str, t.List[str]]) -
 
 def build_ontology_response(
     inferred_labels_path: str,
-    cell_ontology_cache: CellOntologyCache,
+    ontology_resource_path: str,
     azimuth_ref_name: str,
-    output_path: str,
+    output_dir: str,
 ) -> CellTypeOntologyAwareResults:
     """
     Build a CAS-compatible ``CellTypeOntologyAwareResults`` from an ``inferred_labels.csv``
@@ -85,11 +85,14 @@ def build_ontology_response(
     :param inferred_labels_path: Path to ``inferred_labels.csv`` from
         :func:`map_azimuth_to_cas_labels` (row index = barcodes, columns
         ``cas_cell_type_label_k`` / ``cas_cell_type_score_k``).
-    :param cell_ontology_cache: :class:`~cellarium.cas.postprocessing.cell_ontology.CellOntologyCache`
-        instance for ancestor traversal and label lookup.
+    :param ontology_resource_path: Path to ``ontology_resource.json`` (saved by
+        ``cellarium-cas annotate --save-ontology-resource``).  Loaded to build the
+        :class:`~cellarium.cas.postprocessing.cell_ontology.CellOntologyCache` and
+        copied as-is to *output_dir*.
     :param azimuth_ref_name: Azimuth reference name (e.g. ``"pbmcref"``), written into
         ``model_name`` as ``azimuth_<ref_name>``.
-    :param output_path: Path to write ``ontology_response.json``.
+    :param output_dir: Directory to write ``ontology_response.json`` and
+        ``ontology_resource.json`` into (created if absent).
 
     :returns: The constructed :class:`~cellarium.cas.models.CellTypeOntologyAwareResults`.
     :raises ValueError: If no ``cas_cell_type_label_k`` columns are found.
@@ -98,10 +101,14 @@ def build_ontology_response(
 
     import pandas as pd
 
+    # --- load ontology resource and build cache ---
+    with open(ontology_resource_path) as f:
+        ontology_resource = json.load(f)
+    cell_ontology_cache = CellOntologyCache(ontology_resource)
+
     # --- load inferred labels ---
     labels_df = pd.read_csv(inferred_labels_path, index_col=0)
     labels_df.index = labels_df.index.astype(str)
-    obs_names = labels_df.index.tolist()
 
     top_k = max(
         (int(m.group(1)) for col in labels_df.columns if (m := re.match(r"^cas_cell_type_label_(\d+)$", col))),
@@ -202,59 +209,11 @@ def build_ontology_response(
         model_name=f"azimuth_{azimuth_ref_name}",
     )
 
-    output_path_obj = Path(output_path)
-    output_path_obj.parent.mkdir(parents=True, exist_ok=True)
-    with open(output_path_obj, "w") as f:
+    output_dir_path = Path(output_dir)
+    output_dir_path.mkdir(parents=True, exist_ok=True)
+    with open(output_dir_path / "ontology_response.json", "w") as f:
         f.write(result.model_dump_json())
+    with open(output_dir_path / "ontology_resource.json", "w") as f:
+        json.dump(ontology_resource, f)
 
     return result
-
-
-@click.command("build-ontology-response")
-@click.option(
-    "--inferred-labels-path",
-    required=True,
-    type=click.Path(exists=True),
-    help="Path to inferred_labels.csv produced by map_azimuth_to_cas_labels.py.",
-)
-@click.option("--output-path", required=True, type=click.Path(), help="Path to write ontology_response.json.")
-@click.option(
-    "--ontology-resource-path",
-    required=True,
-    type=click.Path(exists=True),
-    help=(
-        "Path to ontology_resource.json (saved by 'cellarium-cas annotate "
-        "--save-ontology-resource'). Used to construct the CellOntologyCache."
-    ),
-)
-@click.option(
-    "--azimuth-ref-name",
-    required=True,
-    help="Azimuth reference name (e.g. pbmcref). Written into model_name as azimuth_<ref_name>.",
-)
-def main(
-    inferred_labels_path: str,
-    output_path: str,
-    ontology_resource_path: str,
-    azimuth_ref_name: str,
-) -> None:
-    """Build a CAS-compatible ontology_response.json from an inferred_labels.csv."""
-    with open(ontology_resource_path) as f:
-        ontology_resource = json.load(f)
-    cell_ontology_cache = CellOntologyCache(ontology_resource)
-
-    try:
-        build_ontology_response(
-            inferred_labels_path=inferred_labels_path,
-            cell_ontology_cache=cell_ontology_cache,
-            azimuth_ref_name=azimuth_ref_name,
-            output_path=output_path,
-        )
-    except ValueError as e:
-        raise click.UsageError(str(e)) from e
-
-    click.echo(f"Saved ontology response → {output_path}")
-
-
-if __name__ == "__main__":
-    main()
