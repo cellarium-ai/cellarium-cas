@@ -16,3 +16,6 @@ echo "Converting h5ad to 10x format..."
 
 echo "Running Azimuth annotation..."
 Rscript /scripts/run_azimuth.R "$MTX_DIR" "$AZIMUTH_REF" "$OUTPUT_CSV"
+
+echo "Cleaning up intermediate 10x files..."
+rm -rf "$MTX_DIR"
