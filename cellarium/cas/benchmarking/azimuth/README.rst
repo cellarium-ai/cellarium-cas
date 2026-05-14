@@ -103,7 +103,7 @@ Run from the project root (``cellarium-cas`` must be installed)::
         crosswalk_csv_path="crosswalk.csv",
         crosswalk_azimuth_col="tool_cell_label",
         crosswalk_cl_id_col="cl_id",
-        crosswalk_cl_name_col="cl_label",      # optional but recommended
+        crosswalk_cl_label_col="cl_label",      # optional but recommended
         azimuth_ref_name="pbmcref",
         level_specs=[
             ("predicted.celltype.l3", "predicted.celltype.l3.score"),

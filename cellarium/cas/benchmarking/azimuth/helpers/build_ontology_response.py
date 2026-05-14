@@ -77,14 +77,14 @@ def build_ontology_response(
     Build a CAS-compatible ``CellTypeOntologyAwareResults`` from an ``inferred_labels.csv``
     produced by :func:`map_azimuth_to_cas_labels`.
 
-    Reads ``cas_cell_type_label_k`` and ``cas_cell_type_score_k`` columns (rank 1 = most
+    Reads ``cas_cell_type_name_k`` and ``cas_cell_type_score_k`` columns (rank 1 = most
     granular) and propagates each mapped CL term's score to all its ontology ancestors
     using ``max``-merge, so ancestor nodes reflect the highest-confidence prediction that
     flows through them.
 
     :param inferred_labels_path: Path to ``inferred_labels.csv`` from
         :func:`map_azimuth_to_cas_labels` (row index = barcodes, columns
-        ``cas_cell_type_label_k`` / ``cas_cell_type_score_k``).
+        ``cas_cell_type_name_k`` / ``cas_cell_type_score_k``).
     :param ontology_resource_path: Path to ``ontology_resource.json`` (saved by
         ``cellarium-cas annotate --save-ontology-resource``).  Loaded to build the
         :class:`~cellarium.cas.postprocessing.cell_ontology.CellOntologyCache` and
@@ -95,7 +95,7 @@ def build_ontology_response(
         ``ontology_resource.json`` into (created if absent).
 
     :returns: The constructed :class:`~cellarium.cas.models.CellTypeOntologyAwareResults`.
-    :raises ValueError: If no ``cas_cell_type_label_k`` columns are found.
+    :raises ValueError: If no ``cas_cell_type_name_k`` columns are found.
     """
     import re
 
@@ -111,13 +111,13 @@ def build_ontology_response(
     labels_df.index = labels_df.index.astype(str)
 
     top_k = max(
-        (int(m.group(1)) for col in labels_df.columns if (m := re.match(r"^cas_cell_type_label_(\d+)$", col))),
+        (int(m.group(1)) for col in labels_df.columns if (m := re.match(r"^cas_cell_type_name_(\d+)$", col))),
         default=0,
     )
     if top_k == 0:
         raise ValueError(
-            f"No 'cas_cell_type_label_k' columns found in {inferred_labels_path}. "
-            "Run map_azimuth_to_cas_labels.py first."
+            f"No 'cas_cell_type_name_k' columns found in {inferred_labels_path}. "
+            "Run map_azimuth_to_cas_labels first."
         )
 
     # --- pre-build ancestor traversal structures ---
@@ -140,7 +140,7 @@ def build_ontology_response(
         # Collect (cl_id, score) per rank; rank 1 = most granular
         level_cl_ids: t.List[t.Tuple[t.Optional[str], float]] = []
         for k in range(1, top_k + 1):
-            raw_cl_id = row.get(f"cas_cell_type_label_{k}")
+            raw_cl_id = row.get(f"cas_cell_type_name_{k}")
             raw_score = row.get(f"cas_cell_type_score_{k}")
 
             score = float(raw_score) if raw_score is not None and not pd.isna(raw_score) else 0.0

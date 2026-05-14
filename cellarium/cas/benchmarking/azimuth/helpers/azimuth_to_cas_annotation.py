@@ -27,7 +27,7 @@ def azimuth_to_cas_annotation(
     azimuth_ref_name: str,
     ontology_resource_path: str,
     output_dir: str,
-    crosswalk_cl_name_col: t.Optional[str] = None,
+    crosswalk_cl_label_col: t.Optional[str] = None,
 ) -> t.Dict[str, str]:
     """
     Produce a complete CAS-compatible annotate output directory from Azimuth annotations.
@@ -51,8 +51,8 @@ def azimuth_to_cas_annotation(
         ``cellarium-cas annotate --save-ontology-resource``).  Passed to
         :func:`build_ontology_response`, which loads it and copies it to *output_dir*.
     :param output_dir: Directory to write all four output files into (created if absent).
-    :param crosswalk_cl_name_col: Optional column in the crosswalk containing human-readable
-        CL term names.  Written to ``cas_cell_type_name_k`` columns.  If ``None``, the Azimuth
+    :param crosswalk_cl_label_col: Optional column in the crosswalk containing human-readable
+        CL term labels.  Written to ``cas_cell_type_label_k`` columns.  If ``None``, the Azimuth
         label string is used.
 
     :returns: Dict with keys ``output_dir``, ``inferred_labels_path``, ``metadata_path``,
@@ -69,7 +69,7 @@ def azimuth_to_cas_annotation(
         crosswalk_cl_id_col=crosswalk_cl_id_col,
         level_specs=level_specs,
         azimuth_ref_name=azimuth_ref_name,
-        crosswalk_cl_name_col=crosswalk_cl_name_col,
+        crosswalk_cl_label_col=crosswalk_cl_label_col,
     )
 
     build_ontology_response(
