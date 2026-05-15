@@ -23,10 +23,10 @@ def azimuth_to_cas_annotation(
     crosswalk_csv_path: str,
     crosswalk_azimuth_col: str,
     crosswalk_cl_id_col: str,
-    level_specs: t.List[t.Tuple[str, str]],
     azimuth_ref_name: str,
     ontology_resource_path: str,
     output_dir: str,
+    level_specs: t.Optional[t.List[t.Tuple[str, str]]] = None,
     crosswalk_cl_label_col: t.Optional[str] = None,
 ) -> t.Dict[str, str]:
     """
@@ -43,14 +43,15 @@ def azimuth_to_cas_annotation(
     :param crosswalk_csv_path: Path to the HRA crosswalk CSV mapping Azimuth labels to CL IDs.
     :param crosswalk_azimuth_col: Column in the crosswalk containing Azimuth cell type labels.
     :param crosswalk_cl_id_col: Column in the crosswalk containing CL ontology term IDs.
-    :param level_specs: List of ``(azimuth_label_col, azimuth_score_col)`` tuples ordered
-        **most granular first**.
     :param azimuth_ref_name: Azimuth reference name (e.g. ``"pbmcref"``).  Written into
         ``model_name`` as ``azimuth_<ref_name>``.
     :param ontology_resource_path: Path to ``ontology_resource.json`` (saved by
         ``cellarium-cas annotate --save-ontology-resource``).  Passed to
         :func:`build_ontology_response`, which loads it and copies it to *output_dir*.
     :param output_dir: Directory to write all four output files into (created if absent).
+    :param level_specs: List of ``(azimuth_label_col, azimuth_score_col)`` tuples ordered
+        **most granular first**.  If ``None`` (default), pairs are auto-detected from
+        ``predicted.<level>`` / ``predicted.<level>.score`` columns in the Azimuth CSV.
     :param crosswalk_cl_label_col: Optional column in the crosswalk containing human-readable
         CL term labels.  Written to ``cas_cell_type_label_k`` columns.  If ``None``, the Azimuth
         label string is used.
@@ -67,8 +68,8 @@ def azimuth_to_cas_annotation(
         crosswalk_csv_path=crosswalk_csv_path,
         crosswalk_azimuth_col=crosswalk_azimuth_col,
         crosswalk_cl_id_col=crosswalk_cl_id_col,
-        level_specs=level_specs,
         azimuth_ref_name=azimuth_ref_name,
+        level_specs=level_specs,
         crosswalk_cl_label_col=crosswalk_cl_label_col,
     )
 
