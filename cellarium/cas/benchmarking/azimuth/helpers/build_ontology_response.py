@@ -67,6 +67,127 @@ def _get_node_and_ancestors(cl_id: str, parents_map: t.Dict[str, t.List[str]]) -
     return visited
 
 
+def _get_top_k(labels_df) -> int:
+    """Return the highest rank index *k* found in ``cas_cell_type_name_k`` columns, or 0."""
+    import re
+
+    matches = (re.match(r"^cas_cell_type_name_(\d+)$", col) for col in labels_df.columns)
+    return max((int(m.group(1)) for m in matches if m), default=0)
+
+
+def _get_ancestors_cached(
+    cl_id: str,
+    parents_map: t.Dict[str, t.List[str]],
+    ancestors_cache: t.Dict[str, t.Set[str]],
+) -> t.Set[str]:
+    """Return cached ancestor set for *cl_id*, populating the cache on first access."""
+    if cl_id not in ancestors_cache:
+        ancestors_cache[cl_id] = _get_node_and_ancestors(cl_id, parents_map)
+    return ancestors_cache[cl_id]
+
+
+def _validated_cl_id(
+    raw_cl_id,
+    rank: int,
+    known_cl_ids: t.Set[str],
+    warned_missing_cl_ids: t.Set[str],
+) -> t.Optional[str]:
+    """Return a validated CL ID string, or ``None`` if absent or unknown."""
+    import pandas as pd
+
+    if raw_cl_id is None or pd.isna(raw_cl_id):
+        return None
+    cl_id = str(raw_cl_id)
+    if cl_id in known_cl_ids:
+        return cl_id
+    if cl_id not in warned_missing_cl_ids:
+        warnings.warn(f"CL ID '{cl_id}' (rank {rank}) is not present in the cell ontology cache — skipped.")
+        warned_missing_cl_ids.add(cl_id)
+    return None
+
+
+def _parse_row_level_cl_ids(
+    row,
+    top_k: int,
+    known_cl_ids: t.Set[str],
+    warned_missing_cl_ids: t.Set[str],
+) -> t.List[t.Tuple[t.Optional[str], float]]:
+    """Parse one DataFrame row into a list of ``(cl_id, score)`` pairs for ranks 1..top_k."""
+    import pandas as pd
+
+    level_cl_ids = []
+    for k in range(1, top_k + 1):
+        raw_score = row.get(f"cas_cell_type_score_{k}")
+        score = float(raw_score) if raw_score is not None and not pd.isna(raw_score) else 0.0
+        cl_id = _validated_cl_id(row.get(f"cas_cell_type_name_{k}"), k, known_cl_ids, warned_missing_cl_ids)
+        level_cl_ids.append((cl_id, score))
+    return level_cl_ids
+
+
+def _check_linearity(
+    valid_ids: t.List[t.Tuple[str, float]],
+    warned_nonlinear_pairs: t.Set[t.Tuple[str, str]],
+    parents_map: t.Dict[str, t.List[str]],
+    ancestors_cache: t.Dict[str, t.Set[str]],
+) -> None:
+    """Warn once per adjacent pair whose less-granular term is not an ancestor of the more-granular one."""
+    for i in range(len(valid_ids) - 1):
+        more_granular_cl = valid_ids[i][0]
+        less_granular_cl = valid_ids[i + 1][0]
+        pair = (more_granular_cl, less_granular_cl)
+        if pair in warned_nonlinear_pairs:
+            continue
+        ancestors = _get_ancestors_cached(more_granular_cl, parents_map, ancestors_cache)
+        if less_granular_cl not in ancestors:
+            warnings.warn(
+                f"Crosswalk hierarchy violation: '{less_granular_cl}' is not an ancestor of "
+                f"'{more_granular_cl}' in the cell ontology — propagating independently."
+            )
+            warned_nonlinear_pairs.add(pair)
+
+
+def _propagate_scores(
+    level_cl_ids: t.List[t.Tuple[t.Optional[str], float]],
+    parents_map: t.Dict[str, t.List[str]],
+    ancestors_cache: t.Dict[str, t.Set[str]],
+    known_cl_ids: t.Set[str],
+) -> t.Dict[str, float]:
+    """Propagate per-level scores to all ontology ancestors via max-merge."""
+    node_scores: t.Dict[str, float] = {}
+    for cl_id, score in level_cl_ids:
+        if cl_id is None:
+            continue
+        for ancestor in _get_ancestors_cached(cl_id, parents_map, ancestors_cache):
+            if ancestor in known_cl_ids:
+                node_scores[ancestor] = max(node_scores.get(ancestor, 0.0), score)
+    return node_scores
+
+
+def _build_annotation(
+    barcode: str,
+    level_cl_ids: t.List[t.Tuple[t.Optional[str], float]],
+    node_scores: t.Dict[str, float],
+    cl_names_to_labels_map: t.Dict[str, str],
+) -> CellTypeOntologyAwareResults.OntologyAwareAnnotation:
+    """Construct an ``OntologyAwareAnnotation`` for a single cell."""
+    matches = [
+        CellTypeOntologyAwareResults.Match(
+            cell_type_ontology_term_id=cl_id,
+            cell_type=cl_names_to_labels_map.get(cl_id, cl_id),
+            score=score,
+        )
+        for cl_id, score in node_scores.items()
+    ]
+    most_granular_score = next((score for cl_id, score in level_cl_ids if cl_id is not None), 0.0)
+    return CellTypeOntologyAwareResults.OntologyAwareAnnotation(
+        query_cell_id=barcode,
+        matches=matches,
+        total_weight=most_granular_score,
+        total_neighbors=1,
+        total_neighbors_unrecognized=0,
+    )
+
+
 def build_ontology_response(
     inferred_labels_path: str,
     ontology_resource_path: str,
@@ -97,8 +218,6 @@ def build_ontology_response(
     :returns: The constructed :class:`~cellarium.cas.models.CellTypeOntologyAwareResults`.
     :raises ValueError: If no ``cas_cell_type_name_k`` columns are found.
     """
-    import re
-
     import pandas as pd
 
     # --- load ontology resource and build cache ---
@@ -110,10 +229,7 @@ def build_ontology_response(
     labels_df = pd.read_csv(inferred_labels_path, index_col=0)
     labels_df.index = labels_df.index.astype(str)
 
-    top_k = max(
-        (int(m.group(1)) for col in labels_df.columns if (m := re.match(r"^cas_cell_type_name_(\d+)$", col))),
-        default=0,
-    )
+    top_k = _get_top_k(labels_df)
     if top_k == 0:
         raise ValueError(
             f"No 'cas_cell_type_name_k' columns found in {inferred_labels_path}. "
@@ -125,83 +241,18 @@ def build_ontology_response(
     known_cl_ids = set(cell_ontology_cache.cl_names_to_idx_map.keys())
     ancestors_cache: t.Dict[str, t.Set[str]] = {}
 
-    def get_ancestors_cached(cl_id: str) -> t.Set[str]:
-        if cl_id not in ancestors_cache:
-            ancestors_cache[cl_id] = _get_node_and_ancestors(cl_id, parents_map)
-        return ancestors_cache[cl_id]
-
     # --- per-cell processing ---
     warned_missing_cl_ids: t.Set[str] = set()
     warned_nonlinear_pairs: t.Set[t.Tuple[str, str]] = set()
-
     annotations: t.List[CellTypeOntologyAwareResults.OntologyAwareAnnotation] = []
 
     for barcode, row in labels_df.iterrows():
-        # Collect (cl_id, score) per rank; rank 1 = most granular
-        level_cl_ids: t.List[t.Tuple[t.Optional[str], float]] = []
-        for k in range(1, top_k + 1):
-            raw_cl_id = row.get(f"cas_cell_type_name_{k}")
-            raw_score = row.get(f"cas_cell_type_score_{k}")
-
-            score = float(raw_score) if raw_score is not None and not pd.isna(raw_score) else 0.0
-            cl_id: t.Optional[str] = None
-
-            if raw_cl_id is not None and not pd.isna(raw_cl_id):
-                cl_id = str(raw_cl_id)
-                if cl_id not in known_cl_ids:
-                    if cl_id not in warned_missing_cl_ids:
-                        warnings.warn(
-                            f"CL ID '{cl_id}' (rank {k}) is not present in the cell ontology cache — skipped."
-                        )
-                        warned_missing_cl_ids.add(cl_id)
-                    cl_id = None
-
-            level_cl_ids.append((cl_id, score))
-
-        # Linearity check (warn once per unique pair, A+C strategy)
+        level_cl_ids = _parse_row_level_cl_ids(row, top_k, known_cl_ids, warned_missing_cl_ids)
         valid_ids = [(cl_id, score) for cl_id, score in level_cl_ids if cl_id is not None]
-        for i in range(len(valid_ids) - 1):
-            more_granular_cl = valid_ids[i][0]
-            less_granular_cl = valid_ids[i + 1][0]
-            pair = (more_granular_cl, less_granular_cl)
-            if pair not in warned_nonlinear_pairs:
-                ancestors_of_more_granular = get_ancestors_cached(more_granular_cl)
-                if less_granular_cl not in ancestors_of_more_granular:
-                    warnings.warn(
-                        f"Crosswalk hierarchy violation: '{less_granular_cl}' is not an ancestor of "
-                        f"'{more_granular_cl}' in the cell ontology — propagating independently."
-                    )
-                    warned_nonlinear_pairs.add(pair)
-
-        # Score propagation: most-granular first, max-merge at shared ancestors
-        node_scores: t.Dict[str, float] = {}
-        for cl_id, score in level_cl_ids:
-            if cl_id is None:
-                continue
-            for ancestor in get_ancestors_cached(cl_id):
-                if ancestor in known_cl_ids:
-                    node_scores[ancestor] = max(node_scores.get(ancestor, 0.0), score)
-
-        matches = [
-            CellTypeOntologyAwareResults.Match(
-                cell_type_ontology_term_id=cl_id,
-                cell_type=cell_ontology_cache.cl_names_to_labels_map.get(cl_id, cl_id),
-                score=score,
-            )
-            for cl_id, score in node_scores.items()
-        ]
-
-        # total_weight: score of the most-granular non-null level
-        most_granular_score = next((score for cl_id, score in level_cl_ids if cl_id is not None), 0.0)
-
+        _check_linearity(valid_ids, warned_nonlinear_pairs, parents_map, ancestors_cache)
+        node_scores = _propagate_scores(level_cl_ids, parents_map, ancestors_cache, known_cl_ids)
         annotations.append(
-            CellTypeOntologyAwareResults.OntologyAwareAnnotation(
-                query_cell_id=barcode,
-                matches=matches,
-                total_weight=most_granular_score,
-                total_neighbors=1,
-                total_neighbors_unrecognized=0,
-            )
+            _build_annotation(barcode, level_cl_ids, node_scores, cell_ontology_cache.cl_names_to_labels_map)
         )
 
     result = CellTypeOntologyAwareResults(

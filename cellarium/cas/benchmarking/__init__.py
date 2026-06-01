@@ -9,5 +9,5 @@ try:
     ]
 except ImportError as e:
     raise ImportError(
-        "Benchmarking dependencies are not installed. " "Install them with: pip install cellarium-cas[benchmark]"
+        "Benchmarking dependencies are not installed. Install them with: pip install cellarium-cas[benchmark]"
     ) from e

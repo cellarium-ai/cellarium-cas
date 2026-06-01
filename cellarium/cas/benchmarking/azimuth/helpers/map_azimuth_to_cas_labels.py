@@ -4,6 +4,114 @@ import warnings
 from pathlib import Path
 
 
+def _load_and_align_azimuth_df(azimuth_csv_path: str, obs_names: t.List[str]) -> t.Any:
+    """Load the Azimuth CSV, validate barcode coverage, and reindex to *obs_names* order."""
+    import pandas as pd
+
+    azimuth_df = pd.read_csv(azimuth_csv_path, index_col=0)
+    azimuth_df.index = azimuth_df.index.astype(str)
+    missing_barcodes = set(obs_names) - set(azimuth_df.index)
+    if missing_barcodes:
+        sample = sorted(missing_barcodes)[:5]
+        raise ValueError(
+            f"{len(missing_barcodes)} barcodes from h5ad not found in Azimuth CSV (first {len(sample)}): {sample}"
+        )
+    return azimuth_df.reindex(obs_names)
+
+
+def _validate_level_cols(level_specs: t.List[t.Tuple[str, str]], azimuth_df: t.Any) -> None:
+    """Raise ``ValueError`` if any label/score column from *level_specs* is absent in *azimuth_df*."""
+    missing = [
+        col for label_col, score_col in level_specs for col in (label_col, score_col) if col not in azimuth_df.columns
+    ]
+    if missing:
+        raise ValueError(
+            f"The following level columns are not present in the Azimuth CSV: {missing}. "
+            f"Available columns: {list(azimuth_df.columns)}"
+        )
+
+
+def _load_crosswalk_maps(
+    crosswalk_csv_path: str,
+    crosswalk_azimuth_col: str,
+    crosswalk_cl_id_col: str,
+    crosswalk_cl_label_col: t.Optional[str],
+) -> t.Tuple[t.Dict[str, str], t.Dict[str, str]]:
+    """Load crosswalk CSV and return ``(crosswalk_map, crosswalk_label_map)``."""
+    import pandas as pd
+
+    crosswalk_df = pd.read_csv(crosswalk_csv_path)
+    required_cols = [crosswalk_azimuth_col, crosswalk_cl_id_col]
+    if crosswalk_cl_label_col is not None:
+        required_cols.append(crosswalk_cl_label_col)
+    for col in required_cols:
+        if col not in crosswalk_df.columns:
+            raise ValueError(
+                f"Column '{col}' not found in crosswalk CSV. Available columns: {list(crosswalk_df.columns)}"
+            )
+    crosswalk_map: t.Dict[str, str] = dict(
+        zip(crosswalk_df[crosswalk_azimuth_col].astype(str), crosswalk_df[crosswalk_cl_id_col].astype(str))
+    )
+    if crosswalk_cl_label_col is not None:
+        crosswalk_label_map: t.Dict[str, str] = dict(
+            zip(crosswalk_df[crosswalk_azimuth_col].astype(str), crosswalk_df[crosswalk_cl_label_col].astype(str))
+        )
+    else:
+        crosswalk_label_map = {}
+    return crosswalk_map, crosswalk_label_map
+
+
+def _map_azimuth_label(
+    azimuth_label: t.Any,
+    label_col: str,
+    rank: int,
+    crosswalk_map: t.Dict[str, str],
+    crosswalk_label_map: t.Dict[str, str],
+    warned_missing: t.Set[str],
+) -> t.Tuple[t.Optional[str], t.Optional[str]]:
+    """Map a single Azimuth label to ``(cl_id, cl_label)``, warning once per unknown label."""
+    import pandas as pd
+
+    if azimuth_label is None or pd.isna(azimuth_label):
+        return None, None
+    label_str = str(azimuth_label)
+    cl_id = crosswalk_map.get(label_str)
+    if cl_id is not None:
+        return cl_id, crosswalk_label_map.get(label_str, label_str)
+    if label_str not in warned_missing:
+        warnings.warn(
+            f"Azimuth label '{label_str}' (column '{label_col}') not found in crosswalk "
+            f"— filling with 'unknown' for rank {rank}."
+        )
+        warned_missing.add(label_str)
+    return "unknown", "unknown"
+
+
+def _build_cell_row(
+    barcode: str,
+    level_specs: t.List[t.Tuple[str, str]],
+    azimuth_df: t.Any,
+    crosswalk_map: t.Dict[str, str],
+    crosswalk_label_map: t.Dict[str, str],
+    warned_missing: t.Set[str],
+) -> t.Dict[str, t.Any]:
+    """Build one output row dict for *barcode* across all annotation levels."""
+    import pandas as pd
+
+    row: t.Dict[str, t.Any] = {}
+    for rank, (label_col, score_col) in enumerate(level_specs, start=1):
+        azimuth_label = azimuth_df.at[barcode, label_col]
+        azimuth_score = azimuth_df.at[barcode, score_col]
+        cl_id, cl_label = _map_azimuth_label(
+            azimuth_label, label_col, rank, crosswalk_map, crosswalk_label_map, warned_missing
+        )
+        score = float(azimuth_score) if azimuth_score is not None and not pd.isna(azimuth_score) else None
+        row[f"cas_cell_type_label_{rank}"] = cl_label
+        row[f"cas_cell_type_name_{rank}"] = cl_id
+        row[f"cas_cell_type_score_{rank}"] = score
+    return row
+
+
 def infer_level_specs(azimuth_df: t.Any) -> t.List[t.Tuple[str, str]]:
     """
     Auto-detect ``(label_col, score_col)`` pairs from an Azimuth output DataFrame.
@@ -72,53 +180,17 @@ def map_azimuth_to_cas_labels(
     output_dir_path = Path(output_dir)
     output_dir_path.mkdir(parents=True, exist_ok=True)
 
-    # --- load inputs ---
     adata = anndata.read_h5ad(h5ad_path)
     obs_names = adata.obs_names.astype(str).tolist()
 
-    azimuth_df = pd.read_csv(azimuth_csv_path, index_col=0)
-    azimuth_df.index = azimuth_df.index.astype(str)
-
-    missing_barcodes = set(obs_names) - set(azimuth_df.index)
-    if missing_barcodes:
-        sample = sorted(missing_barcodes)[:5]
-        raise ValueError(
-            f"{len(missing_barcodes)} barcodes from h5ad not found in Azimuth CSV " f"(first {len(sample)}): {sample}"
-        )
-    azimuth_df = azimuth_df.reindex(obs_names)
-
+    azimuth_df = _load_and_align_azimuth_df(azimuth_csv_path, obs_names)
     if level_specs is None:
         level_specs = infer_level_specs(azimuth_df)
+    _validate_level_cols(level_specs, azimuth_df)
 
-    missing_level_cols = [
-        col for label_col, score_col in level_specs for col in (label_col, score_col) if col not in azimuth_df.columns
-    ]
-    if missing_level_cols:
-        raise ValueError(
-            f"The following level columns are not present in the Azimuth CSV: {missing_level_cols}. "
-            f"Available columns: {list(azimuth_df.columns)}"
-        )
-
-    crosswalk_df = pd.read_csv(crosswalk_csv_path)
-    for col in (crosswalk_azimuth_col, crosswalk_cl_id_col):
-        if col not in crosswalk_df.columns:
-            raise ValueError(
-                f"Column '{col}' not found in crosswalk CSV. " f"Available columns: {list(crosswalk_df.columns)}"
-            )
-    crosswalk_map: t.Dict[str, str] = dict(
-        zip(crosswalk_df[crosswalk_azimuth_col].astype(str), crosswalk_df[crosswalk_cl_id_col].astype(str))
+    crosswalk_map, crosswalk_label_map = _load_crosswalk_maps(
+        crosswalk_csv_path, crosswalk_azimuth_col, crosswalk_cl_id_col, crosswalk_cl_label_col
     )
-    if crosswalk_cl_label_col is not None:
-        if crosswalk_cl_label_col not in crosswalk_df.columns:
-            raise ValueError(
-                f"Column '{crosswalk_cl_label_col}' not found in crosswalk CSV. "
-                f"Available columns: {list(crosswalk_df.columns)}"
-            )
-        crosswalk_label_map: t.Dict[str, str] = dict(
-            zip(crosswalk_df[crosswalk_azimuth_col].astype(str), crosswalk_df[crosswalk_cl_label_col].astype(str))
-        )
-    else:
-        crosswalk_label_map = {}
 
     # --- build label rows ---
     warned_missing: t.Set[str] = set()
@@ -126,38 +198,11 @@ def map_azimuth_to_cas_labels(
     label_cols = [f"cas_cell_type_label_{k}" for k in range(1, top_k + 1)]
     name_cols = [f"cas_cell_type_name_{k}" for k in range(1, top_k + 1)]
     score_cols = [f"cas_cell_type_score_{k}" for k in range(1, top_k + 1)]
-    rows: t.List[t.Dict[str, t.Any]] = []
 
-    for barcode in obs_names:
-        row: t.Dict[str, t.Any] = {}
-        for rank, (label_col, score_col) in enumerate(level_specs, start=1):
-            azimuth_label = azimuth_df.at[barcode, label_col] if label_col in azimuth_df.columns else None
-            azimuth_score = azimuth_df.at[barcode, score_col] if score_col in azimuth_df.columns else None
-
-            cl_id = None
-            cl_label = None
-            if azimuth_label is not None and not pd.isna(azimuth_label):
-                label_str = str(azimuth_label)
-                cl_id = crosswalk_map.get(label_str)
-                if cl_id is None:
-                    if label_str not in warned_missing:
-                        warnings.warn(
-                            f"Azimuth label '{label_str}' (column '{label_col}') not found in crosswalk "
-                            f"— filling with 'unknown' for rank {rank}."
-                        )
-                        warned_missing.add(label_str)
-                    cl_id = "unknown"
-                    cl_label = "unknown"
-                else:
-                    cl_label = crosswalk_label_map.get(label_str, label_str)
-
-            score = float(azimuth_score) if azimuth_score is not None and not pd.isna(azimuth_score) else None
-
-            row[f"cas_cell_type_label_{rank}"] = cl_label
-            row[f"cas_cell_type_name_{rank}"] = cl_id
-            row[f"cas_cell_type_score_{rank}"] = score
-
-        rows.append(row)
+    rows = [
+        _build_cell_row(barcode, level_specs, azimuth_df, crosswalk_map, crosswalk_label_map, warned_missing)
+        for barcode in obs_names
+    ]
 
     # Column order matches CAS annotate output: label_1..k, name_1..k, score_1..k
     ordered_cols = label_cols + name_cols + score_cols
