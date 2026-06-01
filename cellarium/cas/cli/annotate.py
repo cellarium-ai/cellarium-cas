@@ -46,6 +46,8 @@ def annotate(
     top_k: int = 3,
     save_metadata: bool = True,
     save_ontology_resource: bool = True,
+    output_h5ad: t.Optional[str] = None,
+    cluster_label_obs_column: t.Optional[str] = None,
 ) -> t.Dict[str, t.Any]:
     """
     Annotate a single-cell dataset using the CAS ontology-aware strategy and save outputs to disk.
@@ -69,10 +71,13 @@ def annotate(
     :param top_k: Number of top cell type calls per cell. Used when ``infer_labels=True``.
     :param save_metadata: If ``True``, save ``metadata.json`` with run provenance info.
     :param save_ontology_resource: If ``True``, save ``ontology_resource.json`` for offline benchmarking.
+    :param output_h5ad: If provided, insert CAS annotations into ``adata`` and save it as an ``.h5ad`` file at this path.
+    :param cluster_label_obs_column: If provided, run cluster-level label inference using this ``adata.obs`` column
+        and include ``cas_cluster_type_*`` columns in ``inferred_labels.csv``. Results are also written to the h5ad when ``output_h5ad`` is set.
 
     :returns: Dict of paths written:
         ``output_dir``, ``ontology_response_path``, and optionally
-        ``ontology_resource_path``, ``inferred_labels_path``, ``metadata_path``.
+        ``ontology_resource_path``, ``inferred_labels_path``, ``metadata_path``, ``output_h5ad_path``.
     """
     import pandas as pd
 
@@ -115,20 +120,42 @@ def annotate(
         if save_ontology_resource:
             result["ontology_resource_path"] = str(_save_ontology_resource(resource, output_dir_path))
 
-    if infer_labels:
+    if infer_labels or output_h5ad is not None or cluster_label_obs_column is not None:
         cas.insert_ontology_aware_response(response, adata)
+
+    if infer_labels:
         cas.compute_most_granular_top_k_calls_single(
             adata=adata,
             min_acceptable_score=min_acceptable_score,
             top_k=top_k,
         )
 
-        label_cols = [f"cas_cell_type_label_{i}" for i in range(1, top_k + 1)]
-        name_cols = [f"cas_cell_type_name_{i}" for i in range(1, top_k + 1)]
-        score_cols = [f"cas_cell_type_score_{i}" for i in range(1, top_k + 1)]
-        all_cols = [c for c in label_cols + name_cols + score_cols if c in adata.obs.columns]
+    if cluster_label_obs_column is not None:
+        cas.compute_most_granular_top_k_calls_cluster(
+            adata=adata,
+            min_acceptable_score=min_acceptable_score,
+            cluster_label_obs_column=cluster_label_obs_column,
+            top_k=top_k,
+            obs_prefix="cas_cluster_type",
+        )
+
+    if infer_labels or cluster_label_obs_column is not None:
+        label_cols = [f"cas_cell_type_label_{i}" for i in range(1, top_k + 1)] if infer_labels else []
+        name_cols = [f"cas_cell_type_name_{i}" for i in range(1, top_k + 1)] if infer_labels else []
+        score_cols = [f"cas_cell_type_score_{i}" for i in range(1, top_k + 1)] if infer_labels else []
+        cluster_label_cols = [f"cas_cluster_type_label_{i}" for i in range(1, top_k + 1)] if cluster_label_obs_column is not None else []
+        cluster_name_cols = [f"cas_cluster_type_name_{i}" for i in range(1, top_k + 1)] if cluster_label_obs_column is not None else []
+        cluster_score_cols = [f"cas_cluster_type_score_{i}" for i in range(1, top_k + 1)] if cluster_label_obs_column is not None else []
+        all_cols = [
+            c for c in label_cols + name_cols + score_cols + cluster_label_cols + cluster_name_cols + cluster_score_cols
+            if c in adata.obs.columns
+        ]
         df = pd.DataFrame(adata.obs[all_cols], index=adata.obs.index)
         result["inferred_labels_path"] = str(_save_inferred_labels(df, output_dir_path))
+
+    if output_h5ad is not None:
+        adata.write_h5ad(filename=output_h5ad, compression="gzip")
+        result["output_h5ad_path"] = str(output_h5ad)
 
     if save_metadata:
         metadata_dict = {
@@ -230,6 +257,17 @@ def annotate(
     show_default=True,
     help="Save ontology_resource.json. Required for offline ontology-aware benchmarking.",
 )
+@click.option(
+    "--output-h5ad",
+    default=None,
+    type=click.Path(dir_okay=False),
+    help="If provided, insert CAS annotations into the AnnData object and save it as an .h5ad file at this path.",
+)
+@click.option(
+    "--cluster-label",
+    default=None,
+    help="adata.obs column containing cluster labels. If provided, runs cluster-level label inference and includes results in inferred_labels.csv.",
+)
 def annotate_command(
     input_path: str,
     output_dir: str,
@@ -247,6 +285,8 @@ def annotate_command(
     top_k: int,
     save_metadata: bool,
     save_ontology_resource: bool,
+    output_h5ad: t.Optional[str],
+    cluster_label: t.Optional[str],
 ) -> None:
     """Annotate a single-cell dataset using the CAS ontology-aware strategy."""
     if cas_api_token is None:
@@ -274,6 +314,8 @@ def annotate_command(
         top_k=top_k,
         save_metadata=save_metadata,
         save_ontology_resource=save_ontology_resource,
+        output_h5ad=output_h5ad,
+        cluster_label_obs_column=cluster_label,
     )
 
     click.echo(f"Saved ontology response → {result['ontology_response_path']}")
@@ -283,3 +325,5 @@ def annotate_command(
         click.echo(f"Saved inferred labels  → {result['inferred_labels_path']}")
     if "metadata_path" in result:
         click.echo(f"Saved metadata         → {result['metadata_path']}")
+    if "output_h5ad_path" in result:
+        click.echo(f"Saved annotated h5ad   → {result['output_h5ad_path']}")
