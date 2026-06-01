@@ -27,4 +27,9 @@ COPY run.sh /scripts/run.sh
 
 RUN chmod +x /scripts/run.sh
 
+RUN useradd -m -u 1000 appuser \
+    && chown -R appuser:appuser /scripts
+
+USER appuser
+
 ENTRYPOINT ["/scripts/run.sh"]
