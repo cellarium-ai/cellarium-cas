@@ -34,6 +34,7 @@ extensions = [
     "sphinx_substitution_extensions",
     "sphinxcontrib.autodoc_pydantic",
     "IPython.sphinxext.ipython_console_highlighting",
+    "sphinx_click",
 ]
 
 exclude_patterns = ['_build', '**.ipynb_checkpoints']

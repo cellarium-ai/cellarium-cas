@@ -143,11 +143,18 @@ def annotate(
         label_cols = [f"cas_cell_type_label_{i}" for i in range(1, top_k + 1)] if infer_labels else []
         name_cols = [f"cas_cell_type_name_{i}" for i in range(1, top_k + 1)] if infer_labels else []
         score_cols = [f"cas_cell_type_score_{i}" for i in range(1, top_k + 1)] if infer_labels else []
-        cluster_label_cols = [f"cas_cluster_type_label_{i}" for i in range(1, top_k + 1)] if cluster_label_obs_column is not None else []
-        cluster_name_cols = [f"cas_cluster_type_name_{i}" for i in range(1, top_k + 1)] if cluster_label_obs_column is not None else []
-        cluster_score_cols = [f"cas_cluster_type_score_{i}" for i in range(1, top_k + 1)] if cluster_label_obs_column is not None else []
+        cluster_label_cols = (
+            [f"cas_cluster_type_label_{i}" for i in range(1, top_k + 1)] if cluster_label_obs_column is not None else []
+        )
+        cluster_name_cols = (
+            [f"cas_cluster_type_name_{i}" for i in range(1, top_k + 1)] if cluster_label_obs_column is not None else []
+        )
+        cluster_score_cols = (
+            [f"cas_cluster_type_score_{i}" for i in range(1, top_k + 1)] if cluster_label_obs_column is not None else []
+        )
         all_cols = [
-            c for c in label_cols + name_cols + score_cols + cluster_label_cols + cluster_name_cols + cluster_score_cols
+            c
+            for c in label_cols + name_cols + score_cols + cluster_label_cols + cluster_name_cols + cluster_score_cols
             if c in adata.obs.columns
         ]
         df = pd.DataFrame(adata.obs[all_cols], index=adata.obs.index)
