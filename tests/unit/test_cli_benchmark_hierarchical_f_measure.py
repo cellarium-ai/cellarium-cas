@@ -89,15 +89,15 @@ def test_run_hierarchical_f_measure_benchmark_writes_sample_and_total_outputs(tm
     total = summary[summary["row_type"] == "total"].iloc[0]
     assert total["annotate_dir"] == "__total__"
     assert total["input_path"] == "__all__"
-    assert total["hierarchical_precision"] == pytest.approx(2 / 3)
-    assert total["hierarchical_recall"] == pytest.approx(1 / 2)
-    assert total["hierarchical_f1"] == pytest.approx(4 / 7)
+    assert total["micro_hierarchical_precision"] == pytest.approx(2 / 3)
+    assert total["micro_hierarchical_recall"] == pytest.approx(1 / 2)
+    assert total["micro_hierarchical_f1"] == pytest.approx(4 / 7)
 
     total_class = class_level[class_level["row_type"] == "total"].iloc[0]
     assert total_class["ground_truth_class"] == "CL:0000002"
-    assert total_class["tp"] == 2.0
-    assert total_class["fp"] == 1.0
-    assert total_class["fn"] == 2.0
+    assert total_class["tp"] == pytest.approx(2.0)
+    assert total_class["fp"] == pytest.approx(1.0)
+    assert total_class["fn"] == pytest.approx(2.0)
 
 
 def test_run_hierarchical_f_measure_benchmark_requires_ontology_resource(tmp_path):

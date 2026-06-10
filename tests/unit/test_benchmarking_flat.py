@@ -106,59 +106,67 @@ def test_effective_preds_empty_predictions():
 # Tests: compute_flat_metrics — summary mode
 
 
-def test_compute_flat_metrics_perfect_predictions_accuracy_1(perfect_predictions):
+def test_compute_flat_metrics_perfect_predictions_flat_f1_1(perfect_predictions):
     gts, preds = perfect_predictions
     df = compute_flat_metrics(gts, preds, top_k=1)
+
     assert len(df) == 1
-    assert df.loc[0, "top_1_accuracy"] == pytest.approx(1.0)
+    assert df.loc[0, "micro_flat_precision"] == pytest.approx(1.0)
+    assert df.loc[0, "micro_flat_recall"] == pytest.approx(1.0)
+    assert df.loc[0, "micro_flat_f1"] == pytest.approx(1.0)
 
 
-def test_compute_flat_metrics_all_wrong_accuracy_0_at_k1(all_wrong_predictions):
+def test_compute_flat_metrics_all_wrong_flat_f1_0_at_k1(all_wrong_predictions):
     gts, preds = all_wrong_predictions
     df = compute_flat_metrics(gts, preds, top_k=1)
-    assert df.loc[0, "top_1_accuracy"] == pytest.approx(0.0)
+
+    assert df.loc[0, "micro_flat_precision"] == pytest.approx(0.0)
+    assert df.loc[0, "micro_flat_recall"] == pytest.approx(0.0)
+    assert df.loc[0, "micro_flat_f1"] == pytest.approx(0.0)
 
 
-def test_compute_flat_metrics_top2_hit_accuracy_at_k2(top2_hit_predictions):
+def test_compute_flat_metrics_top2_hit_flat_f1_at_k2(top2_hit_predictions):
     gts, preds = top2_hit_predictions
     df = compute_flat_metrics(gts, preds, top_k=2)
-    # At k=1: all wrong (GT is at rank-2)
-    assert df.loc[0, "top_1_accuracy"] == pytest.approx(0.0)
-    # At k=2: all correct
-    assert df.loc[0, "top_2_accuracy"] == pytest.approx(1.0)
+
+    assert df.loc[0, "micro_flat_f1"] == pytest.approx(1.0)
 
 
-def test_compute_flat_metrics_returns_all_k_columns(perfect_predictions):
-    gts, preds = perfect_predictions
-    df = compute_flat_metrics(gts, preds, top_k=3)
-    assert len(df) == 1
-    for k in range(1, 4):
-        assert f"top_{k}_accuracy" in df.columns
-
-
-def test_compute_flat_metrics_columns_present(perfect_predictions):
+def test_compute_flat_metrics_summary_columns_match_hierarchical_shape(perfect_predictions):
     gts, preds = perfect_predictions
     df = compute_flat_metrics(gts, preds, top_k=1)
-    expected_cols = {
+
+    assert list(df.columns) == [
         "n_cells",
-        "top_1_accuracy",
-        "top_1_macro_f1",
-        "top_1_weighted_f1",
-        "top_1_macro_precision",
-        "top_1_weighted_precision",
-        "top_1_macro_recall",
-        "top_1_weighted_recall",
-    }
-    assert expected_cols.issubset(set(df.columns))
+        "micro_flat_precision",
+        "micro_flat_recall",
+        "micro_flat_f1",
+        "macro_flat_precision",
+        "macro_flat_recall",
+        "macro_flat_f1",
+        "macro_weighted_flat_precision",
+        "macro_weighted_flat_recall",
+        "macro_weighted_flat_f1",
+    ]
 
 
 def test_compute_flat_metrics_top_k_inferred_when_none(perfect_predictions):
     gts, preds = perfect_predictions
-    df = compute_flat_metrics(gts, preds)  # top_k=None → infer from min pred length
+    df = compute_flat_metrics(gts, preds)  # top_k=None → infer from longest pred length
+
     assert len(df) == 1
-    # all pred lists have length 3, so top_1 through top_3 columns should exist
-    for k in range(1, 4):
-        assert f"top_{k}_accuracy" in df.columns
+    assert df.loc[0, "micro_flat_f1"] == pytest.approx(1.0)
+
+
+def test_compute_flat_metrics_top_k_inferred_from_longest_prediction():
+    df = compute_flat_metrics(["A", "B"], [["A"], ["X", "B"]])
+
+    assert df.loc[0, "micro_flat_f1"] == pytest.approx(1.0)
+
+
+def test_compute_flat_metrics_top_k_not_inferable_raises():
+    with pytest.raises(ValueError, match="top_k must be positive"):
+        compute_flat_metrics(["A"], [[]])
 
 
 def test_compute_flat_metrics_length_mismatch_raises():
@@ -172,24 +180,42 @@ def test_compute_flat_metrics_empty_returns_empty_df():
     assert len(df) == 0
 
 
-# Tests: compute_flat_metrics — cell-level mode
+# Tests: compute_flat_metrics — class-level mode
 
 
-def test_compute_flat_metrics_cell_level_shape(perfect_predictions):
-    gts, preds = perfect_predictions
-    df = compute_flat_metrics(gts, preds, top_k=2, cell_level=True)
-    # one row per cell
-    assert len(df) == 4
+def test_compute_flat_metrics_class_level_columns():
+    df = compute_flat_metrics(["A", "B"], [["A"], ["X"]], top_k=1, class_level=True)
+
+    assert list(df.columns) == [
+        "ground_truth_class",
+        "support",
+        "weight",
+        "tp",
+        "fp",
+        "fn",
+        "flat_precision",
+        "flat_recall",
+        "flat_f1",
+    ]
 
 
-def test_compute_flat_metrics_cell_level_columns(perfect_predictions):
-    gts, preds = perfect_predictions
-    df = compute_flat_metrics(gts, preds, top_k=1, cell_level=True)
-    assert set(df.columns) == {"cell_index", "ground_truth", "top_1_effective_prediction", "top_1_correct"}
+def test_compute_flat_metrics_class_level_counts_and_weighted_summary():
+    gts = ["A", "A", "B"]
+    preds = [["A"], ["X"], ["B"]]
 
+    class_df = compute_flat_metrics(gts, preds, top_k=1, class_level=True)
+    row_a = class_df[class_df["ground_truth_class"] == "A"].iloc[0]
+    row_b = class_df[class_df["ground_truth_class"] == "B"].iloc[0]
 
-def test_compute_flat_metrics_cell_level_correct_flags(perfect_predictions):
-    gts, preds = perfect_predictions
-    df = compute_flat_metrics(gts, preds, top_k=1, cell_level=True)
-    # All top-1 are correct for perfect_predictions
-    assert df["top_1_correct"].all()
+    assert row_a["support"] == 2
+    assert row_a["weight"] == pytest.approx(2 / 3)
+    assert row_a["tp"] == pytest.approx(1.0)
+    assert row_a["fp"] == pytest.approx(1.0)
+    assert row_a["fn"] == pytest.approx(1.0)
+    assert row_a["flat_f1"] == pytest.approx(0.5)
+    assert row_b["flat_f1"] == pytest.approx(1.0)
+
+    summary = compute_flat_metrics(gts, preds, top_k=1)
+    assert summary.loc[0, "micro_flat_f1"] == pytest.approx(2 / 3)
+    assert summary.loc[0, "macro_flat_f1"] == pytest.approx(3 / 4)
+    assert summary.loc[0, "macro_weighted_flat_f1"] == pytest.approx(2 / 3)

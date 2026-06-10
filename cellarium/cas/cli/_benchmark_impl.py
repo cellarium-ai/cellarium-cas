@@ -14,7 +14,9 @@ import anndata
 import pandas as pd
 
 from cellarium.cas.benchmarking.flat import compute_flat_metrics
-from cellarium.cas.benchmarking.hierarchical_f_measure import compute_hierarchical_f_measure_metrics
+from cellarium.cas.benchmarking.hierarchical_f_measure import (
+    compute_hierarchical_f_measure_metrics,
+)
 from cellarium.cas.benchmarking.ontology_aware import compute_ontology_aware_metrics
 from cellarium.cas.logging import logger
 from cellarium.cas.models import CellTypeOntologyAwareResults
@@ -30,12 +32,15 @@ from ._io import (
     load_ontology_response,
 )
 
+LOG_PROCESSING_ANNOTATE_DIR = "Processing annotate output directory: %s"
+LOG_BENCHMARKING_INPUT = "Benchmarking input_path=%s model_name=%s"
+
 
 def run_flat_benchmark(
     annotate_dirs: t.Union[str, Path],
     gt_column_name: str,
     output_dir: t.Union[str, Path],
-    save_cell_level: bool = False,
+    save_class_level: bool = False,
 ) -> t.Dict[str, t.Any]:
     """
     Compute flat classification metrics across one or more annotate output directories.
@@ -49,13 +54,25 @@ def run_flat_benchmark(
     dirs = collect_annotate_output_dirs(annotate_dirs)
     logger.info("Collected %d annotate output directories for flat benchmarking.", len(dirs))
     summary_rows: t.List[pd.DataFrame] = []
+    class_rows: t.List[pd.DataFrame] = []
+    totals_by_model: t.Dict[str, t.Dict[str, t.Any]] = {}
+
+    def _add_flat_context_columns(
+        df: pd.DataFrame, annotate_dir: str, row_type: str, input_path: str, model_name: str
+    ) -> pd.DataFrame:
+        df = df.copy()
+        df.insert(0, "model_name", model_name)
+        df.insert(0, "input_path", input_path)
+        df.insert(0, "row_type", row_type)
+        df.insert(0, "annotate_dir", annotate_dir)
+        return df
 
     for d in dirs:
-        logger.info("Processing annotate output directory: %s", d)
+        logger.info(LOG_PROCESSING_ANNOTATE_DIR, d)
         metadata = load_metadata(d)
         input_path = metadata["input_path"]
         model_name = metadata.get("model_name", "unknown")
-        logger.info("Benchmarking input_path=%s model_name=%s", input_path, model_name)
+        logger.info(LOG_BENCHMARKING_INPUT, input_path, model_name)
 
         adata = anndata.read_h5ad(input_path)
         if gt_column_name not in adata.obs.columns:
@@ -69,18 +86,34 @@ def run_flat_benchmark(
         top_k = _infer_top_k(labels_df)
         predictions = _extract_label_predictions(labels_df, top_k)
 
-        summary = compute_flat_metrics(ground_truths, predictions, top_k=top_k, cell_level=False)
-        summary.insert(0, "model_name", model_name)
-        summary.insert(0, "input_path", input_path)
-        summary.insert(0, "annotate_dir", d.name)
-        summary_rows.append(summary)
+        total = totals_by_model.setdefault(model_name, {"ground_truths": [], "predictions": [], "top_k": top_k})
+        if total["top_k"] != top_k:
+            raise ValueError(
+                f"All annotate output directories for model '{model_name}' must have the same top_k "
+                f"to compute global flat metric totals."
+            )
+        total["ground_truths"].extend(ground_truths)
+        total["predictions"].extend(predictions)
 
-        if save_cell_level:
-            cell_df = compute_flat_metrics(ground_truths, predictions, top_k=top_k, cell_level=True)
-            cell_path = output_dir_path / f"{d.name}_cell_level_flat.csv"
-            logger.info("Writing flat cell-level metrics to: %s (%d rows)", cell_path, len(cell_df))
-            cell_df.to_csv(cell_path, index=False)
+        summary = compute_flat_metrics(ground_truths, predictions, top_k=top_k, class_level=False)
+        summary_rows.append(_add_flat_context_columns(summary, d.name, "sample", input_path, model_name))
 
+        if save_class_level:
+            class_df = compute_flat_metrics(ground_truths, predictions, top_k=top_k, class_level=True)
+            class_rows.append(_add_flat_context_columns(class_df, d.name, "sample", input_path, model_name))
+
+    for model_name in sorted(totals_by_model):
+        total = totals_by_model[model_name]
+        summary = compute_flat_metrics(
+            total["ground_truths"], total["predictions"], top_k=total["top_k"], class_level=False
+        )
+        summary_rows.append(_add_flat_context_columns(summary, "__total__", "total", "__all__", model_name))
+
+        if save_class_level:
+            class_df = compute_flat_metrics(
+                total["ground_truths"], total["predictions"], top_k=total["top_k"], class_level=True
+            )
+            class_rows.append(_add_flat_context_columns(class_df, "__total__", "total", "__all__", model_name))
     if not summary_rows:
         raise ValueError("No results produced — check that annotate_dirs contains valid directories.")
 
@@ -89,11 +122,19 @@ def run_flat_benchmark(
     combined.to_csv(summary_path, index=False)
     logger.info("Writing flat benchmark summary to: %s (%d rows)", summary_path, len(combined))
 
-    return {
+    result = {
         "summary_path": str(summary_path),
         "n_combinations": len(dirs),
         "n_summary_rows": len(combined),
     }
+    if save_class_level:
+        class_level = pd.concat(class_rows, ignore_index=True) if class_rows else pd.DataFrame()
+        class_level_path = output_dir_path / "flat_benchmark_class_level.csv"
+        logger.info("Writing flat class-level metrics to: %s (%d rows)", class_level_path, len(class_level))
+        class_level.to_csv(class_level_path, index=False)
+        result["class_level_path"] = str(class_level_path)
+        result["n_class_level_rows"] = len(class_level)
+    return result
 
 
 def run_ontology_aware_benchmark(
@@ -117,11 +158,11 @@ def run_ontology_aware_benchmark(
     summary_rows: t.List[pd.DataFrame] = []
 
     for d in dirs:
-        logger.info("Processing annotate output directory: %s", d)
+        logger.info(LOG_PROCESSING_ANNOTATE_DIR, d)
         metadata = load_metadata(d)
         input_path = metadata["input_path"]
         model_name = metadata.get("model_name", "unknown")
-        logger.info("Benchmarking input_path=%s model_name=%s", input_path, model_name)
+        logger.info(LOG_BENCHMARKING_INPUT, input_path, model_name)
 
         adata = anndata.read_h5ad(input_path)
         if gt_cl_column_name not in adata.obs.columns:
@@ -208,11 +249,11 @@ def run_hierarchical_f_measure_benchmark(
         return df
 
     for d in dirs:
-        logger.info("Processing annotate output directory: %s", d)
+        logger.info(LOG_PROCESSING_ANNOTATE_DIR, d)
         metadata = load_metadata(d)
         input_path = metadata["input_path"]
         model_name = metadata.get("model_name", "unknown")
-        logger.info("Benchmarking input_path=%s model_name=%s", input_path, model_name)
+        logger.info(LOG_BENCHMARKING_INPUT, input_path, model_name)
 
         adata = anndata.read_h5ad(input_path)
         if gt_cl_column_name not in adata.obs.columns:

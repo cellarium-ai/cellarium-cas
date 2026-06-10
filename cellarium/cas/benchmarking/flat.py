@@ -3,6 +3,35 @@ import typing as t
 import pandas as pd
 from sklearn.metrics import f1_score, precision_score, recall_score
 
+_SUMMARY_COLUMNS = [
+    "n_cells",
+    "micro_flat_precision",
+    "micro_flat_recall",
+    "micro_flat_f1",
+    "macro_flat_precision",
+    "macro_flat_recall",
+    "macro_flat_f1",
+    "macro_weighted_flat_precision",
+    "macro_weighted_flat_recall",
+    "macro_weighted_flat_f1",
+]
+
+_CLASS_LEVEL_COLUMNS = [
+    "ground_truth_class",
+    "support",
+    "weight",
+    "tp",
+    "fp",
+    "fn",
+    "flat_precision",
+    "flat_recall",
+    "flat_f1",
+]
+
+
+def _safe_divide(numerator: float, denominator: float) -> float:
+    return numerator / denominator if denominator > 0.0 else 0.0
+
 
 def extract_predictions_from_adata(
     adata: t.Any,
@@ -22,17 +51,10 @@ def extract_predictions_from_adata(
 
     :return: List of length ``n_obs``, each element a list of up to ``top_k`` predicted labels.
     """
-    predictions: t.List[t.List[str]] = []
-    for _, row in adata.obs.iterrows():
-        cell_preds = []
-        for rank in range(1, top_k + 1):
-            col = f"{column_prefix}_{rank}"
-            if col in adata.obs.columns:
-                val = row[col]
-                if pd.notna(val):
-                    cell_preds.append(str(val))
-        predictions.append(cell_preds)
-    return predictions
+    cols = [f"{column_prefix}_{rank}" for rank in range(1, top_k + 1) if f"{column_prefix}_{rank}" in adata.obs.columns]
+    return [
+        [str(value) for value in row if pd.notna(value)] for row in adata.obs[cols].itertuples(index=False, name=None)
+    ]
 
 
 def _effective_predictions_at_k(
@@ -62,38 +84,82 @@ def _effective_predictions_at_k(
     return ground_truths, effective_preds
 
 
+def _build_class_level_rows(ground_truths: t.List[str], effective_preds: t.List[str]) -> pd.DataFrame:
+    n_cells = len(ground_truths)
+    indices_by_class: t.Dict[str, t.List[int]] = {}
+    for i, ground_truth_class in enumerate(ground_truths):
+        indices_by_class.setdefault(ground_truth_class, []).append(i)
+
+    rows: t.List[t.Dict[str, t.Any]] = []
+    for ground_truth_class in sorted(indices_by_class):
+        indices = indices_by_class[ground_truth_class]
+        tp = 0.0
+        fp = 0.0
+        fn = 0.0
+
+        for i in indices:
+            if effective_preds[i] == ground_truth_class:
+                tp += 1.0
+            else:
+                fp += 1.0
+                fn += 1.0
+
+        precision = _safe_divide(tp, tp + fp)
+        recall = _safe_divide(tp, tp + fn)
+        f1 = _safe_divide(2.0 * precision * recall, precision + recall)
+        support = len(indices)
+
+        rows.append(
+            {
+                "ground_truth_class": ground_truth_class,
+                "support": support,
+                "weight": support / n_cells,
+                "tp": tp,
+                "fp": fp,
+                "fn": fn,
+                "flat_precision": precision,
+                "flat_recall": recall,
+                "flat_f1": f1,
+            }
+        )
+
+    return pd.DataFrame(rows, columns=_CLASS_LEVEL_COLUMNS)
+
+
 def compute_flat_metrics(
     ground_truths: t.List[str],
     predictions: t.List[t.List[str]],
     top_k: t.Optional[int] = None,
-    cell_level: bool = False,
+    class_level: bool = False,
 ) -> pd.DataFrame:
     """
-    Compute flat (taxonomy-agnostic) classification metrics at each k from 1 to ``top_k``.
+    Compute flat (taxonomy-agnostic) classification metrics at ``top_k``.
 
     Uses standard multi-class top-k evaluation: a prediction at rank k is considered
     correct if the ground truth label appears anywhere in the top-k predictions.
-    Computes accuracy, macro and weighted F1, precision, and recall via scikit-learn.
+    The output mirrors ``compute_hierarchical_f_measure_metrics``: summary mode returns
+    one row with micro, macro, and support-weighted macro metrics; class-level mode
+    returns one row per ground-truth class.
 
     :param ground_truths: Ground truth label per cell. Must have the same length as ``predictions``.
     :param predictions: Ranked predictions per cell. Each inner list contains labels ordered
-        by rank (highest confidence first). All inner lists should have at least ``top_k`` entries.
-    :param top_k: Evaluate metrics at k=1 through k=``top_k``. Defaults to the length of
-        the shortest prediction list.
-    :param cell_level: If ``False`` (default), return a summary DataFrame with one row per k
-        containing aggregated metrics. If ``True``, return a per-cell DataFrame with
-        correct/incorrect flags at each k.
+        by rank (highest confidence first).
+    :param top_k: Evaluate metrics at this k. Defaults to the longest prediction list, so all
+        supplied ranks are considered.
+    :param class_level: If ``False`` (default), return one summary row. If ``True``, return
+        one row per ground-truth class with pooled binary counts.
 
     :return:
-        - Summary (``cell_level=False``): DataFrame with a single row and columns
-          ``n_cells``, ``top_{k}_accuracy``, ``top_{k}_macro_f1``, ``top_{k}_weighted_f1``,
-          ``top_{k}_macro_precision``, ``top_{k}_weighted_precision``, ``top_{k}_macro_recall``,
-          ``top_{k}_weighted_recall`` for k in 1..``top_k``.
-        - Cell-level (``cell_level=True``): DataFrame with columns
-          ``cell_index``, ``ground_truth``, ``top_{k}_effective_prediction``, ``top_{k}_correct``
-          for k in 1..``top_k``.
+        - Summary (``class_level=False``): DataFrame with columns ``n_cells``,
+          ``micro_flat_precision``, ``micro_flat_recall``, ``micro_flat_f1``,
+          ``macro_flat_precision``, ``macro_flat_recall``, ``macro_flat_f1``,
+          ``macro_weighted_flat_precision``, ``macro_weighted_flat_recall``,
+          ``macro_weighted_flat_f1``.
+        - Class-level (``class_level=True``): DataFrame with columns
+          ``ground_truth_class``, ``support``, ``weight``, ``tp``, ``fp``, ``fn``,
+          ``flat_precision``, ``flat_recall``, ``flat_f1``.
 
-    :raises ValueError: If ``len(ground_truths) != len(predictions)``.
+    :raises ValueError: If ``len(ground_truths) != len(predictions)``, or if ``top_k`` is not positive.
     """
     if len(ground_truths) != len(predictions):
         raise ValueError(
@@ -106,32 +172,28 @@ def compute_flat_metrics(
         return pd.DataFrame()
 
     if top_k is None:
-        pred_lengths = [len(p) for p in predictions]
-        top_k = min(pred_lengths) if pred_lengths else 1
+        top_k = max(len(p) for p in predictions)
+    if top_k < 1:
+        raise ValueError("top_k must be positive or inferable from at least one prediction.")
 
-    if cell_level:
-        cell_rows: t.List[t.Dict[str, t.Any]] = [
-            {"cell_index": i, "ground_truth": gt} for i, gt in enumerate(ground_truths)
-        ]
-        for k in range(1, top_k + 1):
-            _, effective_preds = _effective_predictions_at_k(ground_truths, predictions, k)
-            for i, (gt, eff_pred) in enumerate(zip(ground_truths, effective_preds)):
-                cell_rows[i][f"top_{k}_effective_prediction"] = eff_pred
-                cell_rows[i][f"top_{k}_correct"] = gt == eff_pred
-        return pd.DataFrame(cell_rows)
+    gts, effective_preds = _effective_predictions_at_k(ground_truths, predictions, top_k)
+    class_df = _build_class_level_rows(gts, effective_preds)
+    if class_level:
+        return class_df
 
-    summary: t.Dict[str, t.Any] = {"n_cells": n_cells}
-    for k in range(1, top_k + 1):
-        gts, effective_preds = _effective_predictions_at_k(ground_truths, predictions, k)
-        accuracy = sum(gt in preds[:k] for gt, preds in zip(ground_truths, predictions)) / n_cells
-        summary[f"top_{k}_accuracy"] = accuracy
-        summary[f"top_{k}_macro_f1"] = f1_score(gts, effective_preds, average="macro", zero_division=0)
-        summary[f"top_{k}_weighted_f1"] = f1_score(gts, effective_preds, average="weighted", zero_division=0)
-        summary[f"top_{k}_macro_precision"] = precision_score(gts, effective_preds, average="macro", zero_division=0)
-        summary[f"top_{k}_weighted_precision"] = precision_score(
-            gts, effective_preds, average="weighted", zero_division=0
-        )
-        summary[f"top_{k}_macro_recall"] = recall_score(gts, effective_preds, average="macro", zero_division=0)
-        summary[f"top_{k}_weighted_recall"] = recall_score(gts, effective_preds, average="weighted", zero_division=0)
-
-    return pd.DataFrame([summary])
+    micro_flat_precision = precision_score(gts, effective_preds, average="micro", zero_division=0)
+    micro_flat_recall = recall_score(gts, effective_preds, average="micro", zero_division=0)
+    micro_flat_f1 = f1_score(gts, effective_preds, average="micro", zero_division=0)
+    summary = {
+        "n_cells": n_cells,
+        "micro_flat_precision": micro_flat_precision,
+        "micro_flat_recall": micro_flat_recall,
+        "micro_flat_f1": micro_flat_f1,
+        "macro_flat_precision": float(class_df["flat_precision"].mean()),
+        "macro_flat_recall": float(class_df["flat_recall"].mean()),
+        "macro_flat_f1": float(class_df["flat_f1"].mean()),
+        "macro_weighted_flat_precision": float((class_df["weight"] * class_df["flat_precision"]).sum()),
+        "macro_weighted_flat_recall": float((class_df["weight"] * class_df["flat_recall"]).sum()),
+        "macro_weighted_flat_f1": float((class_df["weight"] * class_df["flat_f1"]).sum()),
+    }
+    return pd.DataFrame([summary], columns=_SUMMARY_COLUMNS)

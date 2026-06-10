@@ -3,11 +3,12 @@ import typing as t
 import warnings
 from pathlib import Path
 
+import anndata
+import pandas as pd
+
 
 def _load_and_align_azimuth_df(azimuth_csv_path: str, obs_names: t.List[str]) -> t.Any:
     """Load the Azimuth CSV, validate barcode coverage, and reindex to *obs_names* order."""
-    import pandas as pd
-
     azimuth_df = pd.read_csv(azimuth_csv_path, index_col=0)
     azimuth_df.index = azimuth_df.index.astype(str)
     missing_barcodes = set(obs_names) - set(azimuth_df.index)
@@ -38,8 +39,6 @@ def _load_crosswalk_maps(
     crosswalk_cl_label_col: t.Optional[str],
 ) -> t.Tuple[t.Dict[str, str], t.Dict[str, str]]:
     """Load crosswalk CSV and return ``(crosswalk_map, crosswalk_label_map)``."""
-    import pandas as pd
-
     crosswalk_df = pd.read_csv(crosswalk_csv_path)
     required_cols = [crosswalk_azimuth_col, crosswalk_cl_id_col]
     if crosswalk_cl_label_col is not None:
@@ -70,8 +69,6 @@ def _map_azimuth_label(
     warned_missing: t.Set[str],
 ) -> t.Tuple[t.Optional[str], t.Optional[str]]:
     """Map a single Azimuth label to ``(cl_id, cl_label)``, warning once per unknown label."""
-    import pandas as pd
-
     if azimuth_label is None or pd.isna(azimuth_label):
         return None, None
     label_str = str(azimuth_label)
@@ -96,8 +93,6 @@ def _build_cell_row(
     warned_missing: t.Set[str],
 ) -> t.Dict[str, t.Any]:
     """Build one output row dict for *barcode* across all annotation levels."""
-    import pandas as pd
-
     row: t.Dict[str, t.Any] = {}
     for rank, (label_col, score_col) in enumerate(level_specs, start=1):
         azimuth_label = azimuth_df.at[barcode, label_col]
@@ -174,9 +169,6 @@ def map_azimuth_to_cas_labels(
     :raises ValueError: If barcodes in the h5ad are missing from the Azimuth CSV, or if
         required columns are absent from either input CSV.
     """
-    import anndata
-    import pandas as pd
-
     output_dir_path = Path(output_dir)
     output_dir_path.mkdir(parents=True, exist_ok=True)
 

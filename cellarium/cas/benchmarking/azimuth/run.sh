@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-if [ "$#" -lt 3 ]; then
+if [[ "$#" -lt 3 ]]; then
   echo "Usage: run.sh <input_h5ad_path> <azimuth_reference> <output_csv_path>"
   exit 1
 fi

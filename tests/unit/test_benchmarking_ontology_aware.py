@@ -143,8 +143,8 @@ def test_exact_match_is_tp_at_hop0(graph):
     hops = _build_hop_neighborhoods("CL:0000002", num_hops=2, graph=graph)
     matches = [make_match("CL:0000002", 1.0)]
     metrics = _compute_cell_metrics(matches, hops, graph, num_hops=2)
-    assert metrics["hop_0_sensitivity"] == pytest.approx(1.0)
-    assert metrics["hop_0_specificity"] == pytest.approx(1.0)
+    assert metrics["hop_0_tpr"] == pytest.approx(1.0)
+    assert metrics["hop_0_tnr"] == pytest.approx(1.0)
 
 
 def test_sibling_is_tp_at_hop2_not_hop0(graph):
@@ -155,8 +155,8 @@ def test_sibling_is_tp_at_hop2_not_hop0(graph):
     hops = _build_hop_neighborhoods("CL:0000002", num_hops=2, graph=graph)
     matches = [make_match("CL:0000003", 0.8)]
     metrics = _compute_cell_metrics(matches, hops, graph, num_hops=2)
-    assert metrics["hop_0_sensitivity"] < 1.0  # not TP at hop-0
-    assert metrics["hop_2_sensitivity"] == pytest.approx(0.8)  # TP at hop-2
+    assert metrics["hop_0_tpr"] < 1.0  # not TP at hop-0
+    assert metrics["hop_2_tpr"] == pytest.approx(0.8)  # TP at hop-2
 
 
 def test_unrelated_term_is_fp_at_all_hops(graph):
@@ -165,14 +165,14 @@ def test_unrelated_term_is_fp_at_all_hops(graph):
     matches = [make_match("CL:9999999", 0.9)]  # unknown term
     metrics = _compute_cell_metrics(matches, hops, graph, num_hops=2)
     # Unknown term not in term_ancestors → skipped, so no TP and no FP
-    assert metrics["hop_0_sensitivity"] == pytest.approx(0.0)
+    assert metrics["hop_0_tpr"] == pytest.approx(0.0)
 
 
-def test_no_matches_gives_zero_sensitivity(graph):
+def test_no_matches_gives_zero_tpr(graph):
     hops = _build_hop_neighborhoods("CL:0000002", num_hops=2, graph=graph)
     metrics = _compute_cell_metrics([], hops, graph, num_hops=2)
     for i in range(3):
-        assert metrics[f"hop_{i}_sensitivity"] == pytest.approx(0.0)
+        assert metrics[f"hop_{i}_tpr"] == pytest.approx(0.0)
 
 
 # Tests: compute_ontology_aware_metrics
@@ -208,17 +208,17 @@ def test_compute_ontology_aware_metrics_summary_has_hop_columns():
     response = make_response(annotations)
     df = compute_ontology_aware_metrics(response, ["CL:0000002"], MOCK_ONTOLOGY_RESOURCE, num_hops=2)
     for i in range(3):
-        assert f"hop_{i}_sensitivity" in df.columns
-        assert f"hop_{i}_specificity" in df.columns
+        assert f"hop_{i}_tpr" in df.columns
+        assert f"hop_{i}_tnr" in df.columns
         assert f"hop_{i}_f1_score" in df.columns
 
 
 def test_compute_ontology_aware_metrics_perfect_prediction():
-    # Predict exact GT → sensitivity = 1.0 at hop-0
+    # Predict exact GT → TPR = 1.0 at hop-0
     annotations = [make_annotation("c1", [make_match("CL:0000002", 1.0)])]
     response = make_response(annotations)
     df = compute_ontology_aware_metrics(response, ["CL:0000002"], MOCK_ONTOLOGY_RESOURCE, num_hops=2)
-    assert df.loc[0, "hop_0_sensitivity"] == pytest.approx(1.0)
+    assert df.loc[0, "hop_0_tpr"] == pytest.approx(1.0)
 
 
 def test_compute_ontology_aware_metrics_cell_level_shape():

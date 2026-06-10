@@ -12,7 +12,7 @@ evaluate annotation quality against a labelled reference dataset:
 * **Hierarchical F-measure benchmarking** (``cellarium.cas.benchmarking.compute_hierarchical_f_measure_metrics``) —
   computes HiClass-compatible micro hP/hR/hF and a support-weighted per-ground-truth-class hP/hR/hF.
 * **Flat benchmarking** (``cellarium.cas.benchmarking.compute_flat_metrics``) —
-  taxonomy-agnostic top-k accuracy, F1, precision, and recall via scikit-learn.
+  taxonomy-agnostic top-k flat precision/recall/F1 with the same summary/class-level shape as hierarchical F-measure.
 
 Prerequisites
 +++++++++++++
@@ -101,8 +101,8 @@ Run the metric
     print(summary)
 
 The summary ``DataFrame`` has a single row with columns
-``n_cells``, ``hop_0_sensitivity``, ``hop_0_specificity``, ``hop_0_f1_score``, …
-``hop_4_sensitivity``, ``hop_4_specificity``, ``hop_4_f1_score``.
+``n_cells``, ``hop_0_tpr``, ``hop_0_tnr``, ``hop_0_f1_score``, …
+``hop_4_tpr``, ``hop_4_tnr``, ``hop_4_f1_score``.
 
 **Hop semantics**: at hop-N a predicted CL term is considered a *true positive* if it
 lies within N bidirectional steps of the ground-truth term in the ontology graph.
@@ -123,7 +123,7 @@ Pass ``cell_level=True`` to get a row per cell, useful for per-cluster analysis:
         num_hops=4,
         cell_level=True,
     )
-    # Columns: query_cell_id, ground_truth, hop_0_sensitivity, …, hop_4_f1_score
+    # Columns: query_cell_id, ground_truth, hop_0_tpr, …, hop_4_f1_score
 
 Step 4 — Hierarchical F-measure benchmarking
 ++++++++++++++++++++++++++++++++++++++++++++
@@ -146,15 +146,15 @@ The hierarchical F-measure path treats every cell as a pair of ontology node set
     )
 
 The summary ``DataFrame`` has exactly these columns: ``n_cells``,
-``hierarchical_precision``, ``hierarchical_recall``, ``hierarchical_f1``,
+``micro_hierarchical_precision``, ``micro_hierarchical_recall``,
+``micro_hierarchical_f1``, ``macro_hierarchical_precision``,
+``macro_hierarchical_recall``, ``macro_hierarchical_f1``,
 ``macro_weighted_hierarchical_precision``, ``macro_weighted_hierarchical_recall``,
 and ``macro_weighted_hierarchical_f1``.
 
-The micro ``hierarchical_precision``, ``hierarchical_recall``, and ``hierarchical_f1``
-columns use the literature-defined HiClass ``average=\"micro\"`` set-count ratios.
-HiClass ``average=\"macro\"`` is not this CAS macro-weighted metric: CAS pools binary
-node counts per ground-truth class first, computes class hP/hR/hF from those pooled
-counts, then support-weights the class scores.
+The micro columns use the literature-defined HiClass ``average=\"micro\"`` set-count
+ratios. The macro columns are unweighted means of the per-ground-truth-class rows.
+The macro-weighted columns use the same class rows, weighted by class support.
 
 When used through ``cellarium-cas benchmark hierarchical-f-measure``, the summary CSV
 contains one ``row_type=\"sample\"`` row per annotate output directory and one
@@ -210,16 +210,18 @@ Extract predictions and run the metric
     summary = compute_flat_metrics(
         ground_truths=ground_truths,
         predictions=predictions,
-        top_k=5,           # evaluate at k=1 through k=5
-        cell_level=False,  # True → one row per (cell, k) pair
+        top_k=5,           # evaluate using the effective top-5 prediction
+        class_level=False, # True → one row per ground-truth class
     )
     print(summary)
 
-The summary ``DataFrame`` has a single row with columns ``n_cells``,
-``top_1_accuracy``, ``top_1_macro_f1``, ``top_1_weighted_f1``, …
-``top_5_accuracy``, ``top_5_macro_f1``, ``top_5_weighted_f1``, and
-corresponding ``macro_precision``, ``weighted_precision``,
-``macro_recall``, ``weighted_recall`` columns for each k.
+The summary ``DataFrame`` has the same shape as hierarchical F-measure output: one row
+with ``n_cells``, ``micro_flat_precision``, ``micro_flat_recall``, ``micro_flat_f1``,
+``macro_flat_precision``, ``macro_flat_recall``, ``macro_flat_f1``,
+``macro_weighted_flat_precision``, ``macro_weighted_flat_recall``, and
+``macro_weighted_flat_f1``. Pass ``class_level=True`` to get the matching class-level
+shape: ``ground_truth_class``, ``support``, ``weight``, ``tp``, ``fp``, ``fn``,
+``flat_precision``, ``flat_recall``, and ``flat_f1``.
 
 Saving results
 ++++++++++++++

@@ -16,7 +16,7 @@ def run_flat_benchmark(
     annotate_dirs: t.Union[str, Path],
     gt_column_name: str,
     output_dir: t.Union[str, Path],
-    save_cell_level: bool = False,
+    save_class_level: bool = False,
 ) -> t.Dict[str, t.Any]:
     """Compute flat classification metrics across one or more annotate output directories."""
     from ._benchmark_impl import run_flat_benchmark as _run_flat_benchmark
@@ -25,7 +25,7 @@ def run_flat_benchmark(
         annotate_dirs=annotate_dirs,
         gt_column_name=gt_column_name,
         output_dir=output_dir,
-        save_cell_level=save_cell_level,
+        save_class_level=save_class_level,
     )
 
 
@@ -90,16 +90,16 @@ def benchmark_group() -> None:
     help="Directory to write benchmark summary CSV into.",
 )
 @click.option(
-    "--save-cell-level/--no-save-cell-level",
+    "--save-class-level/--no-save-class-level",
     default=False,
     show_default=True,
-    help="Also save per-directory cell-level metric CSVs.",
+    help="Also save one class-level flat metric CSV with sample and total rows.",
 )
 def flat_command(
     annotate_dirs: str,
     gt_column_name: str,
     output_dir: str,
-    save_cell_level: bool,
+    save_class_level: bool,
 ) -> None:
     """Compute flat classification metrics across one or more annotate output directories."""
     try:
@@ -107,7 +107,7 @@ def flat_command(
             annotate_dirs=annotate_dirs,
             gt_column_name=gt_column_name,
             output_dir=output_dir,
-            save_cell_level=save_cell_level,
+            save_class_level=save_class_level,
         )
     except ValueError as e:
         raise click.UsageError(str(e)) from e

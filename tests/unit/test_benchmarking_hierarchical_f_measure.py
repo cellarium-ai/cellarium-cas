@@ -3,7 +3,9 @@ import typing as t
 import pandas as pd
 import pytest
 
-from cellarium.cas.benchmarking.hierarchical_f_measure import compute_hierarchical_f_measure_metrics
+from cellarium.cas.benchmarking.hierarchical_f_measure import (
+    compute_hierarchical_f_measure_metrics,
+)
 from cellarium.cas.models import CellTypeOntologyAwareResults
 
 # Minimal mock ontology:
@@ -109,9 +111,32 @@ def test_compute_hierarchical_f_measure_micro_values():
         ontology_resource=MOCK_ONTOLOGY_RESOURCE,
     )
 
-    assert result.loc[0, "hierarchical_precision"] == pytest.approx(5 / 6)
-    assert result.loc[0, "hierarchical_recall"] == pytest.approx(5 / 6)
-    assert result.loc[0, "hierarchical_f1"] == pytest.approx(5 / 6)
+    assert result.loc[0, "micro_hierarchical_precision"] == pytest.approx(5 / 6)
+    assert result.loc[0, "micro_hierarchical_recall"] == pytest.approx(5 / 6)
+    assert result.loc[0, "micro_hierarchical_f1"] == pytest.approx(5 / 6)
+
+
+def test_compute_hierarchical_f_measure_summary_columns():
+    response = make_response([make_annotation("c1", [make_match("CL:0000002")])])
+
+    result = compute_hierarchical_f_measure_metrics(
+        response=response,
+        ground_truths=["CL:0000002"],
+        ontology_resource=MOCK_ONTOLOGY_RESOURCE,
+    )
+
+    assert list(result.columns) == [
+        "n_cells",
+        "micro_hierarchical_precision",
+        "micro_hierarchical_recall",
+        "micro_hierarchical_f1",
+        "macro_hierarchical_precision",
+        "macro_hierarchical_recall",
+        "macro_hierarchical_f1",
+        "macro_weighted_hierarchical_precision",
+        "macro_weighted_hierarchical_recall",
+        "macro_weighted_hierarchical_f1",
+    ]
 
 
 def test_compute_hierarchical_f_measure_macro_weighted_pools_counts_before_division():

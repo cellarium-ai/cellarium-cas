@@ -117,15 +117,15 @@ def _compute_cell_metrics(
     num_hops: int,
 ) -> t.Dict[str, float]:
     """
-    Compute per-hop sensitivity, specificity, and F1 for a single cell's prediction matches.
+    Compute per-hop true-positive rate, true-negative rate, and F1 for a single cell's prediction matches.
 
-    At hop-N a predicted term is:
+    At hop-N a predicted term contributes to:
 
-    - **True positive**: the predicted term falls within the hop-N neighbourhood.
-    - **False positive**: the predicted term lies entirely outside the neighbourhood's
+    - **True-positive rate**: the predicted term falls within the hop-N neighbourhood.
+    - **False-positive rate**: the predicted term lies entirely outside the neighbourhood's
       ancestor/descendant lineage *and* its own descendant subtree shares no overlap with
       the neighbourhood's descendants.
-    - **Neither** (related but outside neighbourhood): skipped for TP/FP counting.
+    - **Neither** (related but outside neighbourhood): skipped for rate computation.
 
     When multiple matches exist, the maximum score among TPs (or FPs) is used.
 
@@ -134,11 +134,11 @@ def _compute_cell_metrics(
     :param graph: Precomputed :class:`_OntologyGraph`.
     :param num_hops: Maximum hop index to evaluate.
 
-    :return: Dict with keys ``hop_{N}_sensitivity``, ``hop_{N}_specificity``, ``hop_{N}_f1_score``
+    :return: Dict with keys ``hop_{N}_tpr``, ``hop_{N}_tnr``, ``hop_{N}_f1_score``
         for N in 0..num_hops.
     """
-    true_positives = [0.0] * (num_hops + 1)
-    false_positives = [0.0] * (num_hops + 1)
+    true_positive_rates = [0.0] * (num_hops + 1)
+    false_positive_rates = [0.0] * (num_hops + 1)
 
     for match in matches:
         match_term = match.cell_type_ontology_term_id
@@ -151,22 +151,22 @@ def _compute_cell_metrics(
 
         for i, hop in enumerate(hops):
             if match_term in hop["nodes"]:
-                true_positives[i] = max(match_score, true_positives[i])
+                true_positive_rates[i] = max(match_score, true_positive_rates[i])
             elif (
                 match_term not in hop["all_ancestors"]
                 and match_term not in hop["all_descendants"]
                 and not match_all_descendants.intersection(hop["all_descendants"])
             ):
-                false_positives[i] = max(match_score, false_positives[i])
+                false_positive_rates[i] = max(match_score, false_positive_rates[i])
 
     result: t.Dict[str, float] = {}
     for i in range(num_hops + 1):
-        tp = true_positives[i]
-        fp = false_positives[i]
-        prec = _precision(tp, fp)
-        result[f"hop_{i}_sensitivity"] = tp
-        result[f"hop_{i}_specificity"] = 1.0 - fp
-        result[f"hop_{i}_f1_score"] = _f1(prec, tp)
+        tpr = true_positive_rates[i]
+        fpr = false_positive_rates[i]
+        precision = _precision(tpr, fpr)
+        result[f"hop_{i}_tpr"] = tpr
+        result[f"hop_{i}_tnr"] = 1.0 - fpr
+        result[f"hop_{i}_f1_score"] = _f1(precision, tpr)
 
     return result
 
@@ -194,13 +194,13 @@ def compute_ontology_aware_metrics(
         ``cl_names`` (list of CL term IDs) and ``children_dictionary`` (term ID to list of child IDs).
         This is the same dict accepted by ``CellOntologyCache.__init__``.
     :param num_hops: Maximum hop distance to evaluate (default 4).
-    :param cell_level: If ``False`` (default), return a summary DataFrame with mean sensitivity,
-        specificity, and F1 per hop. If ``True``, return a per-cell DataFrame with
-        per-hop metrics for each cell.
+    :param cell_level: If ``False`` (default), return a summary DataFrame with mean TPR,
+        TNR, and F1 per hop. If ``True``, return a per-cell DataFrame with per-hop
+        metrics for each cell.
 
     :return:
         - Summary (``cell_level=False``): DataFrame with columns
-          ``hop_{N}_sensitivity``, ``hop_{N}_specificity``, ``hop_{N}_f1_score`` for N in 0..num_hops,
+          ``hop_{N}_tpr``, ``hop_{N}_tnr``, ``hop_{N}_f1_score`` for N in 0..num_hops,
           plus ``n_cells``.
         - Cell-level (``cell_level=True``): DataFrame with columns ``query_cell_id``,
           ``ground_truth``, and per-hop metric columns.
@@ -245,9 +245,7 @@ def compute_ontology_aware_metrics(
     if cell_level:
         return cell_df
 
-    metric_cols = [
-        f"hop_{i}_{metric}" for i in range(num_hops + 1) for metric in ("sensitivity", "specificity", "f1_score")
-    ]
+    metric_cols = [f"hop_{i}_{metric}" for i in range(num_hops + 1) for metric in ("tpr", "tnr", "f1_score")]
     summary = cell_df[metric_cols].mean().to_frame().T
     summary.insert(0, "n_cells", len(cell_df))
     summary = summary.reset_index(drop=True)

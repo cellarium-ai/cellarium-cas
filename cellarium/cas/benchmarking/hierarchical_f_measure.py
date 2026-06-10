@@ -14,9 +14,12 @@ _HICLASS_F1_SUPPORTS_ZERO_DIVISION = "zero_division" in inspect.signature(hiclas
 
 _SUMMARY_COLUMNS = [
     "n_cells",
-    "hierarchical_precision",
-    "hierarchical_recall",
-    "hierarchical_f1",
+    "micro_hierarchical_precision",
+    "micro_hierarchical_recall",
+    "micro_hierarchical_f1",
+    "macro_hierarchical_precision",
+    "macro_hierarchical_recall",
+    "macro_hierarchical_f1",
     "macro_weighted_hierarchical_precision",
     "macro_weighted_hierarchical_recall",
     "macro_weighted_hierarchical_f1",
@@ -173,9 +176,12 @@ def compute_hierarchical_f_measure_metrics(
     )
     summary = {
         "n_cells": len(response.data),
-        "hierarchical_precision": hierarchical_precision,
-        "hierarchical_recall": hierarchical_recall,
-        "hierarchical_f1": hierarchical_f1,
+        "micro_hierarchical_precision": hierarchical_precision,
+        "micro_hierarchical_recall": hierarchical_recall,
+        "micro_hierarchical_f1": hierarchical_f1,
+        "macro_hierarchical_precision": float(class_df["hierarchical_precision"].mean()),
+        "macro_hierarchical_recall": float(class_df["hierarchical_recall"].mean()),
+        "macro_hierarchical_f1": float(class_df["hierarchical_f1"].mean()),
         "macro_weighted_hierarchical_precision": float((class_df["weight"] * class_df["hierarchical_precision"]).sum()),
         "macro_weighted_hierarchical_recall": float((class_df["weight"] * class_df["hierarchical_recall"]).sum()),
         "macro_weighted_hierarchical_f1": float((class_df["weight"] * class_df["hierarchical_f1"]).sum()),
