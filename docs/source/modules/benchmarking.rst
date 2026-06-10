@@ -223,6 +223,167 @@ with ``n_cells``, ``micro_flat_precision``, ``micro_flat_recall``, ``micro_flat_
 shape: ``ground_truth_class``, ``support``, ``weight``, ``tp``, ``fp``, ``fn``,
 ``flat_precision``, ``flat_recall``, and ``flat_f1``.
 
+
+Aggregating benchmark outputs by tissue, donor, assay, or another group
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+If you need group-level metrics later, save class-level outputs and aggregate from
+those rows. Do not average per-sample summary rows unless you explicitly want every
+sample to have equal weight regardless of cell count or class composition.
+
+For flat and hierarchical F-measure, the robust aggregation pattern is:
+
+1. Join class-level benchmark rows to sample metadata.
+2. Pool ``tp``, ``fp``, ``fn``, and ``support`` per group and ground-truth class.
+3. Recompute per-class precision, recall, and F1.
+4. Derive micro, macro, and macro-weighted summaries from the pooled class rows.
+
+Use this when your samples differ by tissue, donor, assay, perturbation, or batch.
+The same notebook pattern works for both flat and hierarchical outputs; only
+``metric_prefix`` changes.
+
+Prepare grouped class-level rows
+--------------------------------
+
+.. code-block:: python
+
+    import pandas as pd
+
+    # Class-level output from either:
+    # - flat: cellarium-cas benchmark flat --save-class-level
+    # - hierarchical: cellarium-cas benchmark hierarchical-f-measure --save-class-level
+    class_level_df = pd.read_csv("flat_benchmark_class_level.csv")
+    # class_level_df = pd.read_csv("hierarchical_f_measure_class_level.csv")
+
+    # One row per sample / annotate output directory.
+    # Required key: annotate_dir. Other columns are arbitrary grouping variables.
+    sample_metadata = pd.read_csv("sample_metadata.csv")
+    # columns might include: annotate_dir, tissue, donor, assay
+
+    df = class_level_df.merge(sample_metadata, on="annotate_dir", how="left")
+
+    # Pick the benchmark family and grouping columns.
+    metric_prefix = "flat"          # or "hierarchical"
+    group_cols = ["tissue", "assay"]  # examples: ["tissue"], ["donor"], ["tissue", "donor"]
+
+    pooled = (
+        df.groupby(group_cols + ["ground_truth_class"], as_index=False)
+        .agg(
+            tp=("tp", "sum"),
+            fp=("fp", "sum"),
+            fn=("fn", "sum"),
+            support=("support", "sum"),
+        )
+    )
+
+    precision_col = f"{metric_prefix}_precision"
+    recall_col = f"{metric_prefix}_recall"
+    f1_col = f"{metric_prefix}_f1"
+
+    pooled[precision_col] = pooled["tp"] / (pooled["tp"] + pooled["fp"])
+    pooled[recall_col] = pooled["tp"] / (pooled["tp"] + pooled["fn"])
+    pooled[f1_col] = (
+        2 * pooled[precision_col] * pooled[recall_col]
+        / (pooled[precision_col] + pooled[recall_col])
+    )
+    pooled = pooled.fillna(0.0)
+
+``pooled`` is the grouped class-level table. It is often the most useful table for
+inspection because it shows which classes drive each group's performance.
+
+Compute group-level micro metrics
+---------------------------------
+
+Micro metrics pool all counts inside a group before division. They answer: “How well
+does the model do for a random cell/node-count contribution in this group?” Abundant
+classes contribute more.
+
+.. code-block:: python
+
+    micro = (
+        pooled.groupby(group_cols, as_index=False)
+        .agg(
+            tp=("tp", "sum"),
+            fp=("fp", "sum"),
+            fn=("fn", "sum"),
+            n_cells=("support", "sum"),
+        )
+    )
+
+    micro[f"micro_{metric_prefix}_precision"] = micro["tp"] / (micro["tp"] + micro["fp"])
+    micro[f"micro_{metric_prefix}_recall"] = micro["tp"] / (micro["tp"] + micro["fn"])
+    micro[f"micro_{metric_prefix}_f1"] = (
+        2 * micro[f"micro_{metric_prefix}_precision"] * micro[f"micro_{metric_prefix}_recall"]
+        / (micro[f"micro_{metric_prefix}_precision"] + micro[f"micro_{metric_prefix}_recall"])
+    )
+    micro = micro.fillna(0.0)
+
+Compute group-level macro metrics
+---------------------------------
+
+Macro metrics average grouped class metrics equally. They answer: “How well does the
+model do across cell types in this group if every class matters equally?” Rare classes
+have the same influence as abundant classes.
+
+.. code-block:: python
+
+    macro = (
+        pooled.groupby(group_cols, as_index=False)
+        .agg(
+            **{
+                f"macro_{metric_prefix}_precision": (precision_col, "mean"),
+                f"macro_{metric_prefix}_recall": (recall_col, "mean"),
+                f"macro_{metric_prefix}_f1": (f1_col, "mean"),
+            }
+        )
+    )
+
+Compute group-level macro-weighted metrics
+------------------------------------------
+
+Macro-weighted metrics still compute scores per class first, then weight each class by
+its support inside the group. They answer: “How well does the model do across classes,
+weighted by how common each class is in this group?”
+
+.. code-block:: python
+
+    pooled["weight"] = pooled["support"] / pooled.groupby(group_cols)["support"].transform("sum")
+
+    weighted = (
+        pooled.assign(
+            weighted_precision=pooled["weight"] * pooled[precision_col],
+            weighted_recall=pooled["weight"] * pooled[recall_col],
+            weighted_f1=pooled["weight"] * pooled[f1_col],
+        )
+        .groupby(group_cols, as_index=False)
+        .agg(
+            **{
+                f"macro_weighted_{metric_prefix}_precision": ("weighted_precision", "sum"),
+                f"macro_weighted_{metric_prefix}_recall": ("weighted_recall", "sum"),
+                f"macro_weighted_{metric_prefix}_f1": ("weighted_f1", "sum"),
+            }
+        )
+    )
+
+Combine the group summaries
+---------------------------
+
+.. code-block:: python
+
+    group_summary = micro.merge(macro, on=group_cols).merge(weighted, on=group_cols)
+    group_summary.to_csv(f"{metric_prefix}_benchmark_by_group.csv", index=False)
+    pooled.to_csv(f"{metric_prefix}_benchmark_by_group_class.csv", index=False)
+
+Interpretation checklist:
+
+* Use **micro** when cell abundance should dominate.
+* Use **macro** when every ground-truth class should matter equally.
+* Use **macro-weighted** when you want class-aware metrics but still want common
+  classes to contribute proportionally to their support.
+* For hierarchical F-measure, ``tp``, ``fp``, and ``fn`` are hierarchical ontology
+  set-count totals. For flat metrics, they are pooled flat one-vs-rest counts. The
+  aggregation pattern is the same, but the meaning of the counts differs.
+
 Saving results
 ++++++++++++++
 
