@@ -16,6 +16,7 @@ import pandas as pd
 from cellarium.cas.benchmarking.flat import compute_flat_metrics
 from cellarium.cas.benchmarking.hierarchical_f_measure import compute_hierarchical_f_measure_metrics
 from cellarium.cas.benchmarking.ontology_aware import compute_ontology_aware_metrics
+from cellarium.cas.logging import logger
 from cellarium.cas.models import CellTypeOntologyAwareResults
 
 from ._io import (
@@ -46,12 +47,15 @@ def run_flat_benchmark(
     output_dir_path.mkdir(parents=True, exist_ok=True)
 
     dirs = collect_annotate_output_dirs(annotate_dirs)
+    logger.info("Collected %d annotate output directories for flat benchmarking.", len(dirs))
     summary_rows: t.List[pd.DataFrame] = []
 
     for d in dirs:
+        logger.info("Processing annotate output directory: %s", d)
         metadata = load_metadata(d)
         input_path = metadata["input_path"]
         model_name = metadata.get("model_name", "unknown")
+        logger.info("Benchmarking input_path=%s model_name=%s", input_path, model_name)
 
         adata = anndata.read_h5ad(input_path)
         if gt_column_name not in adata.obs.columns:
@@ -74,6 +78,7 @@ def run_flat_benchmark(
         if save_cell_level:
             cell_df = compute_flat_metrics(ground_truths, predictions, top_k=top_k, cell_level=True)
             cell_path = output_dir_path / f"{d.name}_cell_level_flat.csv"
+            logger.info("Writing flat cell-level metrics to: %s (%d rows)", cell_path, len(cell_df))
             cell_df.to_csv(cell_path, index=False)
 
     if not summary_rows:
@@ -82,6 +87,7 @@ def run_flat_benchmark(
     combined = pd.concat(summary_rows, ignore_index=True)
     summary_path = output_dir_path / "flat_benchmark_summary.csv"
     combined.to_csv(summary_path, index=False)
+    logger.info("Writing flat benchmark summary to: %s (%d rows)", summary_path, len(combined))
 
     return {
         "summary_path": str(summary_path),
@@ -107,12 +113,15 @@ def run_ontology_aware_benchmark(
     output_dir_path.mkdir(parents=True, exist_ok=True)
 
     dirs = collect_annotate_output_dirs(annotate_dirs)
+    logger.info("Collected %d annotate output directories for ontology-aware benchmarking.", len(dirs))
     summary_rows: t.List[pd.DataFrame] = []
 
     for d in dirs:
+        logger.info("Processing annotate output directory: %s", d)
         metadata = load_metadata(d)
         input_path = metadata["input_path"]
         model_name = metadata.get("model_name", "unknown")
+        logger.info("Benchmarking input_path=%s model_name=%s", input_path, model_name)
 
         adata = anndata.read_h5ad(input_path)
         if gt_cl_column_name not in adata.obs.columns:
@@ -146,6 +155,7 @@ def run_ontology_aware_benchmark(
                 cell_level=True,
             )
             cell_path = output_dir_path / f"{d.name}_cell_level_ontology_aware.csv"
+            logger.info("Writing ontology-aware cell-level metrics to: %s (%d rows)", cell_path, len(cell_df))
             cell_df.to_csv(cell_path, index=False)
 
     if not summary_rows:
@@ -154,6 +164,7 @@ def run_ontology_aware_benchmark(
     combined = pd.concat(summary_rows, ignore_index=True)
     summary_path = output_dir_path / "ontology_aware_benchmark_summary.csv"
     combined.to_csv(summary_path, index=False)
+    logger.info("Writing ontology-aware benchmark summary to: %s (%d rows)", summary_path, len(combined))
 
     return {
         "summary_path": str(summary_path),
@@ -181,6 +192,7 @@ def run_hierarchical_f_measure_benchmark(
         required_files=(ONTOLOGY_RESPONSE_FILENAME, ONTOLOGY_RESOURCE_FILENAME, METADATA_FILENAME),
         missing_hint="Ensure 'cellarium-cas annotate' was run with --save-metadata and --save-ontology-resource.",
     )
+    logger.info("Collected %d annotate output directories for hierarchical F-measure benchmarking.", len(dirs))
     summary_rows: t.List[pd.DataFrame] = []
     class_rows: t.List[pd.DataFrame] = []
     totals_by_model: t.Dict[str, t.Dict[str, t.Any]] = {}
@@ -196,9 +208,11 @@ def run_hierarchical_f_measure_benchmark(
         return df
 
     for d in dirs:
+        logger.info("Processing annotate output directory: %s", d)
         metadata = load_metadata(d)
         input_path = metadata["input_path"]
         model_name = metadata.get("model_name", "unknown")
+        logger.info("Benchmarking input_path=%s model_name=%s", input_path, model_name)
 
         adata = anndata.read_h5ad(input_path)
         if gt_cl_column_name not in adata.obs.columns:
@@ -269,6 +283,7 @@ def run_hierarchical_f_measure_benchmark(
 
     combined = pd.concat(summary_rows, ignore_index=True)
     summary_path = output_dir_path / "hierarchical_f_measure_summary.csv"
+    logger.info("Writing hierarchical F-measure summary to: %s (%d rows)", summary_path, len(combined))
     combined.to_csv(summary_path, index=False)
 
     class_level_path = None
@@ -276,6 +291,9 @@ def run_hierarchical_f_measure_benchmark(
     if save_class_level:
         class_level = pd.concat(class_rows, ignore_index=True) if class_rows else pd.DataFrame()
         class_level_path = output_dir_path / "hierarchical_f_measure_class_level.csv"
+        logger.info(
+            "Writing hierarchical F-measure class-level metrics to: %s (%d rows)", class_level_path, len(class_level)
+        )
         class_level.to_csv(class_level_path, index=False)
         n_class_level_rows = len(class_level)
 
