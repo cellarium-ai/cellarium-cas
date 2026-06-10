@@ -128,12 +128,15 @@ Pass ``cell_level=True`` to get a row per cell, useful for per-cluster analysis:
 Step 4 — Hierarchical F-measure benchmarking
 ++++++++++++++++++++++++++++++++++++++++++++
 
-The hierarchical F-measure path treats every cell as a pair of ontology node sets:
+The HiClass literature calls these sets ``alpha_i`` and ``beta_i``. In code and
+notebook discussion, it is usually clearer to name them by meaning:
 
-* ``alpha_i`` is the set of unique non-empty ``cell_type_ontology_term_id`` values in
-  ``response.data[i].matches``.
-* ``beta_i`` is the ontology ancestor set for ``ground_truths[i]``, including the
-  ground-truth class itself.
+* ``predicted_term_sets[i]`` is the set of unique non-empty
+  ``cell_type_ontology_term_id`` values in ``response.data[i].matches``; this is
+  ``alpha_i`` in the formula.
+* ``ground_truth_ancestor_sets[i]`` is the ontology ancestor set for
+  ``ground_truths[i]``, including the ground-truth class itself; this is ``beta_i``
+  in the formula.
 
 .. code-block:: python
 

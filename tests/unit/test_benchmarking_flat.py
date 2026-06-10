@@ -210,12 +210,26 @@ def test_compute_flat_metrics_class_level_counts_and_weighted_summary():
     assert row_a["support"] == 2
     assert row_a["weight"] == pytest.approx(2 / 3)
     assert row_a["tp"] == pytest.approx(1.0)
-    assert row_a["fp"] == pytest.approx(1.0)
+    assert row_a["fp"] == pytest.approx(0.0)
     assert row_a["fn"] == pytest.approx(1.0)
-    assert row_a["flat_f1"] == pytest.approx(0.5)
+    assert row_a["flat_f1"] == pytest.approx(2 / 3)
     assert row_b["flat_f1"] == pytest.approx(1.0)
 
     summary = compute_flat_metrics(gts, preds, top_k=1)
     assert summary.loc[0, "micro_flat_f1"] == pytest.approx(2 / 3)
-    assert summary.loc[0, "macro_flat_f1"] == pytest.approx(3 / 4)
-    assert summary.loc[0, "macro_weighted_flat_f1"] == pytest.approx(2 / 3)
+    assert summary.loc[0, "macro_flat_f1"] == pytest.approx(5 / 6)
+    assert summary.loc[0, "macro_weighted_flat_f1"] == pytest.approx(7 / 9)
+
+
+def test_compute_flat_metrics_class_level_fp_counts_other_ground_truth_predicted_as_class():
+    class_df = compute_flat_metrics(["A", "B"], [["A"], ["A"]], top_k=1, class_level=True)
+
+    row_a = class_df[class_df["ground_truth_class"] == "A"].iloc[0]
+    row_b = class_df[class_df["ground_truth_class"] == "B"].iloc[0]
+
+    assert row_a["tp"] == pytest.approx(1.0)
+    assert row_a["fp"] == pytest.approx(1.0)
+    assert row_a["fn"] == pytest.approx(0.0)
+    assert row_b["tp"] == pytest.approx(0.0)
+    assert row_b["fp"] == pytest.approx(0.0)
+    assert row_b["fn"] == pytest.approx(1.0)

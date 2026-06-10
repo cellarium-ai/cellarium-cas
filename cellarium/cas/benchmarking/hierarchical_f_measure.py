@@ -58,31 +58,40 @@ def _compute_hiclass_f1(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
 
 def _compute_micro_hierarchical_metrics(
-    beta_sets: t.List[t.Set[str]], alpha_sets: t.List[t.Set[str]]
+    ground_truth_ancestor_sets: t.List[t.Set[str]], predicted_term_sets: t.List[t.Set[str]]
 ) -> t.Tuple[float, float, float]:
-    alpha_denominator = sum(len(alpha_set) for alpha_set in alpha_sets)
-    beta_denominator = sum(len(beta_set) for beta_set in beta_sets)
+    # HiClass literature calls predicted term sets "alpha" and ground-truth
+    # ancestor sets "beta"; use explicit names in code to avoid swapping them.
+    predicted_denominator = sum(len(predicted_term_set) for predicted_term_set in predicted_term_sets)
+    ground_truth_denominator = sum(len(ground_truth_set) for ground_truth_set in ground_truth_ancestor_sets)
 
-    y_true = _sets_to_padded_array(beta_sets)
-    y_pred = _sets_to_padded_array(alpha_sets)
-
-    hierarchical_precision = float(hiclass_precision(y_true, y_pred, average="micro")) if alpha_denominator > 0 else 0.0
-    hierarchical_recall = float(hiclass_recall(y_true, y_pred, average="micro")) if beta_denominator > 0 else 0.0
+    y_true = _sets_to_padded_array(ground_truth_ancestor_sets)
+    y_pred = _sets_to_padded_array(predicted_term_sets)
+    hierarchical_precision = (
+        float(hiclass_precision(y_true, y_pred, average="micro")) if predicted_denominator > 0 else 0.0
+    )
+    hierarchical_recall = (
+        float(hiclass_recall(y_true, y_pred, average="micro")) if ground_truth_denominator > 0 else 0.0
+    )
     hierarchical_f1 = (
         _compute_hiclass_f1(y_true, y_pred)
-        if alpha_denominator > 0 and beta_denominator > 0 and (hierarchical_precision + hierarchical_recall) > 0.0
+        if predicted_denominator > 0
+        and ground_truth_denominator > 0
+        and (hierarchical_precision + hierarchical_recall) > 0.0
         else 0.0
     )
 
     return hierarchical_precision, hierarchical_recall, hierarchical_f1
 
 
-def _extract_alpha_set(annotation: CellTypeOntologyAwareResults.OntologyAwareAnnotation) -> t.Set[str]:
+def _extract_predicted_term_set(annotation: CellTypeOntologyAwareResults.OntologyAwareAnnotation) -> t.Set[str]:
     return {match.cell_type_ontology_term_id for match in annotation.matches if match.cell_type_ontology_term_id != ""}
 
 
 def _build_class_level_rows(
-    ground_truths: t.List[str], beta_sets: t.List[t.Set[str]], alpha_sets: t.List[t.Set[str]]
+    ground_truths: t.List[str],
+    ground_truth_ancestor_sets: t.List[t.Set[str]],
+    predicted_term_sets: t.List[t.Set[str]],
 ) -> pd.DataFrame:
     n_cells = len(ground_truths)
     indices_by_class: t.Dict[str, t.List[int]] = {}
@@ -97,11 +106,11 @@ def _build_class_level_rows(
         fn = 0.0
 
         for i in indices:
-            alpha_set = alpha_sets[i]
-            beta_set = beta_sets[i]
-            tp += float(len(alpha_set.intersection(beta_set)))
-            fp += float(len(alpha_set.difference(beta_set)))
-            fn += float(len(beta_set.difference(alpha_set)))
+            predicted_term_set = predicted_term_sets[i]
+            ground_truth_ancestor_set = ground_truth_ancestor_sets[i]
+            tp += float(len(predicted_term_set.intersection(ground_truth_ancestor_set)))
+            fp += float(len(predicted_term_set.difference(ground_truth_ancestor_set)))
+            fn += float(len(ground_truth_ancestor_set.difference(predicted_term_set)))
 
         precision = _safe_divide(tp, tp + fp)
         recall = _safe_divide(tp, tp + fn)
@@ -134,9 +143,9 @@ def compute_hierarchical_f_measure_metrics(
     """
     Compute hierarchical F-measure metrics from a CAS ontology-aware response.
 
-    ``alpha_i`` is the set of unique non-empty predicted ontology term IDs in the
-    response for cell i. ``beta_i`` is the ontology ancestor set for the ground-truth
-    term for cell i, including the ground-truth class itself.
+    HiClass literature calls the per-cell predicted ontology term set ``alpha_i`` and
+    the per-cell ground-truth ancestor set ``beta_i``. This implementation uses the
+    explicit names ``predicted_term_sets`` and ``ground_truth_ancestor_sets``.
 
     :param response: CAS ontology-aware response object.
     :param ground_truths: Ground truth CL term IDs positionally aligned with ``response.data``.
@@ -164,15 +173,15 @@ def compute_hierarchical_f_measure_metrics(
         return pd.DataFrame()
 
     graph = _precompute_graph(ontology_resource)
-    beta_sets = [set(graph.term_ancestors[gt_term]) for gt_term in ground_truths]
-    alpha_sets = [_extract_alpha_set(annotation) for annotation in response.data]
+    ground_truth_ancestor_sets = [set(graph.term_ancestors[gt_term]) for gt_term in ground_truths]
+    predicted_term_sets = [_extract_predicted_term_set(annotation) for annotation in response.data]
 
-    class_df = _build_class_level_rows(ground_truths, beta_sets, alpha_sets)
+    class_df = _build_class_level_rows(ground_truths, ground_truth_ancestor_sets, predicted_term_sets)
     if class_level:
         return class_df
 
     hierarchical_precision, hierarchical_recall, hierarchical_f1 = _compute_micro_hierarchical_metrics(
-        beta_sets, alpha_sets
+        ground_truth_ancestor_sets, predicted_term_sets
     )
     summary = {
         "n_cells": len(response.data),

@@ -1,7 +1,7 @@
 import typing as t
 
 import pandas as pd
-from sklearn.metrics import f1_score, precision_score, recall_score
+from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
 
 _SUMMARY_COLUMNS = [
     "n_cells",
@@ -86,28 +86,22 @@ def _effective_predictions_at_k(
 
 def _build_class_level_rows(ground_truths: t.List[str], effective_preds: t.List[str]) -> pd.DataFrame:
     n_cells = len(ground_truths)
-    indices_by_class: t.Dict[str, t.List[int]] = {}
-    for i, ground_truth_class in enumerate(ground_truths):
-        indices_by_class.setdefault(ground_truth_class, []).append(i)
+    ground_truth_classes = sorted(set(ground_truths))
+    labels = sorted(set(ground_truths).union(effective_preds))
+    matrix = confusion_matrix(ground_truths, effective_preds, labels=labels)
+    label_to_index = {label: i for i, label in enumerate(labels)}
 
     rows: t.List[t.Dict[str, t.Any]] = []
-    for ground_truth_class in sorted(indices_by_class):
-        indices = indices_by_class[ground_truth_class]
-        tp = 0.0
-        fp = 0.0
-        fn = 0.0
-
-        for i in indices:
-            if effective_preds[i] == ground_truth_class:
-                tp += 1.0
-            else:
-                fp += 1.0
-                fn += 1.0
+    for ground_truth_class in ground_truth_classes:
+        class_index = label_to_index[ground_truth_class]
+        tp = float(matrix[class_index, class_index])
+        fp = float(matrix[:, class_index].sum() - tp)
+        fn = float(matrix[class_index, :].sum() - tp)
+        support = int(matrix[class_index, :].sum())
 
         precision = _safe_divide(tp, tp + fp)
         recall = _safe_divide(tp, tp + fn)
         f1 = _safe_divide(2.0 * precision * recall, precision + recall)
-        support = len(indices)
 
         rows.append(
             {
