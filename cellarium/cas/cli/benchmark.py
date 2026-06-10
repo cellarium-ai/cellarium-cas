@@ -20,6 +20,7 @@ import pandas as pd
 from cellarium.cas.benchmarking.flat import compute_flat_metrics
 from cellarium.cas.benchmarking.hierarchical_f_measure import compute_hierarchical_f_measure_metrics
 from cellarium.cas.benchmarking.ontology_aware import compute_ontology_aware_metrics
+from cellarium.cas.models import CellTypeOntologyAwareResults
 
 from ._io import (
     METADATA_FILENAME,
@@ -214,6 +215,18 @@ def run_hierarchical_f_measure_benchmark(
         missing_hint="Ensure 'cellarium-cas annotate' was run with --save-metadata and --save-ontology-resource.",
     )
     summary_rows: t.List[pd.DataFrame] = []
+    class_rows: t.List[pd.DataFrame] = []
+    totals_by_model: t.Dict[str, t.Dict[str, t.Any]] = {}
+
+    def _add_hierarchical_context_columns(
+        df: pd.DataFrame, annotate_dir: str, row_type: str, input_path: str, model_name: str
+    ) -> pd.DataFrame:
+        df = df.copy()
+        df.insert(0, "model_name", model_name)
+        df.insert(0, "input_path", input_path)
+        df.insert(0, "row_type", row_type)
+        df.insert(0, "annotate_dir", annotate_dir)
+        return df
 
     for d in dirs:
         metadata = load_metadata(d)
@@ -231,16 +244,29 @@ def run_hierarchical_f_measure_benchmark(
         response = load_ontology_response(d)
         ontology_resource = load_ontology_resource(d)
 
+        total = totals_by_model.setdefault(
+            model_name,
+            {
+                "annotations": [],
+                "ground_truths": [],
+                "ontology_resource": ontology_resource,
+            },
+        )
+        if total["ontology_resource"] != ontology_resource:
+            raise ValueError(
+                f"All annotate output directories for model '{model_name}' must use the same ontology resource "
+                f"to compute global hierarchical F-measure totals."
+            )
+        total["annotations"].extend(response.data)
+        total["ground_truths"].extend(ground_truths)
+
         summary = compute_hierarchical_f_measure_metrics(
             response=response,
             ground_truths=ground_truths,
             ontology_resource=ontology_resource,
             class_level=False,
         )
-        summary.insert(0, "model_name", model_name)
-        summary.insert(0, "input_path", input_path)
-        summary.insert(0, "annotate_dir", d.name)
-        summary_rows.append(summary)
+        summary_rows.append(_add_hierarchical_context_columns(summary, d.name, "sample", input_path, model_name))
 
         if save_class_level:
             class_df = compute_hierarchical_f_measure_metrics(
@@ -249,11 +275,27 @@ def run_hierarchical_f_measure_benchmark(
                 ontology_resource=ontology_resource,
                 class_level=True,
             )
-            class_df.insert(0, "model_name", model_name)
-            class_df.insert(0, "input_path", input_path)
-            class_df.insert(0, "annotate_dir", d.name)
-            class_path = output_dir_path / f"{d.name}_class_level_hierarchical_f_measure.csv"
-            class_df.to_csv(class_path, index=False)
+            class_rows.append(_add_hierarchical_context_columns(class_df, d.name, "sample", input_path, model_name))
+
+    for model_name in sorted(totals_by_model):
+        total = totals_by_model[model_name]
+        response = CellTypeOntologyAwareResults(data=total["annotations"], model_name=model_name)
+        summary = compute_hierarchical_f_measure_metrics(
+            response=response,
+            ground_truths=total["ground_truths"],
+            ontology_resource=total["ontology_resource"],
+            class_level=False,
+        )
+        summary_rows.append(_add_hierarchical_context_columns(summary, "__total__", "total", "__all__", model_name))
+
+        if save_class_level:
+            class_df = compute_hierarchical_f_measure_metrics(
+                response=response,
+                ground_truths=total["ground_truths"],
+                ontology_resource=total["ontology_resource"],
+                class_level=True,
+            )
+            class_rows.append(_add_hierarchical_context_columns(class_df, "__total__", "total", "__all__", model_name))
 
     if not summary_rows:
         raise ValueError("No results produced — check that annotate_dirs contains valid directories.")
@@ -262,11 +304,23 @@ def run_hierarchical_f_measure_benchmark(
     summary_path = output_dir_path / "hierarchical_f_measure_summary.csv"
     combined.to_csv(summary_path, index=False)
 
-    return {
+    class_level_path = None
+    n_class_level_rows = 0
+    if save_class_level:
+        class_level = pd.concat(class_rows, ignore_index=True) if class_rows else pd.DataFrame()
+        class_level_path = output_dir_path / "hierarchical_f_measure_class_level.csv"
+        class_level.to_csv(class_level_path, index=False)
+        n_class_level_rows = len(class_level)
+
+    result = {
         "summary_path": str(summary_path),
         "n_combinations": len(dirs),
         "n_summary_rows": len(combined),
     }
+    if class_level_path is not None:
+        result["class_level_path"] = str(class_level_path)
+        result["n_class_level_rows"] = n_class_level_rows
+    return result
 
 
 def _infer_top_k(labels_df: pd.DataFrame) -> int:
@@ -427,7 +481,7 @@ def ontology_aware_command(
     "--save-class-level/--no-save-class-level",
     default=False,
     show_default=True,
-    help="Also save per-directory class-level hierarchical F-measure CSVs.",
+    help="Also save one class-level hierarchical F-measure CSV with sample and total rows.",
 )
 def hierarchical_f_measure_command(
     annotate_dirs: str,

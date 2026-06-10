@@ -156,9 +156,17 @@ HiClass ``average=\"macro\"`` is not this CAS macro-weighted metric: CAS pools b
 node counts per ground-truth class first, computes class hP/hR/hF from those pooled
 counts, then support-weights the class scores.
 
+When used through ``cellarium-cas benchmark hierarchical-f-measure``, the summary CSV
+contains one ``row_type=\"sample\"`` row per annotate output directory and one
+``row_type=\"total\"`` row per model. Total rows pool all cells for that model first,
+then recompute both micro and macro-weighted metrics; they are not averages of the
+sample rows.
+
 Pass ``class_level=True`` to return one row per ground-truth class with columns
 ``ground_truth_class``, ``support``, ``weight``, ``tp``, ``fp``, ``fn``,
-``hierarchical_precision``, ``hierarchical_recall``, and ``hierarchical_f1``.
+``hierarchical_precision``, ``hierarchical_recall``, and ``hierarchical_f1``. In the
+CLI, ``--save-class-level`` writes a single ``hierarchical_f_measure_class_level.csv``
+with per-class ``row_type=\"sample\"`` rows and per-model ``row_type=\"total\"`` rows.
 
 Step 5 — Flat (taxonomy-agnostic) benchmarking
 ++++++++++++++++++++++++++++++++++++++++++++++
