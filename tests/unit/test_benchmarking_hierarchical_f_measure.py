@@ -130,9 +130,9 @@ def test_compute_hierarchical_f_measure_macro_weighted_pools_counts_before_divis
     )
 
     row = result.iloc[0]
-    assert row["tp"] == 2.0
-    assert row["fp"] == 1.0
-    assert row["fn"] == 2.0
+    assert row["tp"] == pytest.approx(2.0)
+    assert row["fp"] == pytest.approx(1.0)
+    assert row["fn"] == pytest.approx(2.0)
     assert row["hierarchical_precision"] == pytest.approx(2 / 3)
     assert row["hierarchical_recall"] == pytest.approx(1 / 2)
     assert row["hierarchical_f1"] == pytest.approx(4 / 7)
@@ -148,7 +148,7 @@ def test_compute_hierarchical_f_measure_unknown_prediction_counts_as_fp():
         class_level=True,
     )
 
-    assert result.loc[0, "fp"] == 1.0
+    assert result.loc[0, "fp"] == pytest.approx(1.0)
 
 
 def test_compute_hierarchical_f_measure_class_level_columns():
