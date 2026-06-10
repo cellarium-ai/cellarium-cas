@@ -3,12 +3,14 @@
 Benchmarking
 ############
 
-The ``cellarium-cas`` package ships two complementary benchmarking modules that let you
+The ``cellarium-cas`` package ships complementary benchmarking modules that let you
 evaluate annotation quality against a labelled reference dataset:
 
 * **Ontology-aware benchmarking** (``cellarium.cas.benchmarking.compute_ontology_aware_metrics``) —
   measures how close the predicted Cell Ontology (CL) terms are to the ground truth within the
   ontology graph, using a hop-neighbourhood metric.
+* **Hierarchical F-measure benchmarking** (``cellarium.cas.benchmarking.compute_hierarchical_f_measure_metrics``) —
+  computes HiClass-compatible micro hP/hR/hF and a support-weighted per-ground-truth-class hP/hR/hF.
 * **Flat benchmarking** (``cellarium.cas.benchmarking.compute_flat_metrics``) —
   taxonomy-agnostic top-k accuracy, F1, precision, and recall via scikit-learn.
 
@@ -123,8 +125,43 @@ Pass ``cell_level=True`` to get a row per cell, useful for per-cluster analysis:
     )
     # Columns: query_cell_id, ground_truth, hop_0_sensitivity, …, hop_4_f1_score
 
-Step 4 — Flat (taxonomy-agnostic) benchmarking
-+++++++++++++++++++++++++++++++++++++++++++++++
+Step 4 — Hierarchical F-measure benchmarking
+++++++++++++++++++++++++++++++++++++++++++++
+
+The hierarchical F-measure path treats every cell as a pair of ontology node sets:
+
+* ``alpha_i`` is the set of unique non-empty ``cell_type_ontology_term_id`` values in
+  ``response.data[i].matches``.
+* ``beta_i`` is the ontology ancestor set for ``ground_truths[i]``, including the
+  ground-truth class itself.
+
+.. code-block:: python
+
+    from cellarium.cas.benchmarking import compute_hierarchical_f_measure_metrics
+
+    hierarchical_summary = compute_hierarchical_f_measure_metrics(
+        response=response,
+        ground_truths=adata.obs[GT_CL_TERM_COLUMN].tolist(),
+        ontology_resource=ontology_resource,
+    )
+
+The summary ``DataFrame`` has exactly these columns: ``n_cells``,
+``hierarchical_precision``, ``hierarchical_recall``, ``hierarchical_f1``,
+``macro_weighted_hierarchical_precision``, ``macro_weighted_hierarchical_recall``,
+and ``macro_weighted_hierarchical_f1``.
+
+The micro ``hierarchical_precision``, ``hierarchical_recall``, and ``hierarchical_f1``
+columns use the literature-defined HiClass ``average=\"micro\"`` set-count ratios.
+HiClass ``average=\"macro\"`` is not this CAS macro-weighted metric: CAS pools binary
+node counts per ground-truth class first, computes class hP/hR/hF from those pooled
+counts, then support-weights the class scores.
+
+Pass ``class_level=True`` to return one row per ground-truth class with columns
+``ground_truth_class``, ``support``, ``weight``, ``tp``, ``fp``, ``fn``,
+``hierarchical_precision``, ``hierarchical_recall``, and ``hierarchical_f1``.
+
+Step 5 — Flat (taxonomy-agnostic) benchmarking
+++++++++++++++++++++++++++++++++++++++++++++++
 
 The flat benchmarking path compares predicted human-readable labels against ground-truth
 labels.  First, insert the response into ``adata`` and derive ranked label predictions.

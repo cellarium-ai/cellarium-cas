@@ -1,9 +1,11 @@
 try:
     from .flat import compute_flat_metrics, extract_predictions_from_adata  # noqa
+    from .hierarchical_f_measure import compute_hierarchical_f_measure_metrics  # noqa
     from .ontology_aware import compute_ontology_aware_metrics  # noqa
 
     __all__ = [
         "compute_flat_metrics",
+        "compute_hierarchical_f_measure_metrics",
         "compute_ontology_aware_metrics",
         "extract_predictions_from_adata",
     ]

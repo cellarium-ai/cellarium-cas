@@ -38,8 +38,10 @@ Pass ``--cluster-label`` to additionally compute cluster-level label calls.
 benchmark
 ---------
 
-Evaluate annotation quality against a labelled reference dataset. Both subcommands
-consume output directories produced by ``cellarium-cas annotate``.
+Evaluate annotation quality against a labelled reference dataset. The flat and ontology-aware
+subcommands consume output directories produced by ``cellarium-cas annotate``. The
+``cellarium-cas benchmark hierarchical-f-measure`` command requires ``ontology_response.json``,
+``ontology_resource.json``, and ``metadata.json`` from each annotate output directory.
 
 .. click:: cellarium.cas.cli.benchmark:benchmark_group
    :prog: cellarium-cas benchmark

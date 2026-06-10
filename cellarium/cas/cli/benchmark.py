@@ -18,9 +18,13 @@ import click
 import pandas as pd
 
 from cellarium.cas.benchmarking.flat import compute_flat_metrics
+from cellarium.cas.benchmarking.hierarchical_f_measure import compute_hierarchical_f_measure_metrics
 from cellarium.cas.benchmarking.ontology_aware import compute_ontology_aware_metrics
 
 from ._io import (
+    METADATA_FILENAME,
+    ONTOLOGY_RESOURCE_FILENAME,
+    ONTOLOGY_RESPONSE_FILENAME,
     collect_annotate_output_dirs,
     load_inferred_labels,
     load_metadata,
@@ -187,6 +191,84 @@ def run_ontology_aware_benchmark(
     }
 
 
+def run_hierarchical_f_measure_benchmark(
+    annotate_dirs: t.Union[str, Path],
+    gt_cl_column_name: str,
+    output_dir: t.Union[str, Path],
+    save_class_level: bool = False,
+) -> t.Dict[str, t.Any]:
+    """
+    Compute hierarchical F-measure metrics across one or more annotate output directories.
+
+    This is the plain-Python entry point. The CLI command :func:`hierarchical_f_measure_command`
+    is a thin wrapper around this function.
+    """
+    import anndata
+
+    output_dir_path = Path(output_dir)
+    output_dir_path.mkdir(parents=True, exist_ok=True)
+
+    dirs = collect_annotate_output_dirs(
+        annotate_dirs,
+        required_files=(ONTOLOGY_RESPONSE_FILENAME, ONTOLOGY_RESOURCE_FILENAME, METADATA_FILENAME),
+        missing_hint="Ensure 'cellarium-cas annotate' was run with --save-metadata and --save-ontology-resource.",
+    )
+    summary_rows: t.List[pd.DataFrame] = []
+
+    for d in dirs:
+        metadata = load_metadata(d)
+        input_path = metadata["input_path"]
+        model_name = metadata.get("model_name", "unknown")
+
+        adata = anndata.read_h5ad(input_path)
+        if gt_cl_column_name not in adata.obs.columns:
+            raise ValueError(
+                f"Ground truth column '{gt_cl_column_name}' not found in obs of {input_path}. "
+                f"Available columns: {list(adata.obs.columns)}"
+            )
+        ground_truths = list(adata.obs[gt_cl_column_name].astype(str))
+
+        response = load_ontology_response(d)
+        ontology_resource = load_ontology_resource(d)
+
+        summary = compute_hierarchical_f_measure_metrics(
+            response=response,
+            ground_truths=ground_truths,
+            ontology_resource=ontology_resource,
+            class_level=False,
+        )
+        summary.insert(0, "model_name", model_name)
+        summary.insert(0, "input_path", input_path)
+        summary.insert(0, "annotate_dir", d.name)
+        summary_rows.append(summary)
+
+        if save_class_level:
+            class_df = compute_hierarchical_f_measure_metrics(
+                response=response,
+                ground_truths=ground_truths,
+                ontology_resource=ontology_resource,
+                class_level=True,
+            )
+            class_df.insert(0, "model_name", model_name)
+            class_df.insert(0, "input_path", input_path)
+            class_df.insert(0, "annotate_dir", d.name)
+            class_path = output_dir_path / f"{d.name}_class_level_hierarchical_f_measure.csv"
+            class_df.to_csv(class_path, index=False)
+
+    if not summary_rows:
+        raise ValueError("No results produced — check that annotate_dirs contains valid directories.")
+
+    combined = pd.concat(summary_rows, ignore_index=True)
+    summary_path = output_dir_path / "hierarchical_f_measure_summary.csv"
+    combined.to_csv(summary_path, index=False)
+
+    return {
+        "summary_path": str(summary_path),
+        "n_combinations": len(dirs),
+        "n_summary_rows": len(combined),
+    }
+
+
 def _infer_top_k(labels_df: pd.DataFrame) -> int:
     """Infer top_k by counting ``cas_cell_type_label_k`` columns in *labels_df*."""
     k = 0
@@ -318,3 +400,50 @@ def ontology_aware_command(
         raise click.UsageError(str(e)) from e
 
     click.echo(f"Saved ontology-aware benchmark summary → {result['summary_path']}")
+
+
+@benchmark_group.command("hierarchical-f-measure")
+@click.option(
+    "--annotate-dirs",
+    required=True,
+    type=click.Path(exists=True),
+    help=(
+        "Path to a parent directory whose subdirectories are annotate output dirs, "
+        "or a .txt file listing one annotate output directory path per line."
+    ),
+)
+@click.option(
+    "--gt-cl-column-name",
+    required=True,
+    help="obs column name containing Cell Ontology term IDs (e.g. CL:0000121) in the original .h5ad.",
+)
+@click.option(
+    "--output-dir",
+    required=True,
+    type=click.Path(file_okay=False),
+    help="Directory to write benchmark summary CSV into.",
+)
+@click.option(
+    "--save-class-level/--no-save-class-level",
+    default=False,
+    show_default=True,
+    help="Also save per-directory class-level hierarchical F-measure CSVs.",
+)
+def hierarchical_f_measure_command(
+    annotate_dirs: str,
+    gt_cl_column_name: str,
+    output_dir: str,
+    save_class_level: bool,
+) -> None:
+    """Compute hierarchical F-measure metrics across one or more annotate output directories."""
+    try:
+        result = run_hierarchical_f_measure_benchmark(
+            annotate_dirs=annotate_dirs,
+            gt_cl_column_name=gt_cl_column_name,
+            output_dir=output_dir,
+            save_class_level=save_class_level,
+        )
+    except (ValueError, FileNotFoundError) as e:
+        raise click.UsageError(str(e)) from e
+
+    click.echo(f"Saved hierarchical F-measure summary ({result['n_summary_rows']} rows) → {result['summary_path']}")

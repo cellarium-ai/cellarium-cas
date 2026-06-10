@@ -111,24 +111,31 @@ def load_metadata(output_dir: Path) -> t.Dict[str, t.Any]:
         return json.load(f)
 
 
-def validate_annotate_output_dir(output_dir: Path) -> None:
+def validate_annotate_output_dir(
+    output_dir: Path,
+    required_files: t.Sequence[str] = _REQUIRED_FILES,
+    missing_hint: str = "Ensure 'cellarium-cas annotate' was run with --infer-labels and --save-metadata.",
+) -> None:
     """
     Validate that *output_dir* contains all files required for benchmarking.
 
-    Required files: ``ontology_response.json``, ``inferred_labels.csv``, ``metadata.json``.
+    Required files default to ``ontology_response.json``, ``inferred_labels.csv``, ``metadata.json``.
 
     :raises ValueError: If any required file is missing, listing all absent files.
     """
     output_dir = Path(output_dir)
-    missing = [f for f in _REQUIRED_FILES if not (output_dir / f).exists()]
+    missing = [f for f in required_files if not (output_dir / f).exists()]
     if missing:
         raise ValueError(
-            f"Annotate output directory '{output_dir}' is missing required files: {missing}. "
-            "Ensure 'cellarium-cas annotate' was run with --infer-labels and --save-metadata."
+            f"Annotate output directory '{output_dir}' is missing required files: {missing}. {missing_hint}"
         )
 
 
-def collect_annotate_output_dirs(input_path: t.Union[str, Path]) -> t.List[Path]:
+def collect_annotate_output_dirs(
+    input_path: t.Union[str, Path],
+    required_files: t.Sequence[str] = _REQUIRED_FILES,
+    missing_hint: str = "Ensure 'cellarium-cas annotate' was run with --infer-labels and --save-metadata.",
+) -> t.List[Path]:
     """
     Resolve a list of annotate output directories from *input_path*.
 
@@ -156,6 +163,6 @@ def collect_annotate_output_dirs(input_path: t.Union[str, Path]) -> t.List[Path]
         raise ValueError(f"No annotate output directories found in: {input_path}")
 
     for d in dirs:
-        validate_annotate_output_dir(d)
+        validate_annotate_output_dir(d, required_files=required_files, missing_hint=missing_hint)
 
     return dirs
