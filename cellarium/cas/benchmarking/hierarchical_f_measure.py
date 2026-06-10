@@ -1,3 +1,4 @@
+import inspect
 import typing as t
 
 import numpy as np
@@ -8,6 +9,8 @@ from hiclass.metrics import recall as hiclass_recall
 
 from cellarium.cas.benchmarking.ontology_aware import _precompute_graph
 from cellarium.cas.models import CellTypeOntologyAwareResults
+
+_HICLASS_F1_SUPPORTS_ZERO_DIVISION = "zero_division" in inspect.signature(hiclass_f1).parameters
 
 _SUMMARY_COLUMNS = [
     "n_cells",
@@ -45,6 +48,12 @@ def _sets_to_padded_array(label_sets: t.List[t.Set[str]]) -> np.ndarray:
     return np.asarray(rows, dtype=str)
 
 
+def _compute_hiclass_f1(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    if _HICLASS_F1_SUPPORTS_ZERO_DIVISION:
+        return float(hiclass_f1(y_true, y_pred, average="micro", zero_division=0.0))
+    return float(hiclass_f1(y_true, y_pred, average="micro"))
+
+
 def _compute_micro_hierarchical_metrics(
     beta_sets: t.List[t.Set[str]], alpha_sets: t.List[t.Set[str]]
 ) -> t.Tuple[float, float, float]:
@@ -57,11 +66,9 @@ def _compute_micro_hierarchical_metrics(
     hierarchical_precision = float(hiclass_precision(y_true, y_pred, average="micro")) if alpha_denominator > 0 else 0.0
     hierarchical_recall = float(hiclass_recall(y_true, y_pred, average="micro")) if beta_denominator > 0 else 0.0
     hierarchical_f1 = (
-        float(hiclass_f1(y_true, y_pred, average="micro", zero_division=0.0))
-        if alpha_denominator > 0 and beta_denominator > 0
-        else _safe_divide(
-            2.0 * hierarchical_precision * hierarchical_recall, hierarchical_precision + hierarchical_recall
-        )
+        _compute_hiclass_f1(y_true, y_pred)
+        if alpha_denominator > 0 and beta_denominator > 0 and (hierarchical_precision + hierarchical_recall) > 0.0
+        else 0.0
     )
 
     return hierarchical_precision, hierarchical_recall, hierarchical_f1
