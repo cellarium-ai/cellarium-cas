@@ -128,42 +128,61 @@ Pass ``cell_level=True`` to get a row per cell, useful for per-cluster analysis:
 Step 4 — Hierarchical F-measure benchmarking
 ++++++++++++++++++++++++++++++++++++++++++++
 
+Hierarchical F-measure evaluates the final predicted CL labels at every k from 1 to
+``top_k``. For each k, the cell's prediction set is the union of the top-k predicted
+CL terms expanded to their ontology ancestor sets before comparison with the
+ground-truth ancestor set.
+
 The HiClass literature calls these sets ``alpha_i`` and ``beta_i``. In code and
 notebook discussion, it is usually clearer to name them by meaning:
 
-* ``predicted_term_sets[i]`` is the set of unique non-empty
-  ``cell_type_ontology_term_id`` values in ``response.data[i].matches``; this is
-  ``alpha_i`` in the formula.
+* ``predicted_ancestor_sets[i]`` is the union of ancestors for the top-k final
+  predicted CL term IDs in ``predictions[i]``; this is ``alpha_i`` in the formula.
 * ``ground_truth_ancestor_sets[i]`` is the ontology ancestor set for
   ``ground_truths[i]``, including the ground-truth class itself; this is ``beta_i``
   in the formula.
 
+Before running this code, insert the ontology-aware response into ``adata`` and run
+``compute_most_granular_top_k_calls_single`` as shown in Step 5 so the
+``cas_cell_type_name_k`` columns exist.
+
 .. code-block:: python
 
-    from cellarium.cas.benchmarking import compute_hierarchical_f_measure_metrics
+    from cellarium.cas.benchmarking import compute_hierarchical_f_measure_metrics, extract_predictions_from_adata
 
-    hierarchical_summary = compute_hierarchical_f_measure_metrics(
-        response=response,
-        ground_truths=adata.obs[GT_CL_TERM_COLUMN].tolist(),
-        ontology_resource=ontology_resource,
+    # Reads final predicted CL IDs from cas_cell_type_name_1 … cas_cell_type_name_k.
+    # These columns are produced by compute_most_granular_top_k_calls_single.
+    predictions = extract_predictions_from_adata(
+        adata,
+        column_prefix="cas_cell_type_name",
+        top_k=5,
     )
 
-The summary ``DataFrame`` has exactly these columns: ``n_cells``,
-``micro_hierarchical_precision``, ``micro_hierarchical_recall``,
-``micro_hierarchical_f1``, ``macro_hierarchical_precision``,
-``macro_hierarchical_recall``, ``macro_hierarchical_f1``,
-``macro_weighted_hierarchical_precision``, ``macro_weighted_hierarchical_recall``,
-and ``macro_weighted_hierarchical_f1``.
+    hierarchical_summary = compute_hierarchical_f_measure_metrics(
+        predictions=predictions,
+        ground_truths=adata.obs[GT_CL_TERM_COLUMN].tolist(),
+        ontology_resource=ontology_resource,
+        top_k=1,
+    )
+
+The summary ``DataFrame`` has ``n_cells`` plus one set of metric columns per evaluated
+k: ``top_{k}_micro_hierarchical_precision``, ``top_{k}_micro_hierarchical_recall``,
+``top_{k}_micro_hierarchical_f1``, ``top_{k}_macro_hierarchical_precision``,
+``top_{k}_macro_hierarchical_recall``, ``top_{k}_macro_hierarchical_f1``,
+``top_{k}_macro_weighted_hierarchical_precision``,
+``top_{k}_macro_weighted_hierarchical_recall``, and
+``top_{k}_macro_weighted_hierarchical_f1``.
 
 The micro columns use the literature-defined HiClass ``average=\"micro\"`` set-count
 ratios. The macro columns are unweighted means of the per-ground-truth-class rows.
 The macro-weighted columns use the same class rows, weighted by class support.
 
-When used through ``cellarium-cas benchmark hierarchical-f-measure``, the summary CSV
-contains one ``row_type=\"sample\"`` row per annotate output directory and one
-``row_type=\"total\"`` row per model. Total rows pool all cells for that model first,
-then recompute both micro and macro-weighted metrics; they are not averages of the
-sample rows.
+When used through ``cellarium-cas benchmark hierarchical-f-measure``, all available
+``cas_cell_type_name_k`` columns are included, matching flat benchmark behavior.
+The summary CSV contains one ``row_type=\"sample\"`` row per annotate output directory
+and one ``row_type=\"total\"`` row per model. Total rows pool all cells for that model
+first, then recompute both micro and macro-weighted metrics; they are not averages of
+the sample rows.
 
 Pass ``class_level=True`` to return one row per ground-truth class with columns
 ``ground_truth_class``, ``support``, ``weight``, ``tp``, ``fp``, ``fn``,

@@ -6,7 +6,6 @@ import pytest
 from cellarium.cas.benchmarking.hierarchical_f_measure import (
     compute_hierarchical_f_measure_metrics,
 )
-from cellarium.cas.models import CellTypeOntologyAwareResults
 
 # Minimal mock ontology:
 #   root (CL:0000000)
@@ -40,55 +39,31 @@ ROOT_CHILD_ONTOLOGY_RESOURCE: t.Dict[str, t.Any] = {
 }
 
 
-def make_match(term_id: str, score: float = 1.0) -> CellTypeOntologyAwareResults.Match:
-    return CellTypeOntologyAwareResults.Match(
-        cell_type_ontology_term_id=term_id,
-        score=score,
-        cell_type=term_id,
-    )
-
-
-def make_annotation(cell_id: str, matches: t.List[CellTypeOntologyAwareResults.Match]):
-    return CellTypeOntologyAwareResults.OntologyAwareAnnotation(
-        query_cell_id=cell_id,
-        matches=matches,
-        total_weight=sum(m.score for m in matches),
-        total_neighbors=len(matches),
-        total_neighbors_unrecognized=0,
-    )
-
-
-def make_response(annotations: t.List[CellTypeOntologyAwareResults.OntologyAwareAnnotation]):
-    return CellTypeOntologyAwareResults(data=annotations)
-
-
 def test_compute_hierarchical_f_measure_length_mismatch_raises():
-    response = make_response([make_annotation("c1", [make_match("CL:0000002")])])
+    predictions = [["CL:0000002"]]
 
     with pytest.raises(ValueError, match="Length mismatch"):
         compute_hierarchical_f_measure_metrics(
-            response=response,
+            predictions=predictions,
             ground_truths=["CL:0000002", "CL:0000003"],
             ontology_resource=MOCK_ONTOLOGY_RESOURCE,
         )
 
 
 def test_compute_hierarchical_f_measure_unrecognized_gt_raises():
-    response = make_response([make_annotation("c1", [make_match("CL:0000002")])])
+    predictions = [["CL:0000002"]]
 
     with pytest.raises(ValueError, match="not present in the ontology resource"):
         compute_hierarchical_f_measure_metrics(
-            response=response,
+            predictions=predictions,
             ground_truths=["CL:9999999"],
             ontology_resource=MOCK_ONTOLOGY_RESOURCE,
         )
 
 
-def test_compute_hierarchical_f_measure_empty_response():
-    response = make_response([])
-
+def test_compute_hierarchical_f_measure_empty_predictions():
     result = compute_hierarchical_f_measure_metrics(
-        response=response,
+        predictions=[],
         ground_truths=[],
         ontology_resource=MOCK_ONTOLOGY_RESOURCE,
     )
@@ -98,57 +73,73 @@ def test_compute_hierarchical_f_measure_empty_response():
 
 
 def test_compute_hierarchical_f_measure_micro_values():
-    response = make_response(
-        [
-            make_annotation("c1", [make_match("CL:0000000"), make_match("CL:0000001"), make_match("CL:0000002")]),
-            make_annotation("c2", [make_match("CL:0000000"), make_match("CL:0000001"), make_match("CL:0000002")]),
-        ]
-    )
+    predictions = [["CL:0000002"], ["CL:0000002"]]
 
     result = compute_hierarchical_f_measure_metrics(
-        response=response,
+        predictions=predictions,
         ground_truths=["CL:0000002", "CL:0000003"],
         ontology_resource=MOCK_ONTOLOGY_RESOURCE,
     )
 
-    assert result.loc[0, "micro_hierarchical_precision"] == pytest.approx(5 / 6)
-    assert result.loc[0, "micro_hierarchical_recall"] == pytest.approx(5 / 6)
-    assert result.loc[0, "micro_hierarchical_f1"] == pytest.approx(5 / 6)
+    assert result.loc[0, "top_1_micro_hierarchical_precision"] == pytest.approx(5 / 6)
+    assert result.loc[0, "top_1_micro_hierarchical_recall"] == pytest.approx(5 / 6)
+    assert result.loc[0, "top_1_micro_hierarchical_f1"] == pytest.approx(5 / 6)
+
+
+def test_compute_hierarchical_f_measure_top_k_adds_columns_per_k():
+    predictions = [["CL:0000003", "CL:0000002"]]
+
+    result = compute_hierarchical_f_measure_metrics(
+        predictions=predictions,
+        ground_truths=["CL:0000002"],
+        ontology_resource=MOCK_ONTOLOGY_RESOURCE,
+        top_k=2,
+    )
+
+    assert result.loc[0, "top_1_micro_hierarchical_precision"] == pytest.approx(2 / 3)
+    assert result.loc[0, "top_1_micro_hierarchical_recall"] == pytest.approx(2 / 3)
+    assert result.loc[0, "top_2_micro_hierarchical_precision"] == pytest.approx(3 / 4)
+    assert result.loc[0, "top_2_micro_hierarchical_recall"] == pytest.approx(1.0)
+
+
+def test_compute_hierarchical_f_measure_non_positive_top_k_raises():
+    with pytest.raises(ValueError, match="top_k must be positive"):
+        compute_hierarchical_f_measure_metrics(
+            predictions=[["CL:0000002"]],
+            ground_truths=["CL:0000002"],
+            ontology_resource=MOCK_ONTOLOGY_RESOURCE,
+            top_k=0,
+        )
 
 
 def test_compute_hierarchical_f_measure_summary_columns():
-    response = make_response([make_annotation("c1", [make_match("CL:0000002")])])
+    predictions = [["CL:0000002"]]
 
     result = compute_hierarchical_f_measure_metrics(
-        response=response,
+        predictions=predictions,
         ground_truths=["CL:0000002"],
         ontology_resource=MOCK_ONTOLOGY_RESOURCE,
     )
 
     assert list(result.columns) == [
         "n_cells",
-        "micro_hierarchical_precision",
-        "micro_hierarchical_recall",
-        "micro_hierarchical_f1",
-        "macro_hierarchical_precision",
-        "macro_hierarchical_recall",
-        "macro_hierarchical_f1",
-        "macro_weighted_hierarchical_precision",
-        "macro_weighted_hierarchical_recall",
-        "macro_weighted_hierarchical_f1",
+        "top_1_micro_hierarchical_precision",
+        "top_1_micro_hierarchical_recall",
+        "top_1_micro_hierarchical_f1",
+        "top_1_macro_hierarchical_precision",
+        "top_1_macro_hierarchical_recall",
+        "top_1_macro_hierarchical_f1",
+        "top_1_macro_weighted_hierarchical_precision",
+        "top_1_macro_weighted_hierarchical_recall",
+        "top_1_macro_weighted_hierarchical_f1",
     ]
 
 
 def test_compute_hierarchical_f_measure_macro_weighted_pools_counts_before_division():
-    response = make_response(
-        [
-            make_annotation("c1", [make_match("CL:0000000"), make_match("CL:0000002")]),
-            make_annotation("c2", [make_match("unknown")]),
-        ]
-    )
+    predictions = [["CL:0000002"], []]
 
     result = compute_hierarchical_f_measure_metrics(
-        response=response,
+        predictions=predictions,
         ground_truths=["CL:0000002", "CL:0000002"],
         ontology_resource=ROOT_CHILD_ONTOLOGY_RESOURCE,
         class_level=True,
@@ -156,31 +147,28 @@ def test_compute_hierarchical_f_measure_macro_weighted_pools_counts_before_divis
 
     row = result.iloc[0]
     assert row["tp"] == pytest.approx(2.0)
-    assert row["fp"] == pytest.approx(1.0)
+    assert row["fp"] == pytest.approx(0.0)
     assert row["fn"] == pytest.approx(2.0)
-    assert row["hierarchical_precision"] == pytest.approx(2 / 3)
+    assert row["hierarchical_precision"] == pytest.approx(1.0)
     assert row["hierarchical_recall"] == pytest.approx(1 / 2)
-    assert row["hierarchical_f1"] == pytest.approx(4 / 7)
+    assert row["hierarchical_f1"] == pytest.approx(2 / 3)
 
 
-def test_compute_hierarchical_f_measure_unknown_prediction_counts_as_fp():
-    response = make_response([make_annotation("c1", [make_match("CL:9999999")])])
-
-    result = compute_hierarchical_f_measure_metrics(
-        response=response,
-        ground_truths=["CL:0000002"],
-        ontology_resource=MOCK_ONTOLOGY_RESOURCE,
-        class_level=True,
-    )
-
-    assert result.loc[0, "fp"] == pytest.approx(1.0)
+def test_compute_hierarchical_f_measure_unrecognized_prediction_raises():
+    with pytest.raises(ValueError, match="predicted terms are not present"):
+        compute_hierarchical_f_measure_metrics(
+            predictions=[["CL:9999999"]],
+            ground_truths=["CL:0000002"],
+            ontology_resource=MOCK_ONTOLOGY_RESOURCE,
+            class_level=True,
+        )
 
 
 def test_compute_hierarchical_f_measure_class_level_columns():
-    response = make_response([make_annotation("c1", [make_match("CL:0000002")])])
+    predictions = [["CL:0000002"]]
 
     result = compute_hierarchical_f_measure_metrics(
-        response=response,
+        predictions=predictions,
         ground_truths=["CL:0000002"],
         ontology_resource=MOCK_ONTOLOGY_RESOURCE,
         class_level=True,

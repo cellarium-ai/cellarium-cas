@@ -19,12 +19,11 @@ from cellarium.cas.benchmarking.hierarchical_f_measure import (
 )
 from cellarium.cas.benchmarking.ontology_aware import compute_ontology_aware_metrics
 from cellarium.cas.logging import logger
-from cellarium.cas.models import CellTypeOntologyAwareResults
 
 from ._io import (
+    INFERRED_LABELS_FILENAME,
     METADATA_FILENAME,
     ONTOLOGY_RESOURCE_FILENAME,
-    ONTOLOGY_RESPONSE_FILENAME,
     collect_annotate_output_dirs,
     load_inferred_labels,
     load_metadata,
@@ -83,8 +82,8 @@ def run_flat_benchmark(
         ground_truths = list(adata.obs[gt_column_name].astype(str))
 
         labels_df = load_inferred_labels(d)
-        top_k = _infer_top_k(labels_df)
-        predictions = _extract_label_predictions(labels_df, top_k)
+        top_k = _infer_top_k(labels_df, "cas_cell_type_label")
+        predictions = _extract_predictions(labels_df, top_k, "cas_cell_type_label")
 
         total = totals_by_model.setdefault(model_name, {"ground_truths": [], "predictions": [], "top_k": top_k})
         if total["top_k"] != top_k:
@@ -225,13 +224,14 @@ def run_hierarchical_f_measure_benchmark(
     This is the plain-Python entry point. The CLI command :func:`hierarchical_f_measure_command`
     is a thin wrapper around this function.
     """
+
     output_dir_path = Path(output_dir)
     output_dir_path.mkdir(parents=True, exist_ok=True)
 
     dirs = collect_annotate_output_dirs(
         annotate_dirs,
-        required_files=(ONTOLOGY_RESPONSE_FILENAME, ONTOLOGY_RESOURCE_FILENAME, METADATA_FILENAME),
-        missing_hint="Ensure 'cellarium-cas annotate' was run with --save-metadata and --save-ontology-resource.",
+        required_files=(INFERRED_LABELS_FILENAME, ONTOLOGY_RESOURCE_FILENAME, METADATA_FILENAME),
+        missing_hint="Ensure 'cellarium-cas annotate' was run with --infer-labels, --save-metadata, and --save-ontology-resource.",
     )
     logger.info("Collected %d annotate output directories for hierarchical F-measure benchmarking.", len(dirs))
     summary_rows: t.List[pd.DataFrame] = []
@@ -263,13 +263,16 @@ def run_hierarchical_f_measure_benchmark(
             )
         ground_truths = list(adata.obs[gt_cl_column_name].astype(str))
 
-        response = load_ontology_response(d)
+        labels_df = load_inferred_labels(d)
+        top_k = _infer_top_k(labels_df, "cas_cell_type_name")
+        predictions = _extract_predictions(labels_df, top_k, "cas_cell_type_name")
         ontology_resource = load_ontology_resource(d)
 
         total = totals_by_model.setdefault(
             model_name,
             {
-                "annotations": [],
+                "predictions": [],
+                "top_k": top_k,
                 "ground_truths": [],
                 "ontology_resource": ontology_resource,
             },
@@ -279,42 +282,50 @@ def run_hierarchical_f_measure_benchmark(
                 f"All annotate output directories for model '{model_name}' must use the same ontology resource "
                 f"to compute global hierarchical F-measure totals."
             )
-        total["annotations"].extend(response.data)
+        if total["top_k"] != top_k:
+            raise ValueError(
+                f"All annotate output directories for model '{model_name}' must have the same top_k "
+                f"to compute global hierarchical F-measure totals."
+            )
+        total["predictions"].extend(predictions)
         total["ground_truths"].extend(ground_truths)
 
         summary = compute_hierarchical_f_measure_metrics(
-            response=response,
+            predictions=predictions,
             ground_truths=ground_truths,
             ontology_resource=ontology_resource,
+            top_k=top_k,
             class_level=False,
         )
         summary_rows.append(_add_hierarchical_context_columns(summary, d.name, "sample", input_path, model_name))
 
         if save_class_level:
             class_df = compute_hierarchical_f_measure_metrics(
-                response=response,
+                predictions=predictions,
                 ground_truths=ground_truths,
                 ontology_resource=ontology_resource,
+                top_k=top_k,
                 class_level=True,
             )
             class_rows.append(_add_hierarchical_context_columns(class_df, d.name, "sample", input_path, model_name))
 
     for model_name in sorted(totals_by_model):
         total = totals_by_model[model_name]
-        response = CellTypeOntologyAwareResults(data=total["annotations"], model_name=model_name)
         summary = compute_hierarchical_f_measure_metrics(
-            response=response,
+            predictions=total["predictions"],
             ground_truths=total["ground_truths"],
             ontology_resource=total["ontology_resource"],
+            top_k=total["top_k"],
             class_level=False,
         )
         summary_rows.append(_add_hierarchical_context_columns(summary, "__total__", "total", "__all__", model_name))
 
         if save_class_level:
             class_df = compute_hierarchical_f_measure_metrics(
-                response=response,
+                predictions=total["predictions"],
                 ground_truths=total["ground_truths"],
                 ontology_resource=total["ontology_resource"],
+                top_k=total["top_k"],
                 class_level=True,
             )
             class_rows.append(_add_hierarchical_context_columns(class_df, "__total__", "total", "__all__", model_name))
@@ -349,28 +360,29 @@ def run_hierarchical_f_measure_benchmark(
     return result
 
 
-def _infer_top_k(labels_df: pd.DataFrame) -> int:
-    """Infer top_k by counting ``cas_cell_type_label_k`` columns in *labels_df*."""
+def _infer_top_k(labels_df: pd.DataFrame, column_prefix: str) -> int:
+    """Infer top_k by counting ``{column_prefix}_k`` columns in *labels_df*."""
     k = 0
+    pattern = re.compile(rf"^{re.escape(column_prefix)}_(\d+)$")
     for col in labels_df.columns:
-        m = re.match(r"^cas_cell_type_label_(\d+)$", col)
+        m = pattern.match(col)
         if m:
             k = max(k, int(m.group(1)))
     if k == 0:
         raise ValueError(
-            "Could not find any 'cas_cell_type_label_k' columns in inferred_labels.csv. "
+            f"Could not find any '{column_prefix}_k' columns in inferred_labels.csv. "
             "Ensure 'cellarium-cas annotate' was run with --infer-labels."
         )
     return k
 
 
-def _extract_label_predictions(labels_df: pd.DataFrame, top_k: int) -> t.List[t.List[str]]:
-    """Return ranked label predictions as a list-of-lists (one per cell) from *labels_df*."""
+def _extract_predictions(labels_df: pd.DataFrame, top_k: int, column_prefix: str) -> t.List[t.List[str]]:
+    """Return ranked predictions as a list-of-lists (one per cell) from *labels_df*."""
     predictions: t.List[t.List[str]] = []
     for _, row in labels_df.iterrows():
         cell_preds = []
         for k in range(1, top_k + 1):
-            col = f"cas_cell_type_label_{k}"
+            col = f"{column_prefix}_{k}"
             if col in labels_df.columns:
                 val = row[col]
                 if pd.notna(val):

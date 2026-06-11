@@ -8,12 +8,10 @@ from hiclass.metrics import precision as hiclass_precision
 from hiclass.metrics import recall as hiclass_recall
 
 from cellarium.cas.benchmarking.ontology_aware import _precompute_graph
-from cellarium.cas.models import CellTypeOntologyAwareResults
 
 _HICLASS_F1_SUPPORTS_ZERO_DIVISION = "zero_division" in inspect.signature(hiclass_f1).parameters
 
-_SUMMARY_COLUMNS = [
-    "n_cells",
+_SUMMARY_METRICS = [
     "micro_hierarchical_precision",
     "micro_hierarchical_recall",
     "micro_hierarchical_f1",
@@ -58,15 +56,15 @@ def _compute_hiclass_f1(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
 
 def _compute_micro_hierarchical_metrics(
-    ground_truth_ancestor_sets: t.List[t.Set[str]], predicted_term_sets: t.List[t.Set[str]]
+    ground_truth_ancestor_sets: t.List[t.Set[str]], predicted_ancestor_sets: t.List[t.Set[str]]
 ) -> t.Tuple[float, float, float]:
     # HiClass literature calls predicted term sets "alpha" and ground-truth
     # ancestor sets "beta"; use explicit names in code to avoid swapping them.
-    predicted_denominator = sum(len(predicted_term_set) for predicted_term_set in predicted_term_sets)
+    predicted_denominator = sum(len(predicted_ancestor_set) for predicted_ancestor_set in predicted_ancestor_sets)
     ground_truth_denominator = sum(len(ground_truth_set) for ground_truth_set in ground_truth_ancestor_sets)
 
     y_true = _sets_to_padded_array(ground_truth_ancestor_sets)
-    y_pred = _sets_to_padded_array(predicted_term_sets)
+    y_pred = _sets_to_padded_array(predicted_ancestor_sets)
     hierarchical_precision = (
         float(hiclass_precision(y_true, y_pred, average="micro")) if predicted_denominator > 0 else 0.0
     )
@@ -84,14 +82,18 @@ def _compute_micro_hierarchical_metrics(
     return hierarchical_precision, hierarchical_recall, hierarchical_f1
 
 
-def _extract_predicted_term_set(annotation: CellTypeOntologyAwareResults.OntologyAwareAnnotation) -> t.Set[str]:
-    return {match.cell_type_ontology_term_id for match in annotation.matches if match.cell_type_ontology_term_id != ""}
+def _build_predicted_ancestor_set(predicted_terms: t.List[str], graph: t.Any) -> t.Set[str]:
+    ancestor_set: t.Set[str] = set()
+    for term in predicted_terms:
+        if term:
+            ancestor_set.update(graph.term_ancestors[term])
+    return ancestor_set
 
 
 def _build_class_level_rows(
     ground_truths: t.List[str],
     ground_truth_ancestor_sets: t.List[t.Set[str]],
-    predicted_term_sets: t.List[t.Set[str]],
+    predicted_ancestor_sets: t.List[t.Set[str]],
 ) -> pd.DataFrame:
     n_cells = len(ground_truths)
     indices_by_class: t.Dict[str, t.List[int]] = {}
@@ -106,11 +108,11 @@ def _build_class_level_rows(
         fn = 0.0
 
         for i in indices:
-            predicted_term_set = predicted_term_sets[i]
+            predicted_ancestor_set = predicted_ancestor_sets[i]
             ground_truth_ancestor_set = ground_truth_ancestor_sets[i]
-            tp += float(len(predicted_term_set.intersection(ground_truth_ancestor_set)))
-            fp += float(len(predicted_term_set.difference(ground_truth_ancestor_set)))
-            fn += float(len(ground_truth_ancestor_set.difference(predicted_term_set)))
+            tp += float(len(predicted_ancestor_set.intersection(ground_truth_ancestor_set)))
+            fp += float(len(predicted_ancestor_set.difference(ground_truth_ancestor_set)))
+            fn += float(len(ground_truth_ancestor_set.difference(predicted_ancestor_set)))
 
         precision = _safe_divide(tp, tp + fp)
         recall = _safe_divide(tp, tp + fn)
@@ -135,31 +137,42 @@ def _build_class_level_rows(
 
 
 def compute_hierarchical_f_measure_metrics(
-    response: CellTypeOntologyAwareResults,
+    predictions: t.List[t.List[str]],
     ground_truths: t.List[str],
     ontology_resource: t.Dict[str, t.Any],
+    top_k: int = 1,
     class_level: bool = False,
 ) -> pd.DataFrame:
     """
-    Compute hierarchical F-measure metrics from a CAS ontology-aware response.
+    Compute hierarchical F-measure metrics from final predicted CL labels.
+
+    Each prediction list contains one or more final predicted CL term IDs for a cell
+    (for example, ``cas_cell_type_name_1`` … ``cas_cell_type_name_k`` from
+    ``inferred_labels.csv``). Summary mode evaluates every k from 1 to ``top_k`` and
+    returns columns prefixed with ``top_{k}_``. Class-level mode returns pooled
+    binary node-count metrics for exactly ``top_k`` predictions per cell.
 
     HiClass literature calls the per-cell predicted ontology term set ``alpha_i`` and
     the per-cell ground-truth ancestor set ``beta_i``. This implementation uses the
-    explicit names ``predicted_term_sets`` and ``ground_truth_ancestor_sets``.
+    explicit names ``predicted_ancestor_sets`` and ``ground_truth_ancestor_sets``.
 
-    :param response: CAS ontology-aware response object.
-    :param ground_truths: Ground truth CL term IDs positionally aligned with ``response.data``.
+    :param predictions: Predicted CL term IDs per cell, positionally aligned with ``ground_truths``.
+    :param ground_truths: Ground truth CL term IDs positionally aligned with ``predictions``.
     :param ontology_resource: Raw cell ontology resource dict with ``cl_names`` and
         ``children_dictionary`` keys.
+    :param top_k: Highest ranked prediction depth to evaluate. Summary mode returns
+        metrics for k=1..``top_k``; class-level mode uses exactly ``top_k``.
     :param class_level: If ``False`` (default), return one summary row. If ``True``, return
         one row per ground-truth class with pooled binary node-count metrics.
-    :raises ValueError: If lengths mismatch or any ground truth term is absent from the ontology.
+    :raises ValueError: If lengths mismatch, ``top_k`` is not positive, or any ground truth/predicted term is absent from the ontology.
     """
-    if len(ground_truths) != len(response.data):
+    if len(ground_truths) != len(predictions):
         raise ValueError(
             f"Length mismatch: ground_truths has {len(ground_truths)} entries "
-            f"but response.data has {len(response.data)} entries."
+            f"but predictions has {len(predictions)} entries."
         )
+    if top_k < 1:
+        raise ValueError("top_k must be positive.")
 
     all_terms = frozenset(ontology_resource["cl_names"])
     unrecognized = [gt for gt in ground_truths if gt not in all_terms]
@@ -169,30 +182,55 @@ def compute_hierarchical_f_measure_metrics(
             f"Ensure all ground truth labels are valid CL term IDs."
         )
 
-    if not response.data:
+    unrecognized_predictions = [
+        term for cell_predictions in predictions for term in cell_predictions[:top_k] if term and term not in all_terms
+    ]
+    if unrecognized_predictions:
+        raise ValueError(
+            "The following predicted terms are not present in the ontology resource: "
+            f"{sorted(set(unrecognized_predictions))}. Ensure inferred labels contain valid CL term IDs."
+        )
+
+    if not predictions:
         return pd.DataFrame()
 
     graph = _precompute_graph(ontology_resource)
     ground_truth_ancestor_sets = [set(graph.term_ancestors[gt_term]) for gt_term in ground_truths]
-    predicted_term_sets = [_extract_predicted_term_set(annotation) for annotation in response.data]
 
-    class_df = _build_class_level_rows(ground_truths, ground_truth_ancestor_sets, predicted_term_sets)
     if class_level:
-        return class_df
+        predicted_ancestor_sets = [
+            _build_predicted_ancestor_set(cell_predictions[:top_k], graph) for cell_predictions in predictions
+        ]
+        return _build_class_level_rows(ground_truths, ground_truth_ancestor_sets, predicted_ancestor_sets)
 
-    hierarchical_precision, hierarchical_recall, hierarchical_f1 = _compute_micro_hierarchical_metrics(
-        ground_truth_ancestor_sets, predicted_term_sets
-    )
-    summary = {
-        "n_cells": len(response.data),
-        "micro_hierarchical_precision": hierarchical_precision,
-        "micro_hierarchical_recall": hierarchical_recall,
-        "micro_hierarchical_f1": hierarchical_f1,
-        "macro_hierarchical_precision": float(class_df["hierarchical_precision"].mean()),
-        "macro_hierarchical_recall": float(class_df["hierarchical_recall"].mean()),
-        "macro_hierarchical_f1": float(class_df["hierarchical_f1"].mean()),
-        "macro_weighted_hierarchical_precision": float((class_df["weight"] * class_df["hierarchical_precision"]).sum()),
-        "macro_weighted_hierarchical_recall": float((class_df["weight"] * class_df["hierarchical_recall"]).sum()),
-        "macro_weighted_hierarchical_f1": float((class_df["weight"] * class_df["hierarchical_f1"]).sum()),
-    }
-    return pd.DataFrame([summary], columns=_SUMMARY_COLUMNS)
+    summary: t.Dict[str, t.Any] = {"n_cells": len(predictions)}
+    for k in range(1, top_k + 1):
+        predicted_ancestor_sets = [
+            _build_predicted_ancestor_set(cell_predictions[:k], graph) for cell_predictions in predictions
+        ]
+        class_df = _build_class_level_rows(ground_truths, ground_truth_ancestor_sets, predicted_ancestor_sets)
+        hierarchical_precision, hierarchical_recall, hierarchical_f1 = _compute_micro_hierarchical_metrics(
+            ground_truth_ancestor_sets, predicted_ancestor_sets
+        )
+        summary.update(
+            {
+                f"top_{k}_micro_hierarchical_precision": hierarchical_precision,
+                f"top_{k}_micro_hierarchical_recall": hierarchical_recall,
+                f"top_{k}_micro_hierarchical_f1": hierarchical_f1,
+                f"top_{k}_macro_hierarchical_precision": float(class_df["hierarchical_precision"].mean()),
+                f"top_{k}_macro_hierarchical_recall": float(class_df["hierarchical_recall"].mean()),
+                f"top_{k}_macro_hierarchical_f1": float(class_df["hierarchical_f1"].mean()),
+                f"top_{k}_macro_weighted_hierarchical_precision": float(
+                    (class_df["weight"] * class_df["hierarchical_precision"]).sum()
+                ),
+                f"top_{k}_macro_weighted_hierarchical_recall": float(
+                    (class_df["weight"] * class_df["hierarchical_recall"]).sum()
+                ),
+                f"top_{k}_macro_weighted_hierarchical_f1": float(
+                    (class_df["weight"] * class_df["hierarchical_f1"]).sum()
+                ),
+            }
+        )
+
+    columns = ["n_cells"] + [f"top_{k}_{metric}" for k in range(1, top_k + 1) for metric in _SUMMARY_METRICS]
+    return pd.DataFrame([summary], columns=columns)
