@@ -27,9 +27,13 @@ from cellarium.cas.benchmarking.confusion_matrix import (
     save_confusion_matrix,
 )
 from cellarium.cas.benchmarking.f_measure import compute_f_measure_from_cm
-from cellarium.cas.benchmarking.hierarchical_f_measure import compute_hierarchical_f_measure_from_cm
+from cellarium.cas.benchmarking.hierarchical_f_measure import (
+    compute_hierarchical_f_measure_from_cm,
+)
 from cellarium.cas.logging import logger
-from cellarium.cas.postprocessing.cell_ontology.cell_ontology_cache import CellOntologyCache
+from cellarium.cas.postprocessing.cell_ontology.cell_ontology_cache import (
+    CellOntologyCache,
+)
 
 from ._io import (
     INFERRED_LABELS_FILENAME,
@@ -49,23 +53,31 @@ _BENCHMARK_REQUIRED_FILES = (
 )
 
 
+def _ranked_inferred_label_columns(inferred_label: str, top_k: int) -> t.List[str]:
+    if top_k == 1:
+        return [inferred_label]
+
+    prefix, sep, rank_suffix = inferred_label.rpartition("_")
+    if sep == "" or rank_suffix != "1":
+        raise ValueError(
+            "--f-measure-top-k > 1 requires --inferred-label to end with '_1' so ranked columns can be derived."
+        )
+    return [f"{prefix}_{rank}" for rank in range(1, top_k + 1)]
+
+
 def run_confusion_matrix_step(
     annotate_dirs: t.Union[str, Path],
     output_dir: t.Union[str, Path],
     gt_label: str,
     inferred_label: str,
+    f_measure_top_k: int = 1,
 ) -> t.Dict[str, t.Any]:
     """
     Build per-sample confusion matrices and write them to ``<output_dir>/cm_raw/``.
 
-    For every annotate output directory the function:
-
-    1. Opens the original ``.h5ad`` at ``metadata["input_path"]`` and reads *gt_label*.
-    2. Reads the *inferred_label* column from ``inferred_labels.csv``.
-    3. Loads the full ``cl_names`` label universe from ``ontology_resource.json``.
-    4. Builds a sparse confusion matrix aligned to that label universe.
-    5. Saves ``confusion_matrix.npz`` + ``confusion_matrix_meta.json`` under
-       ``<output_dir>/cm_raw/<annotate_dir_name>/``.
+    The top-1 matrices remain the source of truth for hierarchical F-measure.
+    Flat F-measure also gets a selected-K matrix tree under
+    ``<output_dir>/cm_raw_f_measure/``.
 
     :param annotate_dirs: Path to a parent directory whose immediate subdirectories
         are annotate output dirs, or a ``.txt`` file listing one dir per line.
@@ -73,12 +85,16 @@ def run_confusion_matrix_step(
     :param gt_label: Column name in the original ``.h5ad`` ``obs`` that contains
         ground-truth cell type labels.
     :param inferred_label: Column name in ``inferred_labels.csv`` that contains the
-        predicted cell type labels (e.g. ``cas_cell_type_name_1``).
+        top-ranked predicted cell type labels (e.g. ``cas_cell_type_name_1``).
+    :param f_measure_top_k: Number of ranked inferred-label columns to consider
+        for flat F-measure.  Hierarchical F-measure remains top-1.
     :returns: Dict with ``n_samples`` (int) and ``cm_raw_dir`` (str).
     """
     output_dir_path = Path(output_dir)
     cm_raw_dir = output_dir_path / "cm_raw"
+    cm_raw_f_measure_dir = output_dir_path / "cm_raw_f_measure"
     cm_raw_dir.mkdir(parents=True, exist_ok=True)
+    cm_raw_f_measure_dir.mkdir(parents=True, exist_ok=True)
 
     dirs = collect_annotate_output_dirs(
         annotate_dirs,
@@ -86,6 +102,7 @@ def run_confusion_matrix_step(
         missing_hint=("Ensure 'cellarium-cas annotate' was run with --infer-labels and --save-ontology-resource."),
     )
     logger.info("Building confusion matrices for %d annotate output directories.", len(dirs))
+    f_measure_inferred_labels = _ranked_inferred_label_columns(inferred_label, f_measure_top_k)
 
     for annotate_dir in dirs:
         metadata = load_metadata(annotate_dir)
@@ -111,6 +128,12 @@ def run_confusion_matrix_step(
                 f"Available columns: {sorted(labels_df.columns.tolist())}"
             )
         y_pred = labels_df[inferred_label].astype(str).tolist()
+        missing_f_measure_columns = [column for column in f_measure_inferred_labels if column not in labels_df.columns]
+        if missing_f_measure_columns:
+            raise ValueError(
+                f"F-measure inferred-label column(s) not found in {labels_csv}: {missing_f_measure_columns}.\n"
+                f"Available columns: {labels_df.columns.tolist()}"
+            )
 
         # --- label universe ---
         ontology_resource = load_ontology_resource(annotate_dir)
@@ -123,11 +146,42 @@ def run_confusion_matrix_step(
             "model_name": model_name,
             "test_sample": input_path,
             "annotate_dir": str(annotate_dir.resolve()),
+            "gt_label": gt_label,
+            "inferred_label": inferred_label,
             "label_order": label_order,
             "matrix_shape": list(cm.shape),
         }
         save_confusion_matrix(cm, meta, sample_cm_dir)
         logger.info("Saved confusion matrix (%d x %d) -> %s", cm.shape[0], cm.shape[1], sample_cm_dir)
+
+        if f_measure_top_k == 1:
+            f_measure_y_pred = y_pred
+        else:
+            ranked_predictions = labels_df[f_measure_inferred_labels].astype(str)
+            f_measure_y_pred = [
+                true_label if true_label in top_k_predictions else fallback_prediction
+                for true_label, top_k_predictions, fallback_prediction in zip(
+                    y_true,
+                    ranked_predictions.itertuples(index=False, name=None),
+                    y_pred,
+                )
+            ]
+
+        f_measure_cm = build_confusion_matrix(y_true, f_measure_y_pred, label_order)
+        sample_f_measure_cm_dir = cm_raw_f_measure_dir / annotate_dir.name
+        f_measure_meta: t.Dict[str, t.Any] = {
+            **meta,
+            "matrix_shape": list(f_measure_cm.shape),
+            "f_measure_top_k": f_measure_top_k,
+            "f_measure_inferred_labels": f_measure_inferred_labels,
+        }
+        save_confusion_matrix(f_measure_cm, f_measure_meta, sample_f_measure_cm_dir)
+        logger.info(
+            "Saved flat F-measure confusion matrix (%d x %d) -> %s",
+            f_measure_cm.shape[0],
+            f_measure_cm.shape[1],
+            sample_f_measure_cm_dir,
+        )
 
     return {"n_samples": len(dirs), "cm_raw_dir": str(cm_raw_dir)}
 
@@ -147,6 +201,19 @@ def run_aggregate_step(output_dir: t.Union[str, Path]) -> t.Dict[str, t.Any]:
     output_dir_path = Path(output_dir)
     cm_raw_dir = output_dir_path / "cm_raw"
     cm_aggregate_dir = output_dir_path / "cm_aggregate"
+
+    n_groups = _aggregate_cm_tree(cm_raw_dir, cm_aggregate_dir)
+
+    cm_raw_f_measure_dir = output_dir_path / "cm_raw_f_measure"
+    if cm_raw_f_measure_dir.exists():
+        cm_aggregate_f_measure_dir = output_dir_path / "cm_aggregate_f_measure"
+        _aggregate_cm_tree(cm_raw_f_measure_dir, cm_aggregate_f_measure_dir)
+        logger.info("Saved flat F-measure aggregate CMs -> %s", cm_aggregate_f_measure_dir)
+
+    return {"n_groups": n_groups, "cm_aggregate_dir": str(cm_aggregate_dir)}
+
+
+def _aggregate_cm_tree(cm_raw_dir: Path, cm_aggregate_dir: Path) -> int:
     cm_aggregate_dir.mkdir(parents=True, exist_ok=True)
 
     if not cm_raw_dir.exists():
@@ -165,7 +232,7 @@ def run_aggregate_step(output_dir: t.Union[str, Path]) -> t.Dict[str, t.Any]:
     if not groups:
         raise ValueError(f"No confusion matrix artifacts found in {cm_raw_dir}.")
 
-    logger.info("Aggregating confusion matrices for %d model group(s).", len(groups))
+    logger.info("Aggregating confusion matrices from %s for %d model group(s).", cm_raw_dir, len(groups))
 
     for model_name, entries in sorted(groups.items()):
         first_shape = entries[0][1]
@@ -195,7 +262,7 @@ def run_aggregate_step(output_dir: t.Union[str, Path]) -> t.Dict[str, t.Any]:
         save_confusion_matrix(agg_cm, agg_meta, group_dir)
         logger.info("Saved aggregated CM for model '%s' (%d samples) -> %s", model_name, n_samples, group_dir)
 
-    return {"n_groups": len(groups), "cm_aggregate_dir": str(cm_aggregate_dir)}
+    return len(groups)
 
 
 def run_f_measure_step(output_dir: t.Union[str, Path]) -> t.Dict[str, t.Any]:
@@ -211,11 +278,11 @@ def run_f_measure_step(output_dir: t.Union[str, Path]) -> t.Dict[str, t.Any]:
     :returns: Dict with ``per_sample_path`` and ``per_group_path``.
     """
     output_dir_path = Path(output_dir)
-    _require_cm_dirs(output_dir_path)
+    cm_raw_dir, cm_aggregate_dir = _resolve_f_measure_cm_dirs(output_dir_path)
 
     # --- per sample ---
     per_sample_rows: t.List[t.Dict[str, t.Any]] = []
-    for sample_dir in _iter_cm_dirs(output_dir_path / "cm_raw"):
+    for sample_dir in _iter_cm_dirs(cm_raw_dir):
         cm, meta = load_confusion_matrix(sample_dir)
         metrics = compute_f_measure_from_cm(cm)
         per_sample_rows.append({"model_name": meta["model_name"], "test_sample": meta["test_sample"], **metrics})
@@ -226,7 +293,7 @@ def run_f_measure_step(output_dir: t.Union[str, Path]) -> t.Dict[str, t.Any]:
 
     # --- per group ---
     per_group_rows: t.List[t.Dict[str, t.Any]] = []
-    for group_dir in _iter_cm_dirs(output_dir_path / "cm_aggregate"):
+    for group_dir in _iter_cm_dirs(cm_aggregate_dir):
         cm, meta = load_confusion_matrix(group_dir)
         metrics = compute_f_measure_from_cm(cm)
         per_group_rows.append({"group_name": meta["model_name"], **metrics})
@@ -255,14 +322,13 @@ def run_hierarchical_f_measure_step(output_dir: t.Union[str, Path]) -> t.Dict[st
     _require_cm_dirs(output_dir_path)
 
     ontology_cache = _load_ontology_cache(output_dir_path)
-    ancestors_dict = {term: ontology_cache.get_ancestors(term, remove_root=True) for term in ontology_cache.cl_names}
 
     # --- per sample ---
     per_sample_rows: t.List[t.Dict[str, t.Any]] = []
     for sample_dir in _iter_cm_dirs(output_dir_path / "cm_raw"):
         cm, meta = load_confusion_matrix(sample_dir)
         label_order: t.List[str] = meta["label_order"]
-        metrics = compute_hierarchical_f_measure_from_cm(cm, label_order, ancestors_dict)
+        metrics = compute_hierarchical_f_measure_from_cm(cm, label_order, ontology_cache)
         per_sample_rows.append({"model_name": meta["model_name"], "test_sample": meta["test_sample"], **metrics})
 
     per_sample_path = output_dir_path / "hierarchical_f_measure_per_sample.csv"
@@ -274,7 +340,7 @@ def run_hierarchical_f_measure_step(output_dir: t.Union[str, Path]) -> t.Dict[st
     for group_dir in _iter_cm_dirs(output_dir_path / "cm_aggregate"):
         cm, meta = load_confusion_matrix(group_dir)
         label_order = meta["label_order"]
-        metrics = compute_hierarchical_f_measure_from_cm(cm, label_order, ancestors_dict)
+        metrics = compute_hierarchical_f_measure_from_cm(cm, label_order, ontology_cache)
         per_group_rows.append({"group_name": meta["model_name"], **metrics})
 
     per_group_path = output_dir_path / "hierarchical_f_measure_per_group.csv"
@@ -289,6 +355,7 @@ def run_all_steps(
     output_dir: t.Union[str, Path],
     gt_label: str,
     inferred_label: str,
+    f_measure_top_k: int = 1,
 ) -> t.Dict[str, t.Any]:
     """
     Run the full benchmark pipeline: confusion-matrix -> aggregate -> f-measure -> hierarchical.
@@ -297,10 +364,20 @@ def run_all_steps(
     :param output_dir: Benchmarking workspace directory.
     :param gt_label: Ground-truth obs column name in the original ``.h5ad``.
     :param inferred_label: Predicted-label column name in ``inferred_labels.csv``.
+    :param f_measure_top_k: Number of ranked inferred-label columns to consider
+        for flat F-measure.  Hierarchical F-measure remains top-1.
     :returns: Merged dict of results from all four steps.
     """
     result: t.Dict[str, t.Any] = {}
-    result.update(run_confusion_matrix_step(annotate_dirs, output_dir, gt_label, inferred_label))
+    result.update(
+        run_confusion_matrix_step(
+            annotate_dirs,
+            output_dir,
+            gt_label,
+            inferred_label,
+            f_measure_top_k=f_measure_top_k,
+        )
+    )
     result.update(run_aggregate_step(output_dir))
     result.update({"f_measure_" + k: v for k, v in run_f_measure_step(output_dir).items()})
     result.update({"h_f_measure_" + k: v for k, v in run_hierarchical_f_measure_step(output_dir).items()})
@@ -335,6 +412,25 @@ def _iter_cm_dirs(parent: Path) -> t.Iterator[Path]:
     for p in sorted(parent.iterdir()):
         if p.is_dir():
             yield p
+
+
+def _resolve_f_measure_cm_dirs(output_dir: Path) -> t.Tuple[Path, Path]:
+    cm_raw_f_measure = output_dir / "cm_raw_f_measure"
+    cm_aggregate_f_measure = output_dir / "cm_aggregate_f_measure"
+    flat_raw_exists = cm_raw_f_measure.exists()
+    flat_aggregate_exists = cm_aggregate_f_measure.exists()
+
+    if flat_raw_exists and flat_aggregate_exists:
+        return cm_raw_f_measure, cm_aggregate_f_measure
+
+    if flat_raw_exists != flat_aggregate_exists:
+        raise FileNotFoundError(
+            "Flat F-measure confusion-matrix artifacts are incomplete. Run 'benchmark aggregate' after "
+            "'benchmark confusion-matrix'."
+        )
+
+    _require_cm_dirs(output_dir)
+    return output_dir / "cm_raw", output_dir / "cm_aggregate"
 
 
 def _require_cm_dirs(output_dir: Path) -> None:

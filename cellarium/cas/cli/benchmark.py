@@ -51,6 +51,17 @@ _inferred_label_option = click.option(
     ),
 )
 
+_f_measure_top_k_option = click.option(
+    "--f-measure-top-k",
+    type=click.IntRange(min=1),
+    default=1,
+    show_default=True,
+    help=(
+        "Number of ranked inferred-label columns to consider for flat F-measure. Columns are derived from "
+        "--inferred-label by replacing its trailing rank; hierarchical F-measure remains top-1."
+    ),
+)
+
 
 @click.group("benchmark")
 def benchmark_group() -> None:
@@ -62,11 +73,13 @@ def benchmark_group() -> None:
 @_output_dir_option
 @_gt_label_option
 @_inferred_label_option
+@_f_measure_top_k_option
 def confusion_matrix_command(
     annotate_dirs: str,
     output_dir: str,
     gt_label: str,
     inferred_label: str,
+    f_measure_top_k: int,
 ) -> None:
     """Build per-sample confusion matrices and save them to <output-dir>/cm_raw/.
 
@@ -77,7 +90,13 @@ def confusion_matrix_command(
     from ._benchmark_impl import run_confusion_matrix_step
 
     try:
-        result = run_confusion_matrix_step(annotate_dirs, output_dir, gt_label, inferred_label)
+        result = run_confusion_matrix_step(
+            annotate_dirs,
+            output_dir,
+            gt_label,
+            inferred_label,
+            f_measure_top_k=f_measure_top_k,
+        )
     except (ValueError, FileNotFoundError) as exc:
         raise click.UsageError(str(exc)) from exc
 
@@ -160,11 +179,13 @@ def hierarchical_command(output_dir: str) -> None:
 @_output_dir_option
 @_gt_label_option
 @_inferred_label_option
+@_f_measure_top_k_option
 def all_command(
     annotate_dirs: str,
     output_dir: str,
     gt_label: str,
     inferred_label: str,
+    f_measure_top_k: int,
 ) -> None:
     """Run the full benchmark pipeline in one command.
 
@@ -174,7 +195,13 @@ def all_command(
     from ._benchmark_impl import run_all_steps
 
     try:
-        result = run_all_steps(annotate_dirs, output_dir, gt_label, inferred_label)
+        result = run_all_steps(
+            annotate_dirs,
+            output_dir,
+            gt_label,
+            inferred_label,
+            f_measure_top_k=f_measure_top_k,
+        )
     except (ValueError, FileNotFoundError) as exc:
         raise click.UsageError(str(exc)) from exc
 

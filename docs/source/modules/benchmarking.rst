@@ -15,9 +15,10 @@ supported:
   rather than exact label matches, so partial credit is awarded for predictions that
   are close in the Cell Ontology tree.
 
-Both metric families use a shared **confusion matrix** as the base artifact.  The
-same matrix feeds both flat and hierarchical computations, making the pipeline
-consistent and composable.
+The CLI keeps ``cm_raw/`` as the top-1 confusion-matrix source for hierarchical
+F-measure.  Flat F-measure reads ``cm_raw_f_measure/`` when present; with the
+default top-k of 1 it matches top-1 behavior, and with ``--f-measure-top-k > 1``
+it uses selected top-k hit semantics.
 
 Prerequisites
 +++++++++++++
@@ -50,6 +51,10 @@ Each annotate output directory must contain:
 The ground-truth labels are read from the original ``.h5ad`` at
 ``metadata["input_path"]``.  That column must contain CL ontology term IDs
 (e.g. ``"CL:0000540"``) for hierarchical metrics.
+Use ``cas_cell_type_name_k`` when the ground-truth column contains CL term IDs;
+use ``cas_cell_type_label_k`` only if the ground-truth column and benchmark label
+universe are human-readable labels too.
+
 
 Running the full pipeline via CLI
 ++++++++++++++++++++++++++++++++++
@@ -61,15 +66,22 @@ call::
         --annotate-dirs ./annotate_outputs \
         --output-dir    ./benchmark_results \
         --gt-label      cell_type_ontology_term_id \
-        --inferred-label cas_cell_type_name_1
+        --inferred-label cas_cell_type_name_1 \
+        --f-measure-top-k 3
 
 ``--annotate-dirs`` may be a directory whose immediate subdirectories are annotate
 output dirs, or a ``.txt`` file listing one path per line.
+
+``--f-measure-top-k`` produces one selected-K flat F-measure result, not separate
+outputs for every intermediate K.
+
 
 After the command completes, ``benchmark_results/`` contains::
 
     cm_raw/                          # per-sample sparse confusion matrices
     cm_aggregate/                    # per-model aggregated confusion matrices
+    cm_raw_f_measure/                # per-sample flat F-measure matrices for selected top-k
+    cm_aggregate_f_measure/          # per-model flat F-measure aggregates for selected top-k
     f_measure_per_sample.csv         # F-measure per annotate run
     f_measure_per_group.csv          # F-measure per model (aggregated)
     hierarchical_f_measure_per_sample.csv
@@ -86,7 +98,8 @@ re-compute only the metric CSVs after adding new runs::
         --annotate-dirs ./annotate_outputs \
         --output-dir    ./benchmark_results \
         --gt-label      cell_type_ontology_term_id \
-        --inferred-label cas_cell_type_name_1
+        --inferred-label cas_cell_type_name_1 \
+        --f-measure-top-k 3
 
     # Step 2 — aggregate by model name
     cellarium-cas benchmark aggregate \
