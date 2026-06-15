@@ -112,11 +112,12 @@ def infer_level_specs(azimuth_df: t.Any) -> t.List[t.Tuple[str, str]]:
     Auto-detect ``(label_col, score_col)`` pairs from an Azimuth output DataFrame.
 
     Azimuth writes predicted labels as ``predicted.<level>`` and per-cell confidence
-    scores as ``predicted.<level>.score``.  Pairs are returned **coarsest first**
-    (column-position order, since Azimuth adds coarser levels first), so rank 1 is always populated.
+    scores as ``predicted.<level>.score``.  Pairs are returned **most granular first**
+    (rank 1 = finest), matching CAS convention where rank 1 is always the most
+    granular call.
 
     :param azimuth_df: DataFrame loaded from the Azimuth metadata CSV.
-    :returns: List of ``(label_col, score_col)`` tuples, coarsest first.
+    :returns: List of ``(label_col, score_col)`` tuples, most granular first.
     :raises ValueError: If no ``predicted.*`` / ``predicted.*.score`` pairs are found.
     """
     pairs = [
@@ -130,8 +131,9 @@ def infer_level_specs(azimuth_df: t.Any) -> t.List[t.Tuple[str, str]]:
             "'predicted.<level>' with a corresponding 'predicted.<level>.score' column.  "
             f"Available columns: {list(azimuth_df.columns)}"
         )
-    # Azimuth adds annotation levels coarse-to-fine; preserve that order so rank 1 is always populated.
-    return pairs
+    # Azimuth adds annotation levels coarse-to-fine (column order).  Reverse so that
+    # rank 1 is always the most granular level, matching CAS convention.
+    return pairs[::-1]
 
 
 def map_azimuth_to_cas_labels(
@@ -158,9 +160,10 @@ def map_azimuth_to_cas_labels(
     :param azimuth_ref_name: Azimuth reference name (e.g. ``"pbmcref"``), used to build
         the ``model_name`` field as ``azimuth_<ref_name>``.
     :param level_specs: List of ``(azimuth_label_col, azimuth_score_col)`` tuples ordered
-        **coarsest first**.  Each tuple names the columns in the Azimuth CSV for one
-        annotation level.  If ``None`` (default), pairs are auto-detected from columns
-        matching ``predicted.<level>`` / ``predicted.<level>.score``.
+        **most granular first** (rank 1 = finest level).  Each tuple names the columns in
+        the Azimuth CSV for one annotation level.  If ``None`` (default), pairs are
+        auto-detected from columns matching ``predicted.<level>`` /
+        ``predicted.<level>.score`` and reversed so that rank 1 is the finest level.
     :param crosswalk_cl_label_col: Optional column in the crosswalk containing the human-readable
         CL term label (e.g. ``"cl_label"``).  Written to ``cas_cell_type_label_k`` columns.
         If ``None``, the Azimuth label string is used.

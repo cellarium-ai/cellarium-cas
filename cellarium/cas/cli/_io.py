@@ -14,8 +14,8 @@ import pandas as pd
 from cellarium.cas import models
 
 ONTOLOGY_RESPONSE_FILENAME = "ontology_response.json"
-INFERRED_LABELS_FILENAME = "inferred_labels.csv"
 ONTOLOGY_RESOURCE_FILENAME = "ontology_resource.json"
+INFERRED_LABELS_FILENAME = "inferred_labels.csv"
 METADATA_FILENAME = "metadata.json"
 
 _REQUIRED_FILES = (ONTOLOGY_RESPONSE_FILENAME, INFERRED_LABELS_FILENAME, METADATA_FILENAME)
@@ -47,14 +47,6 @@ def save_inferred_labels(df: pd.DataFrame, output_dir: Path) -> Path:
     path = output_dir / INFERRED_LABELS_FILENAME
     df.to_csv(path)
     return path
-
-
-def load_inferred_labels(output_dir: Path) -> pd.DataFrame:
-    """Load ``inferred_labels.csv`` from *output_dir*. Index column is the obs index."""
-    path = Path(output_dir) / INFERRED_LABELS_FILENAME
-    if not path.exists():
-        raise FileNotFoundError(f"inferred_labels.csv not found in {output_dir}")
-    return pd.read_csv(path, index_col=0)
 
 
 def save_ontology_resource(resource: t.Dict[str, t.Any], output_dir: Path) -> Path:

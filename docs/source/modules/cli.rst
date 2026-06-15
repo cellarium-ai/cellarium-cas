@@ -38,13 +38,30 @@ Pass ``--cluster-label`` to additionally compute cluster-level label calls.
 benchmark
 ---------
 
-Evaluate annotation quality against a labelled reference dataset. The flat and ontology-aware
-subcommands consume output directories produced by ``cellarium-cas annotate``. The
-``cellarium-cas benchmark hierarchical-f-measure`` command requires ``ontology_response.json``,
-``ontology_resource.json``, and ``metadata.json`` from each annotate output directory.
-Its summary CSV includes per-sample rows and per-model total rows. With
-``--save-class-level`` it writes one ``hierarchical_f_measure_class_level.csv`` containing
-per-class scores for each model/sample and per-model total.
+Evaluate annotation quality against a labelled reference dataset.  The benchmark
+subcommands consume output directories produced by ``cellarium-cas annotate``.
+All benchmark artifacts (confusion matrices, metric CSVs) are written to a single
+``--output-dir`` that acts as the benchmarking workspace.  Annotate directories
+are never modified.
+
+The pipeline has four ordered steps plus a convenience command that runs all of them:
+
+.. code-block:: bash
+
+    # All-in-one
+    cellarium-cas benchmark all \
+        --annotate-dirs ./annotate_outputs \
+        --output-dir    ./benchmark_results \
+        --gt-label      cell_type_ontology_term_id \
+        --inferred-label cas_cell_type_name_1
+
+    # Or step by step
+    cellarium-cas benchmark confusion-matrix ...
+    cellarium-cas benchmark aggregate        ...
+    cellarium-cas benchmark f-measure        ...
+    cellarium-cas benchmark hierarchical     ...
+
+See :doc:`benchmarking` for full documentation of the pipeline and output columns.
 
 .. click:: cellarium.cas.cli.benchmark:benchmark_group
    :prog: cellarium-cas benchmark
