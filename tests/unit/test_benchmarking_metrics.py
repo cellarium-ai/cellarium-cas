@@ -300,13 +300,13 @@ class TestFMeasureFromCM:
         # All-zero CM (no predictions)
         cm = scipy.sparse.csr_matrix((len(LABELS), len(LABELS)), dtype=np.int64)
         m = compute_f_measure_from_cm(cm)
-        assert m["f1_micro"] == 0.0
-        assert m["f1_macro"] == 0.0
+        np.testing.assert_allclose(m["f1_micro"], 0.0)
+        np.testing.assert_allclose(m["f1_macro"], 0.0)
 
     def test_zero_division_custom_value(self):
         cm = scipy.sparse.csr_matrix((len(LABELS), len(LABELS)), dtype=np.int64)
         m = compute_f_measure_from_cm(cm, zero_division=1.0)
-        assert m["f1_micro"] == 1.0
+        np.testing.assert_allclose(m["f1_micro"], 1.0)
 
 
 # ---------------------------------------------------------------------------
@@ -512,4 +512,4 @@ class TestHierarchicalMacro:
     def test_zero_division_macro(self):
         cm = scipy.sparse.csr_matrix((len(LABELS), len(LABELS)), dtype=np.int64)
         m = compute_hierarchical_f_measure_from_cm(cm, LABELS, ONTOLOGY_CACHE, zero_division=0.0)
-        assert m["h_f1_macro"] == 0.0
+        np.testing.assert_allclose(m["h_f1_macro"], 0.0)

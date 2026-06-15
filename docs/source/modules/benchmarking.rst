@@ -199,7 +199,7 @@ Aggregating custom groups
 
 The CLI ``aggregate`` command groups confusion matrices by ``model_name`` automatically.
 For custom groupings (e.g. by assay type or tissue), use
-:func:`~cellarium.cas.benchmarking.confusion_matrix.aggregate_confusion_matrices` directly
+``aggregate_confusion_matrices`` directly
 in a notebook::
 
     from cellarium.cas.benchmarking.confusion_matrix import (
@@ -220,7 +220,7 @@ Azimuth integration
 
 The ``cellarium.cas.benchmarking.azimuth`` helpers convert Azimuth annotation outputs
 into CAS-compatible annotate directories so they can be evaluated with the same pipeline.
-See :mod:`cellarium.cas.benchmarking.azimuth.helpers.azimuth_to_cas_annotation` for usage.
+See ``cellarium.cas.benchmarking.azimuth.helpers.azimuth_to_cas_annotation`` for usage.
 
 **Important:** when ``level_specs`` is auto-detected, Azimuth levels are ordered
 **most granular first** (rank 1 = finest level), matching CAS convention.  If you
