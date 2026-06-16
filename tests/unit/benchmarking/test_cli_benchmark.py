@@ -16,36 +16,7 @@ from cellarium.cas.cli._benchmark_impl import (
     run_hierarchical_f_measure_step,
 )
 from cellarium.cas.cli.benchmark import benchmark_group
-
-MOCK_ONTOLOGY_RESOURCE: t.Dict[str, t.Any] = {
-    "cl_names": ["CL:0000000", "CL:0000001", "CL:0000002", "CL:0000003", "CL:0000004"],
-    "cell_ontology_term_id_to_cell_type": {
-        "CL:0000000": "cell",
-        "CL:0000001": "parent",
-        "CL:0000002": "child_a",
-        "CL:0000003": "child_b",
-        "CL:0000004": "grandchild",
-    },
-    "children_dictionary": {
-        "CL:0000000": ["CL:0000001"],
-        "CL:0000001": ["CL:0000002", "CL:0000003"],
-        "CL:0000003": ["CL:0000004"],
-    },
-    "shortest_path_lengths_from_cell_root": {
-        "CL:0000000": 0,
-        "CL:0000001": 1,
-        "CL:0000002": 2,
-        "CL:0000003": 2,
-        "CL:0000004": 3,
-    },
-    "longest_path_lengths_from_cell_root": {
-        "CL:0000000": 0,
-        "CL:0000001": 1,
-        "CL:0000002": 2,
-        "CL:0000003": 2,
-        "CL:0000004": 3,
-    },
-}
+from tests.unit.benchmarking._fixtures import MOCK_ONTOLOGY_RESOURCE
 
 
 def _write_json(path: Path, payload: t.Dict[str, t.Any]) -> None:
