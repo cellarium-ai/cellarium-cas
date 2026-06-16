@@ -54,6 +54,11 @@ def compute_hierarchical_f_measure_from_cm(
         - ``h_recall_micro`` — micro hierarchical recall.
         - ``h_f1_micro`` — micro hierarchical F1.
         - ``h_f1_macro`` — macro hierarchical F1 over ontology nodes with nonzero true support (OvR).
+        - ``h_precision_macro`` — macro hierarchical precision over ontology nodes with nonzero true support.
+        - ``h_recall_macro`` — macro hierarchical recall over ontology nodes with nonzero true support.
+        - ``h_precision_weighted`` — support-weighted hierarchical precision over ontology nodes (support = hierarchical true count per node).
+        - ``h_recall_weighted`` — support-weighted hierarchical recall over ontology nodes.
+        - ``h_f1_weighted`` — support-weighted hierarchical F1 over ontology nodes.
     """
     cm_coo = cm.tocoo()
 
@@ -97,19 +102,42 @@ def compute_hierarchical_f_measure_from_cm(
     h_recall_micro = _safe_div(h_tp, h_tp + h_fn, zero_division)
     h_f1_micro = _safe_f1(h_precision_micro, h_recall_micro, zero_division)
 
-    # --- Macro metrics: OvR per ontology node, averaged over nodes with nonzero true support ---
+    # --- Macro & weighted metrics: OvR per ontology node ---
     node_f1s: t.List[float] = []
+    node_ps: t.List[float] = []
+    node_rs: t.List[float] = []
+    weighted_p_sum = 0.0
+    weighted_r_sum = 0.0
+    weighted_f1_sum = 0.0
+    total_support = 0.0
+
     for node in set(node_h_tp.keys()) | set(node_h_fn.keys()):
         tp = node_h_tp[node]
         fn = node_h_fn[node]
-        if tp + fn == 0:
+        support = tp + fn
+        if support == 0:
             continue
         fp = node_h_fp[node]
         p = _safe_div(tp, tp + fp, zero_division)
         r = _safe_div(tp, tp + fn, zero_division)
-        node_f1s.append(_safe_f1(p, r, zero_division))
+        f1 = _safe_f1(p, r, zero_division)
+        node_f1s.append(f1)
+        node_ps.append(p)
+        node_rs.append(r)
+        weighted_p_sum += p * support
+        weighted_r_sum += r * support
+        weighted_f1_sum += f1 * support
+        total_support += support
 
     h_f1_macro = float(np.mean(node_f1s)) if node_f1s else zero_division
+    h_precision_macro = float(np.mean(node_ps)) if node_ps else zero_division
+    h_recall_macro = float(np.mean(node_rs)) if node_rs else zero_division
+    if total_support > 0:
+        h_precision_weighted = weighted_p_sum / total_support
+        h_recall_weighted = weighted_r_sum / total_support
+        h_f1_weighted = weighted_f1_sum / total_support
+    else:
+        h_precision_weighted = h_recall_weighted = h_f1_weighted = zero_division
 
     return {
         "h_tp": int(h_tp),
@@ -119,6 +147,11 @@ def compute_hierarchical_f_measure_from_cm(
         "h_recall_micro": float(h_recall_micro),
         "h_f1_micro": float(h_f1_micro),
         "h_f1_macro": float(h_f1_macro),
+        "h_precision_macro": float(h_precision_macro),
+        "h_recall_macro": float(h_recall_macro),
+        "h_precision_weighted": float(h_precision_weighted),
+        "h_recall_weighted": float(h_recall_weighted),
+        "h_f1_weighted": float(h_f1_weighted),
     }
 
 

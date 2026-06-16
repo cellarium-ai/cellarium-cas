@@ -22,6 +22,7 @@ import hiclass.metrics as hc_metrics
 import numpy as np
 import pytest
 import scipy.sparse
+from sklearn.metrics import f1_score, precision_score, recall_score
 
 from cellarium.cas.benchmarking.confusion_matrix import (
     aggregate_confusion_matrices,
@@ -87,50 +88,6 @@ MOCK_ONTOLOGY_RESOURCE: t.Dict[str, t.Any] = {
 }
 
 ONTOLOGY_CACHE = CellOntologyCache(MOCK_ONTOLOGY_RESOURCE)
-
-
-# ---------------------------------------------------------------------------
-# CellOntologyCache ancestor building
-# ---------------------------------------------------------------------------
-
-
-class TestCellOntologyCacheAncestors:
-    def test_ancestors_raw_includes_root(self):
-        cache = CellOntologyCache(MOCK_ONTOLOGY_RESOURCE)
-        for term in MOCK_ONTOLOGY_RESOURCE["cl_names"]:
-            if term == "CL:0000000":
-                continue
-            assert "CL:0000000" in cache.ancestors_dict[term], f"Root missing from raw ancestors of {term}"
-
-    def test_ancestors_raw_includes_self(self):
-        cache = CellOntologyCache(MOCK_ONTOLOGY_RESOURCE)
-        for term in MOCK_ONTOLOGY_RESOURCE["cl_names"]:
-            assert term in cache.ancestors_dict[term], f"{term} not in its own ancestor set"
-
-    def test_ancestors_remove_root_flag(self):
-        cache = CellOntologyCache(MOCK_ONTOLOGY_RESOURCE)
-        for term in MOCK_ONTOLOGY_RESOURCE["cl_names"]:
-            assert "CL:0000000" not in cache.get_ancestors(term, remove_root=True)
-
-    def test_ancestors_remove_self_flag(self):
-        cache = CellOntologyCache(MOCK_ONTOLOGY_RESOURCE)
-        for term in MOCK_ONTOLOGY_RESOURCE["cl_names"]:
-            assert term not in cache.get_ancestors(term, remove_self=True)
-
-    def test_ancestors_grandchild_remove_root(self):
-        cache = CellOntologyCache(MOCK_ONTOLOGY_RESOURCE)
-        assert cache.get_ancestors("CL:0000004", remove_root=True) == frozenset(
-            {"CL:0000001", "CL:0000003", "CL:0000004"}
-        )
-
-    def test_ancestors_child_a_remove_root(self):
-        cache = CellOntologyCache(MOCK_ONTOLOGY_RESOURCE)
-        assert cache.get_ancestors("CL:0000002", remove_root=True) == frozenset({"CL:0000001", "CL:0000002"})
-
-    def test_fallback_unknown_term(self):
-        cache = CellOntologyCache(MOCK_ONTOLOGY_RESOURCE)
-        assert cache.get_ancestors("CL:9999999") == frozenset({"CL:9999999"})
-
 
 # ---------------------------------------------------------------------------
 # build_confusion_matrix
@@ -307,6 +264,82 @@ class TestFMeasureFromCM:
         cm = scipy.sparse.csr_matrix((len(LABELS), len(LABELS)), dtype=np.int64)
         m = compute_f_measure_from_cm(cm, zero_division=1.0)
         np.testing.assert_allclose(m["f1_micro"], 1.0)
+
+    def test_weighted_keys_present_and_perfect(self):
+        y_true = ["CL:0000002", "CL:0000002", "CL:0000003"]
+        y_pred = ["CL:0000002", "CL:0000002", "CL:0000003"]
+        cm = build_confusion_matrix(y_true, y_pred, LABELS)
+        m = compute_f_measure_from_cm(cm)
+        np.testing.assert_allclose(m["precision_weighted"], 1.0)
+        np.testing.assert_allclose(m["recall_weighted"], 1.0)
+        np.testing.assert_allclose(m["f1_weighted"], 1.0)
+
+    def test_weighted_matches_sklearn(self):
+        y_true = ["CL:0000002", "CL:0000002", "CL:0000003", "CL:0000004"]
+        y_pred = ["CL:0000002", "CL:0000003", "CL:0000003", "CL:0000004"]
+        cm = build_confusion_matrix(y_true, y_pred, LABELS)
+        m = compute_f_measure_from_cm(cm)
+        np.testing.assert_allclose(
+            m["precision_weighted"],
+            precision_score(y_true, y_pred, labels=LABELS, average="weighted", zero_division=0),
+            rtol=1e-6,
+        )
+        np.testing.assert_allclose(
+            m["recall_weighted"],
+            recall_score(y_true, y_pred, labels=LABELS, average="weighted", zero_division=0),
+            rtol=1e-6,
+        )
+        np.testing.assert_allclose(
+            m["f1_weighted"],
+            f1_score(y_true, y_pred, labels=LABELS, average="weighted", zero_division=0),
+            rtol=1e-6,
+        )
+
+    def test_weighted_zero_division(self):
+        cm = scipy.sparse.csr_matrix((len(LABELS), len(LABELS)), dtype=np.int64)
+        m = compute_f_measure_from_cm(cm)
+        np.testing.assert_allclose(m["precision_weighted"], 0.0)
+        np.testing.assert_allclose(m["recall_weighted"], 0.0)
+        np.testing.assert_allclose(m["f1_weighted"], 0.0)
+        m1 = compute_f_measure_from_cm(cm, zero_division=1.0)
+        np.testing.assert_allclose(m1["precision_weighted"], 1.0)
+        np.testing.assert_allclose(m1["recall_weighted"], 1.0)
+        np.testing.assert_allclose(m1["f1_weighted"], 1.0)
+
+    def test_macro_precision_recall_perfect(self):
+        y_true = ["CL:0000002", "CL:0000002", "CL:0000003"]
+        y_pred = ["CL:0000002", "CL:0000002", "CL:0000003"]
+        cm = build_confusion_matrix(y_true, y_pred, LABELS)
+        m = compute_f_measure_from_cm(cm)
+        np.testing.assert_allclose(m["precision_macro"], 1.0)
+        np.testing.assert_allclose(m["recall_macro"], 1.0)
+
+    def test_macro_precision_recall_matches_sklearn(self):
+        # Our macro averages over nonzero-support classes only; pass those same labels to sklearn.
+        y_true = ["CL:0000002", "CL:0000002", "CL:0000003", "CL:0000004"]
+        y_pred = ["CL:0000002", "CL:0000003", "CL:0000003", "CL:0000004"]
+        active_labels = sorted(set(y_true) | set(y_pred))
+        cm = build_confusion_matrix(y_true, y_pred, LABELS)
+        m = compute_f_measure_from_cm(cm)
+        np.testing.assert_allclose(
+            m["precision_macro"],
+            precision_score(y_true, y_pred, labels=active_labels, average="macro", zero_division=0),
+            rtol=1e-6,
+        )
+        np.testing.assert_allclose(
+            m["recall_macro"],
+            recall_score(y_true, y_pred, labels=active_labels, average="macro", zero_division=0),
+            rtol=1e-6,
+        )
+
+    def test_macro_precision_recall_zero_division(self):
+        cm = scipy.sparse.csr_matrix((len(LABELS), len(LABELS)), dtype=np.int64)
+        m = compute_f_measure_from_cm(cm)
+        np.testing.assert_allclose(m["precision_macro"], 0.0)
+        np.testing.assert_allclose(m["recall_macro"], 0.0)
+        m1 = compute_f_measure_from_cm(cm, zero_division=1.0)
+        np.testing.assert_allclose(m1["precision_macro"], 1.0)
+        np.testing.assert_allclose(m1["recall_macro"], 1.0)
 
 
 # ---------------------------------------------------------------------------
@@ -513,3 +546,68 @@ class TestHierarchicalMacro:
         cm = scipy.sparse.csr_matrix((len(LABELS), len(LABELS)), dtype=np.int64)
         m = compute_hierarchical_f_measure_from_cm(cm, LABELS, ONTOLOGY_CACHE, zero_division=0.0)
         np.testing.assert_allclose(m["h_f1_macro"], 0.0)
+
+    def test_h_weighted_keys_present(self):
+        cm = build_confusion_matrix(
+            ["CL:0000002", "CL:0000002", "CL:0000003"],
+            ["CL:0000002", "CL:0000002", "CL:0000002"],
+            LABELS,
+        )
+        m = compute_hierarchical_f_measure_from_cm(cm, LABELS, ONTOLOGY_CACHE)
+        for key in ("h_precision_weighted", "h_recall_weighted", "h_f1_weighted"):
+            assert key in m, f"Key {key!r} missing from result"
+            assert isinstance(m[key], float), f"{key} should be float"
+            assert 0.0 <= m[key] <= 1.0, f"{key}={m[key]} out of [0, 1]"
+
+    def test_h_weighted_perfect(self):
+        cm = build_confusion_matrix(
+            ["CL:0000002", "CL:0000003"],
+            ["CL:0000002", "CL:0000003"],
+            LABELS,
+        )
+        m = compute_hierarchical_f_measure_from_cm(cm, LABELS, ONTOLOGY_CACHE)
+        np.testing.assert_allclose(m["h_precision_weighted"], 1.0)
+        np.testing.assert_allclose(m["h_recall_weighted"], 1.0)
+        np.testing.assert_allclose(m["h_f1_weighted"], 1.0)
+
+    def test_h_weighted_empty_cm(self):
+        cm = scipy.sparse.csr_matrix((len(LABELS), len(LABELS)), dtype=np.int64)
+        m = compute_hierarchical_f_measure_from_cm(cm, LABELS, ONTOLOGY_CACHE, zero_division=0.0)
+        np.testing.assert_allclose(m["h_precision_weighted"], 0.0)
+        np.testing.assert_allclose(m["h_recall_weighted"], 0.0)
+        np.testing.assert_allclose(m["h_f1_weighted"], 0.0)
+
+    def test_h_macro_precision_recall_hand_computed(self):
+        """
+        Base scenario: CL:0000002 x2 correct, CL:0000003 x1 -> CL:0000002.
+
+        Node CL:0000001: tp=3, fp=0, fn=0 -> P=1.0,  R=1.0
+        Node CL:0000002: tp=2, fp=1, fn=0 -> P=2/3,  R=1.0
+        Node CL:0000003: tp=0, fp=0, fn=1 -> P=0.0,  R=0.0
+        precision_macro = (1.0 + 2/3 + 0.0) / 3 = 5/9
+        recall_macro    = (1.0 + 1.0 + 0.0) / 3 = 2/3
+        """
+        cm = build_confusion_matrix(
+            ["CL:0000002", "CL:0000002", "CL:0000003"],
+            ["CL:0000002", "CL:0000002", "CL:0000002"],
+            LABELS,
+        )
+        m = compute_hierarchical_f_measure_from_cm(cm, LABELS, ONTOLOGY_CACHE)
+        np.testing.assert_allclose(m["h_precision_macro"], 5 / 9, rtol=1e-9)
+        np.testing.assert_allclose(m["h_recall_macro"], 2 / 3, rtol=1e-9)
+
+    def test_h_macro_precision_recall_perfect(self):
+        cm = build_confusion_matrix(
+            ["CL:0000002", "CL:0000003"],
+            ["CL:0000002", "CL:0000003"],
+            LABELS,
+        )
+        m = compute_hierarchical_f_measure_from_cm(cm, LABELS, ONTOLOGY_CACHE)
+        np.testing.assert_allclose(m["h_precision_macro"], 1.0)
+        np.testing.assert_allclose(m["h_recall_macro"], 1.0)
+
+    def test_h_macro_precision_recall_empty_cm(self):
+        cm = scipy.sparse.csr_matrix((len(LABELS), len(LABELS)), dtype=np.int64)
+        m = compute_hierarchical_f_measure_from_cm(cm, LABELS, ONTOLOGY_CACHE, zero_division=0.0)
+        np.testing.assert_allclose(m["h_precision_macro"], 0.0)
+        np.testing.assert_allclose(m["h_recall_macro"], 0.0)

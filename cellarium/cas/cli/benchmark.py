@@ -130,9 +130,13 @@ def f_measure_command(output_dir: str) -> None:
 
     \b
       f_measure_per_sample.csv  (columns: model_name, test_sample, tp, fp, fn,
-                                           precision_micro, recall_micro, f1_micro, f1_macro)
+                                           precision_micro, recall_micro, f1_micro,
+                                           f1_macro, precision_macro, recall_macro,
+                                           precision_weighted, recall_weighted, f1_weighted)
       f_measure_per_group.csv   (columns: group_name, tp, fp, fn,
-                                           precision_micro, recall_micro, f1_micro, f1_macro)
+                                           precision_micro, recall_micro, f1_micro,
+                                           f1_macro, precision_macro, recall_macro,
+                                           precision_weighted, recall_weighted, f1_weighted)
     """
     from ._benchmark_impl import run_f_measure_step
 
@@ -158,10 +162,16 @@ def hierarchical_command(output_dir: str) -> None:
       hierarchical_f_measure_per_sample.csv  (columns: model_name, test_sample,
                                                h_tp, h_fp, h_fn,
                                                h_precision_micro, h_recall_micro,
-                                               h_f1_micro, h_f1_macro)
+                                               h_f1_micro, h_f1_macro,
+                                               h_precision_macro, h_recall_macro,
+                                               h_precision_weighted, h_recall_weighted,
+                                               h_f1_weighted)
       hierarchical_f_measure_per_group.csv   (columns: group_name, h_tp, h_fp, h_fn,
                                                h_precision_micro, h_recall_micro,
-                                               h_f1_micro, h_f1_macro)
+                                               h_f1_micro, h_f1_macro,
+                                               h_precision_macro, h_recall_macro,
+                                               h_precision_weighted, h_recall_weighted,
+                                               h_f1_weighted)
     """
     from ._benchmark_impl import run_hierarchical_f_measure_step
 

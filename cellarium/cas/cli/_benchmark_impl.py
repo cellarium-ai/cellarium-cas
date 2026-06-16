@@ -17,11 +17,11 @@ import typing as t
 from pathlib import Path
 
 import anndata
-import numpy as np
 import pandas as pd
 import scipy.sparse
 
 from cellarium.cas.benchmarking.confusion_matrix import (
+    aggregate_confusion_matrices,
     build_confusion_matrix,
     load_confusion_matrix,
     save_confusion_matrix,
@@ -240,16 +240,16 @@ def _aggregate_cm_tree(cm_raw_dir: Path, cm_aggregate_dir: Path) -> int:
 
         _validate_group_entries(model_name, entries, first_shape, label_order)
 
-        running_sum: scipy.sparse.csr_matrix = scipy.sparse.csr_matrix(first_shape, dtype=np.int64)
+        cms: t.List[scipy.sparse.csr_matrix] = []
         source_annotate_dirs: t.List[str] = []
         n_samples = len(entries)
 
         for sample_dir, _, _ in entries:
             cm, meta = load_confusion_matrix(sample_dir)
-            running_sum = running_sum + cm.astype(np.int64)
+            cms.append(cm)
             source_annotate_dirs.append(meta["annotate_dir"])
 
-        agg_cm = running_sum.tocsr()
+        agg_cm = aggregate_confusion_matrices(cms)
         safe_name = _safe_dirname(model_name)
         group_dir = cm_aggregate_dir / safe_name
         agg_meta: t.Dict[str, t.Any] = {

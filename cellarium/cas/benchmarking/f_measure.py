@@ -35,20 +35,24 @@ def compute_f_measure_from_cm(
         - ``recall_micro`` — micro recall.
         - ``f1_micro`` — micro F1.
         - ``f1_macro`` — macro F1 over nonzero-support classes.
+        - ``precision_macro`` — macro precision over nonzero-support classes.
+        - ``recall_macro`` — macro recall over nonzero-support classes.
+        - ``precision_weighted`` — support-weighted precision over nonzero-support classes.
+        - ``recall_weighted`` — support-weighted recall over nonzero-support classes.
+        - ``f1_weighted`` — support-weighted F1 over nonzero-support classes.
     """
     dense = cm.toarray().astype(np.int64)
-    total = int(dense.sum())
-    tp = int(np.trace(dense))
-    fp = total - tp
-    fn = total - tp
+    row_sums = dense.sum(axis=1)
+    col_sums = dense.sum(axis=0)
+    diag = np.diag(dense)
+
+    tp = int(diag.sum())
+    fp = int((col_sums - diag).sum())
+    fn = int((row_sums - diag).sum())
 
     precision_micro = _safe_div(tp, tp + fp, zero_division)
     recall_micro = _safe_div(tp, tp + fn, zero_division)
     f1_micro = _safe_f1(precision_micro, recall_micro, zero_division)
-
-    row_sums = dense.sum(axis=1)
-    col_sums = dense.sum(axis=0)
-    diag = np.diag(dense)
 
     nonzero_mask = (row_sums > 0) | (col_sums > 0)
     class_tp = diag[nonzero_mask].astype(np.float64)
@@ -63,6 +67,17 @@ def compute_f_measure_from_cm(
     class_f1 = np.where(denom_f1 > 0, 2.0 * class_p * class_r / denom_f1, zero_division)
 
     f1_macro = float(class_f1.mean()) if class_f1.size > 0 else zero_division
+    precision_macro = float(class_p.mean()) if class_p.size > 0 else zero_division
+    recall_macro = float(class_r.mean()) if class_r.size > 0 else zero_division
+
+    support = row_sums[nonzero_mask].astype(np.float64)
+    total_support = support.sum()
+    if total_support > 0:
+        precision_weighted = float((class_p * support).sum() / total_support)
+        recall_weighted = float((class_r * support).sum() / total_support)
+        f1_weighted = float((class_f1 * support).sum() / total_support)
+    else:
+        precision_weighted = recall_weighted = f1_weighted = zero_division
 
     return {
         "tp": tp,
@@ -72,6 +87,11 @@ def compute_f_measure_from_cm(
         "recall_micro": float(recall_micro),
         "f1_micro": float(f1_micro),
         "f1_macro": float(f1_macro),
+        "precision_macro": float(precision_macro),
+        "recall_macro": float(recall_macro),
+        "precision_weighted": float(precision_weighted),
+        "recall_weighted": float(recall_weighted),
+        "f1_weighted": float(f1_weighted),
     }
 
 

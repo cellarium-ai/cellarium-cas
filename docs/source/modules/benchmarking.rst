@@ -139,6 +139,16 @@ Output columns
      - Micro F1.
    * - ``f1_macro``
      - Macro F1 averaged over classes with nonzero support.
+   * - ``precision_macro``
+     - Macro precision averaged over classes with nonzero support.
+   * - ``recall_macro``
+     - Macro recall averaged over classes with nonzero support.
+   * - ``precision_weighted``
+     - Support-weighted precision (weighted by per-class true support).
+   * - ``recall_weighted``
+     - Support-weighted recall.
+   * - ``f1_weighted``
+     - Support-weighted F1.
 
 **hierarchical_f_measure_per_sample.csv** and **hierarchical_f_measure_per_group.csv**:
 
@@ -161,6 +171,16 @@ Output columns
      - Micro hierarchical F1.
    * - ``h_f1_macro``
      - Macro hierarchical F1 (per-class, averaged over true classes with nonzero support).
+   * - ``h_precision_macro``
+     - Macro hierarchical precision (per-node, averaged over nodes with nonzero true support).
+   * - ``h_recall_macro``
+     - Macro hierarchical recall (per-node, averaged over nodes with nonzero true support).
+   * - ``h_precision_weighted``
+     - Support-weighted hierarchical precision (weighted by per-node hierarchical true support).
+   * - ``h_recall_weighted``
+     - Support-weighted hierarchical recall.
+   * - ``h_f1_weighted``
+     - Support-weighted hierarchical F1.
 
 Using the Python API directly
 ++++++++++++++++++++++++++++++
