@@ -180,11 +180,14 @@ def annotate(
 @click.option(
     "--input-path",
     required=True,
-    type=click.Path(exists=True, dir_okay=False),
+    type=click.Path(exists=True, dir_okay=False, resolve_path=True),
     help="Path to input .h5ad or .h5 (Cell Ranger HDF5) file.",
 )
 @click.option(
-    "--output-dir", required=True, type=click.Path(file_okay=False), help="Directory to write output files into."
+    "--output-dir",
+    required=True,
+    type=click.Path(file_okay=False, resolve_path=True),
+    help="Directory to write output files into.",
 )
 @click.option(
     "--cas-api-token",

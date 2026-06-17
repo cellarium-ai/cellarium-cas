@@ -21,6 +21,15 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
   Fixed
   ~~~~~
 
+1.8.1 - unreleased
+-------------------
+
+Added
+~~~~~
+- Added macro precision and recall (``precision_macro``/``recall_macro`` and hierarchical ``h_precision_macro``/``h_recall_macro`` counterparts) to ``compute_f_measure_from_cm`` and ``compute_hierarchical_f_measure_from_cm``, completing the micro/macro/weighted triad for all three averaging strategies. All new columns flow into the benchmarking F-measure CSVs automatically.
+- Added support-weighted precision, recall, and F1 (``precision_weighted``/``recall_weighted``/``f1_weighted`` and hierarchical ``h_*_weighted`` counterparts) to ``compute_f_measure_from_cm`` and ``compute_hierarchical_f_measure_from_cm``; new columns flow into the benchmarking F-measure CSVs.
+
+
 1.8.0 - 2026-04-29
 ------------------
 
