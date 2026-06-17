@@ -81,18 +81,27 @@ def test_top_k_flat_f_measure_does_not_change_hierarchical(tmp_path):
     _run_pipeline(annotate_parent, benchmark_dir, f_measure_top_k=2)
     run_hierarchical_f_measure_step(benchmark_dir)
 
+    # k=1 and k=2 directories must both exist; no old cm_raw/ directory
+    assert (benchmark_dir / "cm_raw_k1").exists()
+    assert (benchmark_dir / "cm_raw_k2").exists()
+    assert not (benchmark_dir / "cm_raw").exists()
+
+    # k=2 flat F-measure: top-2 predictions cover all three truth labels → perfect score
     per_sample = pd.read_csv(benchmark_dir / "f_measure_per_sample.csv").iloc[0]
-    assert per_sample["tp"] == 3
-    assert per_sample["fp"] == 0
-    assert per_sample["fn"] == 0
-    np.testing.assert_allclose(per_sample["f1_micro"], 1.0)
+    assert per_sample["tp_k2"] == 3
+    assert per_sample["fp_k2"] == 0
+    assert per_sample["fn_k2"] == 0
+    np.testing.assert_allclose(per_sample["f1_micro_k2"], 1.0)
+    # wide format: k=1 columns also present
+    assert "f1_micro_k1" in per_sample.index
 
     per_group = pd.read_csv(benchmark_dir / "f_measure_per_group.csv").iloc[0]
-    assert per_group["tp"] == 3
-    assert per_group["fp"] == 0
-    assert per_group["fn"] == 0
-    np.testing.assert_allclose(per_group["f1_micro"], 1.0)
+    assert per_group["tp_k2"] == 3
+    assert per_group["fp_k2"] == 0
+    assert per_group["fn_k2"] == 0
+    np.testing.assert_allclose(per_group["f1_micro_k2"], 1.0)
 
+    # hierarchical F-measure is unaffected by top-k (uses cm_raw_k1/ only)
     hierarchical = pd.read_csv(benchmark_dir / "hierarchical_f_measure_per_sample.csv").iloc[0]
     assert hierarchical["h_fp"] > 0
     assert hierarchical["h_fn"] > 0
@@ -103,17 +112,17 @@ def test_ranked_inferred_label_columns_requires_top_one_suffix():
         _ranked_inferred_label_columns("prediction", 2)
 
 
-def test_top_k_requires_present_ranked_columns(tmp_path):
+def test_top_k_clamps_to_available_columns(tmp_path):
+    """When k exceeds available ranked columns, metrics are clamped to max available rank."""
     annotate_parent, benchmark_dir = _write_benchmark_fixture(tmp_path, include_rank_3=False)
 
-    with pytest.raises(ValueError, match="cas_cell_type_name_3"):
-        run_confusion_matrix_step(
-            annotate_parent,
-            benchmark_dir,
-            "truth",
-            "cas_cell_type_name_1",
-            f_measure_top_k=3,
-        )
+    # k=3 requested but only _1 and _2 columns exist — should not raise
+    _run_pipeline(annotate_parent, benchmark_dir, f_measure_top_k=3)
+
+    per_sample = pd.read_csv(benchmark_dir / "f_measure_per_sample.csv").iloc[0]
+    # k=3 must be clamped to k=2 (same column list), so metrics are identical
+    assert per_sample["f1_micro_k3"] == per_sample["f1_micro_k2"]
+    assert per_sample["tp_k3"] == per_sample["tp_k2"]
 
 
 def test_default_top_one_preserves_existing_flat_f_measure(tmp_path):
@@ -122,16 +131,16 @@ def test_default_top_one_preserves_existing_flat_f_measure(tmp_path):
     _run_pipeline(annotate_parent, benchmark_dir)
 
     per_sample = pd.read_csv(benchmark_dir / "f_measure_per_sample.csv").iloc[0]
-    assert per_sample["tp"] == 1
-    assert per_sample["fp"] == 2
-    assert per_sample["fn"] == 2
-    np.testing.assert_allclose(per_sample["f1_micro"], 1 / 3)
+    assert per_sample["tp_k1"] == 1
+    assert per_sample["fp_k1"] == 2
+    assert per_sample["fn_k1"] == 2
+    np.testing.assert_allclose(per_sample["f1_micro_k1"], 1 / 3)
 
     per_group = pd.read_csv(benchmark_dir / "f_measure_per_group.csv").iloc[0]
-    assert per_group["tp"] == 1
-    assert per_group["fp"] == 2
-    assert per_group["fn"] == 2
-    np.testing.assert_allclose(per_group["f1_micro"], 1 / 3)
+    assert per_group["tp_k1"] == 1
+    assert per_group["fp_k1"] == 2
+    assert per_group["fn_k1"] == 2
+    np.testing.assert_allclose(per_group["f1_micro_k1"], 1 / 3)
 
 
 def test_top_k_option_is_only_on_matrix_build_commands():
