@@ -19,7 +19,7 @@ import click
 _annotate_dirs_option = click.option(
     "--annotate-dirs",
     required=True,
-    type=click.Path(exists=True, resolve_path=True),
+    type=click.Path(exists=True),
     help=(
         "Path to a parent directory whose subdirectories are annotate output dirs, "
         "or a .txt file listing one annotate output directory path per line."
@@ -29,7 +29,7 @@ _annotate_dirs_option = click.option(
 _output_dir_option = click.option(
     "--output-dir",
     required=True,
-    type=click.Path(file_okay=False, resolve_path=True),
+    type=click.Path(file_okay=False),
     help="Benchmarking workspace directory.  All artifacts are written here.",
 )
 

@@ -11,14 +11,11 @@ import gzip
 import os
 import shutil
 import sys
-from pathlib import Path
 
 import anndata
 import pandas as pd
 import scipy.io
 from scipy import sparse
-
-from cellarium.cas._path_utils import resolve_within as _resolve_within
 
 
 def _as_clean_str_series(values) -> pd.Series:
@@ -28,9 +25,7 @@ def _as_clean_str_series(values) -> pd.Series:
 
 
 def convert_h5ad_to_10x(input_path: str, output_dir: str) -> None:
-    input_path = Path(input_path).resolve()
-    output_dir_path = Path(output_dir).resolve()
-    output_dir_path.mkdir(parents=True, exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
 
     adata = anndata.read_h5ad(input_path)
 
@@ -38,17 +33,15 @@ def convert_h5ad_to_10x(input_path: str, output_dir: str) -> None:
     if not sparse.issparse(X):
         X = sparse.csr_matrix(X)
 
-    mtx_file = _resolve_within(output_dir_path, "matrix.mtx")
-    mtx_gz_file = _resolve_within(output_dir_path, "matrix.mtx.gz")
-    scipy.io.mmwrite(str(mtx_file), X.T.tocsc())
+    scipy.io.mmwrite(f"{output_dir}/matrix.mtx", X.T.tocsc())
 
-    with open(mtx_file, "rb") as f_in, gzip.open(mtx_gz_file, "wb") as f_out:
+    with open(f"{output_dir}/matrix.mtx", "rb") as f_in, gzip.open(f"{output_dir}/matrix.mtx.gz", "wb") as f_out:
         shutil.copyfileobj(f_in, f_out)
 
-    os.remove(mtx_file)
+    os.remove(f"{output_dir}/matrix.mtx")
 
     adata.obs_names.to_series().astype(str).to_csv(
-        _resolve_within(output_dir_path, "barcodes.tsv.gz"),
+        f"{output_dir}/barcodes.tsv.gz",
         index=False,
         header=False,
         compression="gzip",
@@ -83,7 +76,7 @@ def convert_h5ad_to_10x(input_path: str, output_dir: str) -> None:
     )
 
     features.to_csv(
-        _resolve_within(output_dir_path, "features.tsv.gz"),
+        f"{output_dir}/features.tsv.gz",
         sep="\t",
         index=False,
         header=False,
