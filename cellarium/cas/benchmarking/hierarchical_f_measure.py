@@ -27,6 +27,8 @@ import scipy.sparse
 
 from cellarium.cas.postprocessing.cell_ontology.cell_ontology_cache import CellOntologyCache
 
+from ._metrics_utils import _safe_div, _safe_f1
+
 
 def compute_hierarchical_f_measure_from_cm(
     cm: scipy.sparse.csr_matrix,
@@ -153,12 +155,3 @@ def compute_hierarchical_f_measure_from_cm(
         "h_recall_weighted": float(h_recall_weighted),
         "h_f1_weighted": float(h_f1_weighted),
     }
-
-
-def _safe_div(numerator: float, denominator: float, zero_division: float) -> float:
-    return numerator / denominator if denominator > 0 else zero_division
-
-
-def _safe_f1(precision: float, recall: float, zero_division: float) -> float:
-    denom = precision + recall
-    return 2.0 * precision * recall / denom if denom > 0 else zero_division

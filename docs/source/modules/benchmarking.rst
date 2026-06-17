@@ -15,10 +15,10 @@ supported:
   rather than exact label matches, so partial credit is awarded for predictions that
   are close in the Cell Ontology tree.
 
-The CLI keeps ``cm_raw/`` as the top-1 confusion-matrix source for hierarchical
-F-measure.  Flat F-measure reads ``cm_raw_f_measure/`` when present; with the
-default top-k of 1 it matches top-1 behavior, and with ``--f-measure-top-k > 1``
-it uses selected top-k hit semantics.
+The CLI writes one ``cm_raw_k{n}/`` directory per k value (1 … ``--f-measure-top-k``).
+Hierarchical F-measure always uses ``cm_raw_k1/`` (top-1 predictions).  Flat F-measure
+computes metrics for every k and stores them in a single wide-format CSV with columns
+suffixed ``_k{n}`` (e.g. ``f1_micro_k1``, ``f1_micro_k2``).
 
 Prerequisites
 +++++++++++++
@@ -72,18 +72,20 @@ call::
 ``--annotate-dirs`` may be a directory whose immediate subdirectories are annotate
 output dirs, or a ``.txt`` file listing one path per line.
 
-``--f-measure-top-k`` produces one selected-K flat F-measure result, not separate
-outputs for every intermediate K.
+``--f-measure-top-k`` computes flat F-measure for every k from 1 to the given value.
+All k results appear as separate column sets (suffixed ``_k{n}``) in a single wide-format
+CSV — no separate output files per k.
 
 
 After the command completes, ``benchmark_results/`` contains::
 
-    cm_raw/                          # per-sample sparse confusion matrices
-    cm_aggregate/                    # per-model aggregated confusion matrices
-    cm_raw_f_measure/                # per-sample flat F-measure matrices for selected top-k
-    cm_aggregate_f_measure/          # per-model flat F-measure aggregates for selected top-k
-    f_measure_per_sample.csv         # F-measure per annotate run
-    f_measure_per_group.csv          # F-measure per model (aggregated)
+    cm_raw_k1/                       # per-sample sparse confusion matrices (top-1 predictions)
+    cm_raw_k2/                       # per-sample sparse confusion matrices (top-2 hit predictions)
+    ...                              # one directory per k up to --f-measure-top-k
+    cm_aggregate_k1/                 # per-model aggregated confusion matrices (top-1)
+    ...                              # one directory per k
+    f_measure_per_sample.csv         # F-measure per annotate run (wide format; columns suffixed _k{n})
+    f_measure_per_group.csv          # F-measure per model (aggregated; wide format)
     hierarchical_f_measure_per_sample.csv
     hierarchical_f_measure_per_group.csv
 
@@ -118,6 +120,9 @@ Output columns
 
 **f_measure_per_sample.csv** and **f_measure_per_group.csv**:
 
+Metric columns are repeated for each k value and suffixed with ``_k{n}`` (e.g.
+``tp_k1``, ``f1_micro_k2``).  Identity columns have no suffix.
+
 .. list-table::
    :header-rows: 1
 
@@ -125,29 +130,29 @@ Output columns
      - Description
    * - ``model_name`` / ``group_name``
      - Model name (per-sample has ``model_name`` + ``test_sample``; per-group has ``group_name``).
-   * - ``tp``
-     - Global true positives (trace of the confusion matrix).
-   * - ``fp``
+   * - ``tp_k{n}``
+     - Global true positives (trace of the confusion matrix) for top-k hit predictions.
+   * - ``fp_k{n}``
      - Global false positives (total − trace).
-   * - ``fn``
+   * - ``fn_k{n}``
      - Global false negatives (total − trace).
-   * - ``precision_micro``
+   * - ``precision_micro_k{n}``
      - Micro precision (= accuracy for single-label multiclass).
-   * - ``recall_micro``
+   * - ``recall_micro_k{n}``
      - Micro recall.
-   * - ``f1_micro``
+   * - ``f1_micro_k{n}``
      - Micro F1.
-   * - ``f1_macro``
+   * - ``f1_macro_k{n}``
      - Macro F1 averaged over classes with nonzero support.
-   * - ``precision_macro``
+   * - ``precision_macro_k{n}``
      - Macro precision averaged over classes with nonzero support.
-   * - ``recall_macro``
+   * - ``recall_macro_k{n}``
      - Macro recall averaged over classes with nonzero support.
-   * - ``precision_weighted``
+   * - ``precision_weighted_k{n}``
      - Support-weighted precision (weighted by per-class true support).
-   * - ``recall_weighted``
+   * - ``recall_weighted_k{n}``
      - Support-weighted recall.
-   * - ``f1_weighted``
+   * - ``f1_weighted_k{n}``
      - Support-weighted F1.
 
 **hierarchical_f_measure_per_sample.csv** and **hierarchical_f_measure_per_group.csv**:
@@ -210,7 +215,7 @@ Low-level functions operate on arrays and confusion matrices::
 
     # Hierarchical F-measure
     h_metrics = compute_hierarchical_f_measure_from_cm(
-        cm, label_order, cache.ancestors_dict
+        cm, label_order, cache
     )
 
 The high-level pipeline functions mirror the CLI steps::

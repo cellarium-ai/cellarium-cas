@@ -215,8 +215,8 @@ def all_command(
     except (ValueError, FileNotFoundError) as exc:
         raise click.UsageError(str(exc)) from exc
 
-    click.echo(f"cm_raw/       <- {result['n_samples']} per-sample confusion matrix(es)")
-    click.echo(f"cm_aggregate/ <- {result['n_groups']} aggregated model group(s)")
+    click.echo(f"cm_raw_k*/       <- {result['n_samples']} per-sample confusion matrix(es)")
+    click.echo(f"cm_aggregate_k*/ <- {result['n_groups']} aggregated model group(s)")
     click.echo(f"F-measure per sample  -> {result['f_measure_per_sample_path']}")
     click.echo(f"F-measure per group   -> {result['f_measure_per_group_path']}")
     click.echo(f"Hierarchical per sample -> {result['h_f_measure_per_sample_path']}")

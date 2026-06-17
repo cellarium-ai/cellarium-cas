@@ -46,6 +46,8 @@ from ._io import (
 )
 
 _BENCHMARK_REQUIRED_FILES = (
+    # ONTOLOGY_RESPONSE_FILENAME is checked for existence only (as a directory-validity sentinel);
+    # its content is not read by the benchmark pipeline.
     ONTOLOGY_RESPONSE_FILENAME,
     INFERRED_LABELS_FILENAME,
     METADATA_FILENAME,
@@ -69,9 +71,9 @@ def _load_sample_data(
     annotate_dir: Path,
     gt_label: str,
     inferred_label: str,
+    metadata: t.Dict[str, t.Any],
 ) -> t.Tuple[t.List[str], t.List[str], pd.DataFrame, t.List[str]]:
     """Load ground-truth labels, top-1 predictions, the full inferred-labels DataFrame, and the label order."""
-    metadata = load_metadata(annotate_dir)
     input_path = metadata["input_path"]
 
     adata = anndata.read_h5ad(input_path)
@@ -219,7 +221,7 @@ def run_confusion_matrix_step(
         model_name = metadata.get("model_name", "unknown")
         logger.info("Processing: %s  (model=%s)", annotate_dir, model_name)
 
-        y_true, y_pred, labels_df, label_order = _load_sample_data(annotate_dir, gt_label, inferred_label)
+        y_true, y_pred, labels_df, label_order = _load_sample_data(annotate_dir, gt_label, inferred_label, metadata)
 
         meta_base: t.Dict[str, t.Any] = {
             "model_name": model_name,
@@ -229,7 +231,9 @@ def run_confusion_matrix_step(
             "inferred_label": inferred_label,
             "label_order": label_order,
         }
-        _process_annotate_dir(annotate_dir, k_cm_dirs, y_true, y_pred, labels_df, label_order, meta_base, inferred_label)
+        _process_annotate_dir(
+            annotate_dir, k_cm_dirs, y_true, y_pred, labels_df, label_order, meta_base, inferred_label
+        )
 
     return {"n_samples": len(dirs), "cm_raw_k1_dir": str(k_cm_dirs[1])}
 
@@ -411,7 +415,7 @@ def _discover_k_dirs(output_dir: Path, prefix: str) -> t.Dict[int, Path]:
     for p in output_dir.iterdir():
         if p.is_dir() and p.name.startswith(prefix):
             try:
-                k = int(p.name[len(prefix):])
+                k = int(p.name[len(prefix) :])
                 result[k] = p
             except ValueError:
                 continue
@@ -501,7 +505,7 @@ def _iter_cm_dirs(parent: Path) -> t.Iterator[Path]:
 def _load_ontology_cache(output_dir: Path) -> CellOntologyCache:
     """Load CellOntologyCache from the first source annotate dir referenced in cm_raw_k1 metadata."""
     cm_raw_k1 = output_dir / "cm_raw_k1"
-    for sample_dir in sorted(p for p in cm_raw_k1.iterdir() if p.is_dir()):
+    for sample_dir in _iter_cm_dirs(cm_raw_k1):
         _, meta = load_confusion_matrix(sample_dir)
         annotate_dir = Path(meta["annotate_dir"])
         resource = load_ontology_resource(annotate_dir)

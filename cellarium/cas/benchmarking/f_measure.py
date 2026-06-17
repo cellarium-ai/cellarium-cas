@@ -15,6 +15,8 @@ import typing as t
 import numpy as np
 import scipy.sparse
 
+from ._metrics_utils import _safe_div, _safe_f1
+
 
 def compute_f_measure_from_cm(
     cm: scipy.sparse.csr_matrix,
@@ -93,12 +95,3 @@ def compute_f_measure_from_cm(
         "recall_weighted": float(recall_weighted),
         "f1_weighted": float(f1_weighted),
     }
-
-
-def _safe_div(numerator: float, denominator: float, zero_division: float) -> float:
-    return numerator / denominator if denominator > 0 else zero_division
-
-
-def _safe_f1(precision: float, recall: float, zero_division: float) -> float:
-    denom = precision + recall
-    return 2.0 * precision * recall / denom if denom > 0 else zero_division

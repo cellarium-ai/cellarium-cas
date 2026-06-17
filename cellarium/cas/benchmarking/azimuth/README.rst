@@ -4,8 +4,7 @@ Azimuth Benchmarking
 This directory contains the Docker image and helper scripts used to run
 `Azimuth <https://azimuth.hubmapconsortium.org/>`_ cell type annotations and convert
 them into the format expected by ``cellarium-cas benchmark``.  All evaluation is
-performed by the same ``cellarium-cas benchmark flat`` and
-``cellarium-cas benchmark ontology-aware`` commands used for CAS, ensuring a
+performed by the same ``cellarium-cas benchmark`` commands used for CAS, ensuring a
 fair, apples-to-apples comparison.
 
 Directory structure::
@@ -155,22 +154,17 @@ Or run Steps 4 and 5 together with the combined helper::
 
 **Step 6 — Run the benchmark**
 
-After Steps 4 and 5, ``/data/azimuth_annotate_dir`` contains all three files
-required by ``cellarium-cas benchmark``.
+After Steps 4 and 5, ``/data/azimuth_annotate_dir`` contains all four files
+required by ``cellarium-cas benchmark`` (``inferred_labels.csv``,
+``metadata.json``, ``ontology_response.json``, ``ontology_resource.json``).
 
-Flat benchmark (taxonomy-agnostic)::
+Run the full pipeline in one command::
 
-    cellarium-cas benchmark flat \
+    cellarium-cas benchmark all \
         --annotate-dirs  /data \
-        --gt-column-name <your_ground_truth_column> \
-        --output-dir     /data/benchmark_results
-
-Ontology-aware benchmark::
-
-    cellarium-cas benchmark ontology-aware \
-        --annotate-dirs      /data \
-        --gt-cl-column-name  <your_cl_id_column> \
-        --output-dir         /data/benchmark_results
+        --output-dir     /data/benchmark_results \
+        --gt-label       <your_ground_truth_obs_column> \
+        --inferred-label cas_cell_type_name_1
 
 Here ``/data`` is the **parent directory** containing ``azimuth_annotate_dir`` as a
 subdirectory.  Point ``--annotate-dirs`` at the same parent that holds your CAS
