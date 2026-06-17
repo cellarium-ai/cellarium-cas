@@ -201,7 +201,7 @@ def run_confusion_matrix_step(
         from 1 to this value.  Hierarchical F-measure always uses k=1.
     :returns: Dict with ``n_samples`` (int) and ``cm_raw_k1_dir`` (str).
     """
-    output_dir_path = Path(output_dir)
+    output_dir_path = Path(output_dir).resolve()
 
     k_cm_dirs: t.Dict[int, Path] = {}
     for k in range(1, f_measure_top_k + 1):
@@ -249,7 +249,7 @@ def run_aggregate_step(output_dir: t.Union[str, Path]) -> t.Dict[str, t.Any]:
     :param output_dir: Benchmarking workspace directory (must already contain ``cm_raw_k1/``).
     :returns: Dict with ``n_groups`` (int) and ``cm_aggregate_k1_dir`` (str).
     """
-    output_dir_path = Path(output_dir)
+    output_dir_path = Path(output_dir).resolve()
     k_raw_dirs = _discover_k_dirs(output_dir_path, "cm_raw_k")
 
     if not k_raw_dirs:
@@ -279,7 +279,7 @@ def run_f_measure_step(output_dir: t.Union[str, Path]) -> t.Dict[str, t.Any]:
     :param output_dir: Benchmarking workspace directory.
     :returns: Dict with ``per_sample_path`` and ``per_group_path``.
     """
-    output_dir_path = Path(output_dir)
+    output_dir_path = Path(output_dir).resolve()
     k_raw_dirs = _discover_k_dirs(output_dir_path, "cm_raw_k")
     k_aggregate_dirs = _discover_k_dirs(output_dir_path, "cm_aggregate_k")
 
@@ -335,7 +335,7 @@ def run_hierarchical_f_measure_step(output_dir: t.Union[str, Path]) -> t.Dict[st
     :param output_dir: Benchmarking workspace directory.
     :returns: Dict with ``per_sample_path`` and ``per_group_path``.
     """
-    output_dir_path = Path(output_dir)
+    output_dir_path = Path(output_dir).resolve()
     cm_raw_k1 = output_dir_path / "cm_raw_k1"
     cm_aggregate_k1 = output_dir_path / "cm_aggregate_k1"
     for d in (cm_raw_k1, cm_aggregate_k1):

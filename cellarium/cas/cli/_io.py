@@ -23,7 +23,7 @@ _REQUIRED_FILES = (ONTOLOGY_RESPONSE_FILENAME, INFERRED_LABELS_FILENAME, METADAT
 
 def save_ontology_response(response: "models.CellTypeOntologyAwareResults", output_dir: Path) -> Path:
     """Serialize ``response`` to ``ontology_response.json`` inside *output_dir*."""
-    output_dir = Path(output_dir)
+    output_dir = Path(output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     path = output_dir / ONTOLOGY_RESPONSE_FILENAME
     with open(path, "w") as f:
@@ -33,7 +33,7 @@ def save_ontology_response(response: "models.CellTypeOntologyAwareResults", outp
 
 def load_ontology_response(output_dir: Path) -> "models.CellTypeOntologyAwareResults":
     """Load and validate ``ontology_response.json`` from *output_dir*."""
-    path = Path(output_dir) / ONTOLOGY_RESPONSE_FILENAME
+    path = Path(output_dir).resolve() / ONTOLOGY_RESPONSE_FILENAME
     if not path.exists():
         raise FileNotFoundError(f"ontology_response.json not found in {output_dir}")
     with open(path) as f:
@@ -42,7 +42,7 @@ def load_ontology_response(output_dir: Path) -> "models.CellTypeOntologyAwareRes
 
 def save_inferred_labels(df: pd.DataFrame, output_dir: Path) -> Path:
     """Save label predictions DataFrame to ``inferred_labels.csv`` inside *output_dir*."""
-    output_dir = Path(output_dir)
+    output_dir = Path(output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     path = output_dir / INFERRED_LABELS_FILENAME
     df.to_csv(path)
@@ -51,7 +51,7 @@ def save_inferred_labels(df: pd.DataFrame, output_dir: Path) -> Path:
 
 def save_ontology_resource(resource: t.Dict[str, t.Any], output_dir: Path) -> Path:
     """Save the raw ontology resource dict to ``ontology_resource.json`` inside *output_dir*."""
-    output_dir = Path(output_dir)
+    output_dir = Path(output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     path = output_dir / ONTOLOGY_RESOURCE_FILENAME
     with open(path, "w") as f:
@@ -66,7 +66,7 @@ def load_ontology_resource(output_dir: Path) -> t.Dict[str, t.Any]:
     Raises a descriptive :class:`FileNotFoundError` if the file is absent, reminding the
     caller to re-run ``cellarium-cas annotate`` with ``--save-ontology-resource``.
     """
-    path = Path(output_dir) / ONTOLOGY_RESOURCE_FILENAME
+    path = Path(output_dir).resolve() / ONTOLOGY_RESOURCE_FILENAME
     if not path.exists():
         raise FileNotFoundError(
             f"ontology_resource.json not found in {output_dir}. "
@@ -78,7 +78,7 @@ def load_ontology_resource(output_dir: Path) -> t.Dict[str, t.Any]:
 
 def save_metadata(metadata: t.Dict[str, t.Any], output_dir: Path) -> Path:
     """Save the metadata dict to ``metadata.json`` inside *output_dir*."""
-    output_dir = Path(output_dir)
+    output_dir = Path(output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     path = output_dir / METADATA_FILENAME
     with open(path, "w") as f:
@@ -93,7 +93,7 @@ def load_metadata(output_dir: Path) -> t.Dict[str, t.Any]:
     Raises a descriptive :class:`FileNotFoundError` if the file is absent, reminding the
     caller to re-run ``cellarium-cas annotate`` with ``--save-metadata``.
     """
-    path = Path(output_dir) / METADATA_FILENAME
+    path = Path(output_dir).resolve() / METADATA_FILENAME
     if not path.exists():
         raise FileNotFoundError(
             f"metadata.json not found in {output_dir}. "
@@ -115,7 +115,7 @@ def validate_annotate_output_dir(
 
     :raises ValueError: If any required file is missing, listing all absent files.
     """
-    output_dir = Path(output_dir)
+    output_dir = Path(output_dir).resolve()
     missing = [f for f in required_files if not (output_dir / f).exists()]
     if missing:
         raise ValueError(
@@ -142,10 +142,10 @@ def collect_annotate_output_dirs(
     :returns: List of validated :class:`~pathlib.Path` objects.
     :raises ValueError: If any resolved directory fails validation.
     """
-    input_path = Path(input_path)
+    input_path = Path(input_path).resolve()
     if input_path.suffix == ".txt":
         lines = input_path.read_text().splitlines()
-        dirs = [Path(line.strip()) for line in lines if line.strip()]
+        dirs = [Path(line.strip()).resolve() for line in lines if line.strip()]
     elif input_path.is_dir():
         dirs = sorted(p for p in input_path.iterdir() if p.is_dir())
     else:
