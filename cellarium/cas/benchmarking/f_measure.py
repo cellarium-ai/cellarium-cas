@@ -5,9 +5,8 @@ Micro precision, recall, and F1 treat the problem globally: TP is the trace of t
 confusion matrix, FP = FN = total − trace.  For single-label multiclass classification
 this means micro precision = recall = F1 = accuracy.
 
-Macro F1 is the unweighted mean of per-class F1 scores, computed only over classes
-with nonzero support (i.e. appearing as a true label **or** as a predicted label in
-the matrix).
+Macro metrics are computed over labels present in either y_true or y_pred.
+Weighted metrics use true-label support as weights.
 """
 
 import typing as t
@@ -43,10 +42,9 @@ def compute_f_measure_from_cm(
         - ``recall_weighted`` — support-weighted recall over nonzero-support classes.
         - ``f1_weighted`` — support-weighted F1 over nonzero-support classes.
     """
-    dense = cm.toarray().astype(np.int64)
-    row_sums = dense.sum(axis=1)
-    col_sums = dense.sum(axis=0)
-    diag = np.diag(dense)
+    row_sums = np.asarray(cm.sum(axis=1)).ravel().astype(np.int64)
+    col_sums = np.asarray(cm.sum(axis=0)).ravel().astype(np.int64)
+    diag = cm.diagonal().astype(np.int64)
 
     tp = int(diag.sum())
     fp = int((col_sums - diag).sum())
