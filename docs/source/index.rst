@@ -34,7 +34,9 @@ At present, CAS outputs annotations exclusively for cell types. In upcoming upda
 
    modules/installation
    modules/usage
+   modules/cli
    modules/workflow
+   modules/benchmarking
    modules/changelog
 
 .. toctree::
