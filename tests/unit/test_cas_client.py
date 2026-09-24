@@ -591,6 +591,13 @@ class TestCasClient:
         assert adata.obs["cas_knn_cell_type_label_1"].notna().all()
         assert adata.obs["cas_knn_cell_type_score_1"].notna().all()
 
+        with pytest.raises(ValueError, match="Requested k_neighbors=4"):
+            cas_client.compute_most_granular_top_k_calls_knn(
+                adata=adata,
+                min_acceptable_score=0.2,
+                k_neighbors=4,
+            )
+
     def test_compute_most_granular_top_k_calls_knn_requires_graph_when_flag_false(self):
         num_cells = 10
         self.__mock_constructor_calls()

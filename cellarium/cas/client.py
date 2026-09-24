@@ -242,6 +242,8 @@ class CASClient:
             build the kNN graph when it is missing. ``None`` uses ``adata.X``.
         :param compute_neighbors_if_missing: If True and no kNN graph is stored in ``adata.obsp['distances']``,
             compute one with ``scanpy.pp.neighbors``. Defaults to True.
+        :raises ValueError: If no graph exists and computation is disabled, or if the graph has fewer than
+            ``k_neighbors`` non-self neighbors for any cell.
         :param top_k: Number of top calls to make per neighborhood.
         :param obs_prefix: Prefix for the ``.obs`` columns to write results into.
         :param use_shortest_path: Whether to use shortest (True) or longest (False) path depth for ranking.

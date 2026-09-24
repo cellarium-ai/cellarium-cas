@@ -8,6 +8,7 @@ import numpy as np
 import scipy.sparse as sp
 from anndata import AnnData
 
+from cellarium.cas.logging import logger
 from cellarium.cas.models import CellTypeOntologyAwareResults
 
 from .cell_ontology.cell_ontology_cache import CL_CELL_ROOT_NODE, CellOntologyCache
@@ -369,12 +370,12 @@ def get_knn_neighbor_indices(
     compute_neighbors_if_missing: bool = True,
 ) -> t.List[np.ndarray]:
     """
-    Return the indices of the ``k_neighbors`` nearest query-cell neighbors per cell, excluding the cell itself.
+    Return nearest query-cell neighbor indices for every cell.
 
     Uses the precomputed scanpy-style kNN graph stored in ``adata.obsp['distances']`` when present.
-    If the graph is absent and ``compute_neighbors_if_missing`` is True, computes it with
+    If the graph is absent and ``compute_neighbors_if_missing`` is True, compute it with
     ``scanpy.pp.neighbors`` on ``adata.X`` (or the ``adata.obsm`` representation given by
-    ``representation_obsm_key``). If the graph is absent and the flag is False, raises ``ValueError``.
+    ``representation_obsm_key``). If the graph is absent and the flag is False, raise ``ValueError``.
 
     :param adata: AnnData object containing the query cells.
     :param k_neighbors: Number of nearest neighbors per cell to return.
@@ -382,9 +383,11 @@ def get_knn_neighbor_indices(
         build the kNN graph when it is missing. ``None`` (default) uses ``adata.X``.
     :param compute_neighbors_if_missing: If True and no graph is stored in ``adata.obsp['distances']``,
         compute one with ``scanpy.pp.neighbors``. Defaults to True.
-    :return: A list with one array per cell, holding the (up to ``k_neighbors``) nearest neighbor indices
-        sorted by increasing distance. Arrays are shorter than ``k_neighbors`` when a precomputed graph
-        contains fewer neighbors for that cell.
+
+    :raises ValueError: If no graph exists and computation is disabled, or if the graph has fewer than
+        ``k_neighbors`` non-self neighbors for any cell.
+
+    :returns: A list with one array per cell, holding the nearest neighbor indices sorted by increasing distance.
     """
     if "distances" not in adata.obsp:
         if not compute_neighbors_if_missing:
@@ -392,6 +395,7 @@ def get_knn_neighbor_indices(
                 "No precomputed kNN graph in adata.obsp['distances']. "
                 "Set compute_neighbors_if_missing=True to compute one with scanpy.pp.neighbors."
             )
+        logger.info("No precomputed kNN graph found; computing neighbors with scanpy.pp.neighbors.")
         import scanpy as sc
 
         # scanpy stores n_neighbors - 1 edges per cell (self is excluded), so request k_neighbors + 1
@@ -401,6 +405,8 @@ def get_knn_neighbor_indices(
             n_neighbors=k_neighbors + 1,
             use_rep="X" if representation_obsm_key is None else representation_obsm_key,
         )
+    else:
+        logger.info("Found precomputed kNN graph in adata.obsp['distances']; using it.")
 
     distances_csr = adata.obsp["distances"].tocsr()
     neighbor_indices = []
@@ -411,6 +417,14 @@ def get_knn_neighbor_indices(
         neighbor_idx = row.indices[order]
         neighbor_idx = neighbor_idx[neighbor_idx != i_cell]
         neighbor_indices.append(neighbor_idx[:k_neighbors])
+
+    neighbor_counts = np.array([len(indices) for indices in neighbor_indices])
+    if neighbor_counts.size and neighbor_counts.min() < k_neighbors:
+        raise ValueError(
+            f"Requested k_neighbors={k_neighbors}, but the precomputed kNN graph has only "
+            f"{neighbor_counts.min()} to {neighbor_counts.max()} non-self neighbors per cell. "
+            "Recompute the graph with more neighbors."
+        )
     return neighbor_indices
 
 
@@ -439,12 +453,12 @@ def compute_most_granular_top_k_calls_knn(
     :param adata: AnnData object with ``cas_cl_scores`` already inserted via :meth:`insert_ontology_aware_response`.
     :param cl: The CellOntologyCache object containing cell ontology term names and labels.
     :param min_acceptable_score: Minimum evidence score for a cell type call to be considered.
-    :param k_neighbors: Number of nearest query-cell neighbors to aggregate each cell's scores over,
-        in addition to the cell itself. Defaults to 5.
     :param representation_obsm_key: Optional ``adata.obsm`` key holding the query-cell representation used to
         build the kNN graph when it is missing. ``None`` (default) uses ``adata.X``.
     :param compute_neighbors_if_missing: If True and no kNN graph is stored in ``adata.obsp['distances']``,
         compute one with ``scanpy.pp.neighbors``. Defaults to True.
+    :raises ValueError: If no graph exists and computation is disabled, or if the graph has fewer than
+        ``k_neighbors`` non-self neighbors for any cell.
     :param aggregation_op: The aggregation operation to apply to the CAS scores within each neighborhood.
     :param aggregation_domain: The domain over which to perform the aggregation.
     :param aggregation_score_threshold: The threshold value for considering a CAS score as non-zero.
