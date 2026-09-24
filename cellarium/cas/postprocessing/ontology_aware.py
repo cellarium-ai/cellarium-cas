@@ -362,6 +362,129 @@ def compute_most_granular_top_k_calls_single(
         adata.obs[k] = v
 
 
+def get_knn_neighbor_indices(
+    adata: AnnData,
+    k_neighbors: int,
+    representation_obsm_key: t.Optional[str] = None,
+    compute_neighbors_if_missing: bool = True,
+) -> t.List[np.ndarray]:
+    """
+    Return the indices of the ``k_neighbors`` nearest query-cell neighbors per cell, excluding the cell itself.
+
+    Uses the precomputed scanpy-style kNN graph stored in ``adata.obsp['distances']`` when present.
+    If the graph is absent and ``compute_neighbors_if_missing`` is True, computes it with
+    ``scanpy.pp.neighbors`` on ``adata.X`` (or the ``adata.obsm`` representation given by
+    ``representation_obsm_key``). If the graph is absent and the flag is False, raises ``ValueError``.
+
+    :param adata: AnnData object containing the query cells.
+    :param k_neighbors: Number of nearest neighbors per cell to return.
+    :param representation_obsm_key: Optional ``adata.obsm`` key holding the query-cell representation used to
+        build the kNN graph when it is missing. ``None`` (default) uses ``adata.X``.
+    :param compute_neighbors_if_missing: If True and no graph is stored in ``adata.obsp['distances']``,
+        compute one with ``scanpy.pp.neighbors``. Defaults to True.
+    :return: A list with one array per cell, holding the (up to ``k_neighbors``) nearest neighbor indices
+        sorted by increasing distance. Arrays are shorter than ``k_neighbors`` when a precomputed graph
+        contains fewer neighbors for that cell.
+    """
+    if "distances" not in adata.obsp:
+        if not compute_neighbors_if_missing:
+            raise ValueError(
+                "No precomputed kNN graph in adata.obsp['distances']. "
+                "Set compute_neighbors_if_missing=True to compute one with scanpy.pp.neighbors."
+            )
+        import scanpy as sc
+
+        # scanpy stores n_neighbors - 1 edges per cell (self is excluded), so request k_neighbors + 1
+        # to end up with exactly k_neighbors neighbors per cell.
+        sc.pp.neighbors(
+            adata,
+            n_neighbors=k_neighbors + 1,
+            use_rep="X" if representation_obsm_key is None else representation_obsm_key,
+        )
+
+    distances_csr = adata.obsp["distances"].tocsr()
+    neighbor_indices = []
+    for i_cell in range(adata.n_obs):
+        row = distances_csr[i_cell]
+        order = np.argsort(row.data)
+        # exclude the cell itself; scanpy graphs omit self, hand-built graphs may include it
+        neighbor_idx = row.indices[order]
+        neighbor_idx = neighbor_idx[neighbor_idx != i_cell]
+        neighbor_indices.append(neighbor_idx[:k_neighbors])
+    return neighbor_indices
+
+
+def compute_most_granular_top_k_calls_knn(
+    adata: AnnData,
+    cl: CellOntologyCache,
+    min_acceptable_score: float,
+    k_neighbors: int = 5,
+    representation_obsm_key: t.Optional[str] = None,
+    compute_neighbors_if_missing: bool = True,
+    aggregation_op: CellOntologyScoresAggregationOp = CellOntologyScoresAggregationOp.MEAN,
+    aggregation_domain: CellOntologyScoresAggregationDomain = CellOntologyScoresAggregationDomain.ALL_CELLS,
+    aggregation_score_threshold: float = 1e-4,
+    top_k: int = 3,
+    obs_prefix: str = "cas_knn_cell_type",
+    root_note: str = CL_CELL_ROOT_NODE,
+    use_shortest_path: bool = True,
+):
+    """
+    Assign the most granular top-k cell type calls per kNN neighborhood in ``adata.obs``.
+
+    Keeps single-cell resolution: for each cell, its CAS scores are aggregated over the cell itself
+    plus its ``k_neighbors`` nearest query-cell neighbors (instead of over a hard Leiden cluster).
+    Neighborhoods overlap, so every cell keeps its own refined annotation.
+
+    :param adata: AnnData object with ``cas_cl_scores`` already inserted via :meth:`insert_ontology_aware_response`.
+    :param cl: The CellOntologyCache object containing cell ontology term names and labels.
+    :param min_acceptable_score: Minimum evidence score for a cell type call to be considered.
+    :param k_neighbors: Number of nearest query-cell neighbors to aggregate each cell's scores over,
+        in addition to the cell itself. Defaults to 5.
+    :param representation_obsm_key: Optional ``adata.obsm`` key holding the query-cell representation used to
+        build the kNN graph when it is missing. ``None`` (default) uses ``adata.X``.
+    :param compute_neighbors_if_missing: If True and no kNN graph is stored in ``adata.obsp['distances']``,
+        compute one with ``scanpy.pp.neighbors``. Defaults to True.
+    :param aggregation_op: The aggregation operation to apply to the CAS scores within each neighborhood.
+    :param aggregation_domain: The domain over which to perform the aggregation.
+    :param aggregation_score_threshold: The threshold value for considering a CAS score as non-zero.
+    :param top_k: Number of top calls to make per neighborhood.
+    :param obs_prefix: Prefix for the ``.obs`` columns to write results into.
+    :param root_note: Root node of the cell ontology used for ranking.
+    :param use_shortest_path: Whether to use shortest (True) or longest (False) path depth for ranking.
+    """
+    neighbor_indices = get_knn_neighbor_indices(
+        adata=adata,
+        k_neighbors=k_neighbors,
+        representation_obsm_key=representation_obsm_key,
+        compute_neighbors_if_missing=compute_neighbors_if_missing,
+    )
+
+    n_obs = adata.n_obs
+    top_k_calls_dict = dict()
+    for k in range(top_k):
+        top_k_calls_dict[f"{obs_prefix}_score_{k + 1}"] = [None] * n_obs
+        top_k_calls_dict[f"{obs_prefix}_name_{k + 1}"] = [None] * n_obs
+        top_k_calls_dict[f"{obs_prefix}_label_{k + 1}"] = [None] * n_obs
+
+    for i_cell in range(n_obs):
+        # self + its k nearest query-cell neighbors
+        obs_indices = np.concatenate(([i_cell], neighbor_indices[i_cell]))
+        aggregated_scores = get_aggregated_cas_ontology_aware_scores(
+            adata, obs_indices, aggregation_op, aggregation_domain, aggregation_score_threshold
+        )
+        top_k_output = get_most_granular_top_k_calls(
+            aggregated_scores, cl, min_acceptable_score, top_k, root_note, use_shortest_path
+        )
+        for k in range(top_k):
+            top_k_calls_dict[f"{obs_prefix}_score_{k + 1}"][i_cell] = top_k_output[k][0]
+            top_k_calls_dict[f"{obs_prefix}_name_{k + 1}"][i_cell] = top_k_output[k][2]
+            top_k_calls_dict[f"{obs_prefix}_label_{k + 1}"][i_cell] = cl.cl_names_to_labels_map[top_k_output[k][2]]
+
+    for k, v in top_k_calls_dict.items():
+        adata.obs[k] = v
+
+
 def compute_most_granular_top_k_calls_cluster(
     adata: AnnData,
     cl: CellOntologyCache,
