@@ -475,7 +475,7 @@ def compute_most_granular_top_k_calls_knn(
     )
 
     n_obs = adata.n_obs
-    top_k_calls_dict = dict()
+    top_k_calls_dict = {}
     for k in range(top_k):
         top_k_calls_dict[f"{obs_prefix}_score_{k + 1}"] = [None] * n_obs
         top_k_calls_dict[f"{obs_prefix}_name_{k + 1}"] = [None] * n_obs
@@ -512,7 +512,7 @@ def compute_most_granular_top_k_calls_cluster(
     root_note: str = CL_CELL_ROOT_NODE,
     use_shortest_path: bool = True,
 ):
-    top_k_calls_dict = dict()
+    top_k_calls_dict = {}
     for k in range(top_k):
         top_k_calls_dict[f"{obs_prefix}_score_{k + 1}"] = [None] * adata.n_obs
         top_k_calls_dict[f"{obs_prefix}_name_{k + 1}"] = [None] * adata.n_obs
