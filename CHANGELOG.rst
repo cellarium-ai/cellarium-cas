@@ -21,7 +21,7 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
   Fixed
   ~~~~~
 
-1.8.1 - unreleased
+1.8.1 - 2026-09-25
 -------------------
 
 Added
@@ -29,6 +29,11 @@ Added
 - Added ``compute_most_granular_top_k_calls_knn`` post-processing strategy, ``CASClient.compute_most_granular_top_k_calls_knn`` convenience method, and ``annotate --knn-smoothing`` CLI option. Keeps single-cell resolution by aggregating each cell's CAS scores over the cell plus its ``k`` nearest query-cell neighbors (instead of a hard Leiden cluster). The neighborhood comes from the scanpy-style kNN graph in ``adata.obsp['distances']``; if absent, it is computed with ``scanpy.pp.neighbors`` (``compute_neighbors_if_missing=True``, the default) on ``adata.X`` or a configurable ``adata.obsm`` key. Neighbor extraction lives in ``get_knn_neighbor_indices``.
 - Added macro precision and recall (``precision_macro``/``recall_macro`` and hierarchical ``h_precision_macro``/``h_recall_macro`` counterparts) to ``compute_f_measure_from_cm`` and ``compute_hierarchical_f_measure_from_cm``, completing the micro/macro/weighted triad for all three averaging strategies. All new columns flow into the benchmarking F-measure CSVs automatically.
 - Added support-weighted precision, recall, and F1 (``precision_weighted``/``recall_weighted``/``f1_weighted`` and hierarchical ``h_*_weighted`` counterparts) to ``compute_f_measure_from_cm`` and ``compute_hierarchical_f_measure_from_cm``; new columns flow into the benchmarking F-measure CSVs.
+
+Fixed
+~~~~~
+- Dropped deprecated ``isort --recursive`` flag from the lint tox environment
+- Ignored a dead ``anndata._core.anndata.AnnData`` internal reference in the Sphinx docs build
 
 
 1.8.0 - 2026-04-29
