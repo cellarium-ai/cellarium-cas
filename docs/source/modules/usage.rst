@@ -84,6 +84,21 @@ Or assign calls per cluster::
         obs_prefix="cas_cell_type_cluster",
     )
 
+Or smooth scores over each cell's local kNN neighborhood while keeping one result per cell::
+
+    cas.compute_most_granular_top_k_calls_knn(
+        adata=adata,
+        min_acceptable_score=0.2,
+        k_neighbors=30,
+        top_k=3,
+        obs_prefix="cas_knn_cell_type",
+    )
+
+This reuses ``adata.obsp['distances']`` when a kNN graph is already present. Otherwise,
+it computes one with ``scanpy.pp.neighbors`` by default. Set
+``compute_neighbors_if_missing=False`` to require a precomputed graph. The graph must
+contain at least ``k_neighbors`` non-self neighbors per cell.
+
 Interactive visualization
 --------------------------
 
