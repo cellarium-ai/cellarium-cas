@@ -48,6 +48,7 @@ def annotate(
     save_ontology_resource: bool = True,
     output_h5ad: t.Optional[str] = None,
     cluster_label_obs_column: t.Optional[str] = None,
+    knn_smoothing: t.Optional[int] = None,
 ) -> t.Dict[str, t.Any]:
     """
     Annotate a single-cell dataset using the CAS ontology-aware strategy and save outputs to disk.
@@ -73,7 +74,11 @@ def annotate(
     :param save_ontology_resource: If ``True``, save ``ontology_resource.json`` for offline benchmarking.
     :param output_h5ad: If provided, insert CAS annotations into ``adata`` and save it as an ``.h5ad`` file at this path.
     :param cluster_label_obs_column: If provided, run cluster-level label inference using this ``adata.obs`` column
-        and include ``cas_cluster_type_*`` columns in ``inferred_labels.csv``. Results are also written to the h5ad when ``output_h5ad`` is set.
+        and include ``cas_cluster_type_*`` columns in ``inferred_labels.csv``. Results are also written to the h5ad
+        when ``output_h5ad`` is set.
+    :param knn_smoothing: If provided, run kNN-based score smoothing with this many query-cell neighbors and
+        include ``cas_knn_cell_type_*`` columns in ``inferred_labels.csv``. Results are also written to the h5ad
+        when ``output_h5ad`` is set.
 
     :returns: Dict of paths written:
         ``output_dir``, ``ontology_response_path``, and optionally
@@ -120,7 +125,7 @@ def annotate(
         if save_ontology_resource:
             result["ontology_resource_path"] = str(_save_ontology_resource(resource, output_dir_path))
 
-    if infer_labels or output_h5ad is not None or cluster_label_obs_column is not None:
+    if infer_labels or output_h5ad is not None or cluster_label_obs_column is not None or knn_smoothing is not None:
         cas.insert_ontology_aware_response(response, adata)
 
     if infer_labels:
@@ -139,7 +144,16 @@ def annotate(
             obs_prefix="cas_cluster_type",
         )
 
-    if infer_labels or cluster_label_obs_column is not None:
+    if knn_smoothing is not None:
+        cas.compute_most_granular_top_k_calls_knn(
+            adata=adata,
+            min_acceptable_score=min_acceptable_score,
+            k_neighbors=knn_smoothing,
+            top_k=top_k,
+            obs_prefix="cas_knn_cell_type",
+        )
+
+    if infer_labels or cluster_label_obs_column is not None or knn_smoothing is not None:
         label_cols = [f"cas_cell_type_label_{i}" for i in range(1, top_k + 1)] if infer_labels else []
         name_cols = [f"cas_cell_type_name_{i}" for i in range(1, top_k + 1)] if infer_labels else []
         score_cols = [f"cas_cell_type_score_{i}" for i in range(1, top_k + 1)] if infer_labels else []
@@ -152,9 +166,26 @@ def annotate(
         cluster_score_cols = (
             [f"cas_cluster_type_score_{i}" for i in range(1, top_k + 1)] if cluster_label_obs_column is not None else []
         )
+        knn_label_cols = (
+            [f"cas_knn_cell_type_label_{i}" for i in range(1, top_k + 1)] if knn_smoothing is not None else []
+        )
+        knn_name_cols = (
+            [f"cas_knn_cell_type_name_{i}" for i in range(1, top_k + 1)] if knn_smoothing is not None else []
+        )
+        knn_score_cols = (
+            [f"cas_knn_cell_type_score_{i}" for i in range(1, top_k + 1)] if knn_smoothing is not None else []
+        )
         all_cols = [
             c
-            for c in label_cols + name_cols + score_cols + cluster_label_cols + cluster_name_cols + cluster_score_cols
+            for c in label_cols
+            + name_cols
+            + score_cols
+            + cluster_label_cols
+            + cluster_name_cols
+            + cluster_score_cols
+            + knn_label_cols
+            + knn_name_cols
+            + knn_score_cols
             if c in adata.obs.columns
         ]
         df = pd.DataFrame(adata.obs[all_cols], index=adata.obs.index)
@@ -278,6 +309,12 @@ def annotate(
     default=None,
     help="adata.obs column containing cluster labels. If provided, runs cluster-level label inference and includes results in inferred_labels.csv.",
 )
+@click.option(
+    "--knn-smoothing",
+    default=None,
+    type=click.IntRange(min=0),
+    help="Run kNN-based CAS score smoothing with this many query-cell neighbors and include results in inferred_labels.csv.",
+)
 def annotate_command(
     input_path: str,
     output_dir: str,
@@ -297,6 +334,7 @@ def annotate_command(
     save_ontology_resource: bool,
     output_h5ad: t.Optional[str],
     cluster_label: t.Optional[str],
+    knn_smoothing: t.Optional[int],
 ) -> None:
     """Annotate a single-cell dataset using the CAS ontology-aware strategy."""
     if cas_api_token is None:
@@ -326,6 +364,7 @@ def annotate_command(
         save_ontology_resource=save_ontology_resource,
         output_h5ad=output_h5ad,
         cluster_label_obs_column=cluster_label,
+        knn_smoothing=knn_smoothing,
     )
 
     click.echo(f"Saved ontology response → {result['ontology_response_path']}")

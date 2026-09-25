@@ -20,6 +20,7 @@ from .ontology_aware import (
     CellOntologyScoresAggregationDomain,
     CellOntologyScoresAggregationOp,
     compute_most_granular_top_k_calls_cluster,
+    compute_most_granular_top_k_calls_knn,
     compute_most_granular_top_k_calls_single,
     convert_aggregated_cell_ontology_scores_to_rooted_tree,
     convert_cas_ontology_aware_response_to_score_matrix,
@@ -43,6 +44,7 @@ __all__ = [
     "get_most_granular_top_k_calls",
     "compute_most_granular_top_k_calls_single",
     "compute_most_granular_top_k_calls_cluster",
+    "compute_most_granular_top_k_calls_knn",
     # cell type summary statistics
     "reduce_cas_query_result_by_majority_vote",
     "reduce_cas_cell_type_summary_statistics_response_by_min_distance",

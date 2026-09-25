@@ -67,6 +67,9 @@ nitpicky = True
 nitpick_ignore_regex = [
     # Ignore exceptions from nested Pydantic models
     (r'py:.*', r'cellarium\.cas\.models\..*'),
+    # anndata docs moved AnnData to the canonical ``anndata.AnnData`` path; the old internal
+    # ``anndata._core.anndata.AnnData`` module path is no longer in the intersphinx inventory
+    (r'py:class', r'anndata\._core\.anndata\..*'),
 ]
 
 # The JSON schema is a bit much in the docs

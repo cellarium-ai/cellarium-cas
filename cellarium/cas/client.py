@@ -216,6 +216,55 @@ class CASClient:
             use_shortest_path=use_shortest_path,
         )
 
+    def compute_most_granular_top_k_calls_knn(
+        self,
+        adata: "anndata.AnnData",
+        min_acceptable_score: float,
+        k_neighbors: int = 5,
+        representation_obsm_key: t.Optional[str] = None,
+        compute_neighbors_if_missing: bool = True,
+        top_k: int = 3,
+        obs_prefix: str = "cas_knn_cell_type",
+        use_shortest_path: bool = True,
+    ) -> None:
+        """
+        Assign the most granular top-k cell type calls per kNN neighborhood in ``adata.obs``.
+
+        Keeps single-cell resolution: for each cell its CAS scores are aggregated over the cell plus its
+        ``k_neighbors`` nearest query-cell neighbors. Requires ``cas_cl_scores`` inserted in ``adata.obsm``
+        via :meth:`insert_ontology_aware_response`.
+
+        :param adata: AnnData object with ``cas_cl_scores`` already inserted via :meth:`insert_ontology_aware_response`.
+        :param min_acceptable_score: Minimum evidence score for a cell type call to be considered.
+        :param k_neighbors: Number of nearest query-cell neighbors to aggregate each cell's scores over,
+            in addition to the cell itself.
+        :param representation_obsm_key: Optional ``adata.obsm`` key holding the query-cell representation used to
+            build the kNN graph when it is missing. ``None`` uses ``adata.X``.
+        :param compute_neighbors_if_missing: If True and no kNN graph is stored in ``adata.obsp['distances']``,
+            compute one with ``scanpy.pp.neighbors``. Defaults to True.
+        :raises ValueError: If no graph exists and computation is disabled, or if the graph has fewer than
+            ``k_neighbors`` non-self neighbors for any cell.
+        :param top_k: Number of top calls to make per neighborhood.
+        :param obs_prefix: Prefix for the ``.obs`` columns to write results into.
+        :param use_shortest_path: Whether to use shortest (True) or longest (False) path depth for ranking.
+        """
+        resource_name = (
+            adata.uns.get(CAS_METADATA_ANNDATA_UNS_KEY, {}).get("ontology_resource_name")
+            or self._resolve_ontology_resource_name()
+        )
+        cl = self._get_ontology_cache(resource_name)
+        _pp_ontology_aware.compute_most_granular_top_k_calls_knn(
+            adata=adata,
+            cl=cl,
+            min_acceptable_score=min_acceptable_score,
+            k_neighbors=k_neighbors,
+            representation_obsm_key=representation_obsm_key,
+            compute_neighbors_if_missing=compute_neighbors_if_missing,
+            top_k=top_k,
+            obs_prefix=obs_prefix,
+            use_shortest_path=use_shortest_path,
+        )
+
     @staticmethod
     def __get_number_of_chunks(adata, chunk_size):
         return math.ceil(len(adata) / chunk_size)
