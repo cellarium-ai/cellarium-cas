@@ -107,7 +107,20 @@ def _build_cell_row(
     return row
 
 
-def infer_level_specs(azimuth_df: t.Any) -> t.List[t.Tuple[str, str]]:
+def _level_coverage(
+    azimuth_df: t.Any, label_col: str, crosswalk_labels: t.AbstractSet[str]
+) -> t.Tuple[float, int]:
+    """Return ``(coverage, n_distinct)`` for *label_col*: fraction of its distinct label values that are crosswalk keys."""
+    distinct = set(azimuth_df[label_col].dropna().astype(str))
+    if not distinct:
+        return 0.0, 0
+    matched = len(distinct & crosswalk_labels)
+    return matched / len(distinct), len(distinct)
+
+
+def infer_level_specs(
+    azimuth_df: t.Any, crosswalk_labels: t.Optional[t.AbstractSet[str]] = None
+) -> t.List[t.Tuple[str, str]]:
     """
     Auto-detect ``(label_col, score_col)`` pairs from an Azimuth output DataFrame.
 
@@ -116,7 +129,18 @@ def infer_level_specs(azimuth_df: t.Any) -> t.List[t.Tuple[str, str]]:
     (rank 1 = finest), matching CAS convention where rank 1 is always the most
     granular call.
 
+    Level order is chosen by crosswalk coverage: for each level, the fraction of its
+    distinct label values (across the DataFrame) that are keys in *crosswalk_labels*.
+    Levels with higher coverage rank earlier, so rank 1 is the deepest level that
+    actually maps to the crosswalk.  Coverage ties break toward the finer level
+    (more distinct labels).  If *crosswalk_labels* is ``None`` or no level has
+    nonzero coverage, fall back to reversing column order (Azimuth convention
+    coarse-to-fine).
+
     :param azimuth_df: DataFrame loaded from the Azimuth metadata CSV.
+    :param crosswalk_labels: Optional set of crosswalk label keys (the
+        ``Annotation_Label`` values).  When provided, levels are ranked by coverage
+        against this set.
     :returns: List of ``(label_col, score_col)`` tuples, most granular first.
     :raises ValueError: If no ``predicted.*`` / ``predicted.*.score`` pairs are found.
     """
@@ -131,8 +155,15 @@ def infer_level_specs(azimuth_df: t.Any) -> t.List[t.Tuple[str, str]]:
             "'predicted.<level>' with a corresponding 'predicted.<level>.score' column.  "
             f"Available columns: {list(azimuth_df.columns)}"
         )
-    # Azimuth adds annotation levels coarse-to-fine (column order).  Reverse so that
-    # rank 1 is always the most granular level, matching CAS convention.
+    if crosswalk_labels:
+        coverage = {
+            label_col: _level_coverage(azimuth_df, label_col, crosswalk_labels) for label_col, _ in pairs
+        }
+        if any(cov > 0 for cov, _ in coverage.values()):
+            # Rank by coverage desc; tie-break by distinct-label count desc (finer
+            # level = more classes).  Fully tied pairs keep detection (column) order.
+            return sorted(pairs, key=lambda p: (-coverage[p[0]][0], -coverage[p[0]][1]))
+    # Fall back to column-order reversal (Azimuth adds levels coarse-to-fine).
     return pairs[::-1]
 
 
@@ -163,7 +194,8 @@ def map_azimuth_to_cas_labels(
         **most granular first** (rank 1 = finest level).  Each tuple names the columns in
         the Azimuth CSV for one annotation level.  If ``None`` (default), pairs are
         auto-detected from columns matching ``predicted.<level>`` /
-        ``predicted.<level>.score`` and reversed so that rank 1 is the finest level.
+        ``predicted.<level>.score``; rank order is then chosen by crosswalk coverage
+        (deepest level that actually maps first), falling back to column-order reversal.
     :param crosswalk_cl_label_col: Optional column in the crosswalk containing the human-readable
         CL term label (e.g. ``"cl_label"``).  Written to ``cas_cell_type_label_k`` columns.
         If ``None``, the Azimuth label string is used.
@@ -179,13 +211,14 @@ def map_azimuth_to_cas_labels(
     obs_names = adata.obs_names.astype(str).tolist()
 
     azimuth_df = _load_and_align_azimuth_df(azimuth_csv_path, obs_names)
-    if level_specs is None:
-        level_specs = infer_level_specs(azimuth_df)
-    _validate_level_cols(level_specs, azimuth_df)
 
     crosswalk_map, crosswalk_label_map = _load_crosswalk_maps(
         crosswalk_csv_path, crosswalk_azimuth_col, crosswalk_cl_id_col, crosswalk_cl_label_col
     )
+
+    if level_specs is None:
+        level_specs = infer_level_specs(azimuth_df, crosswalk_labels=set(crosswalk_map))
+    _validate_level_cols(level_specs, azimuth_df)
 
     # --- build label rows ---
     warned_missing: t.Set[str] = set()
