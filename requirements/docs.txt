@@ -1,4 +1,5 @@
-Pillow>=10.3.0
+Pillow>=13.0.0; python_version >= "3.10"
+Pillow>=10.3.0; python_version < "3.10"
 Sphinx~=7.4
 sphinx-click
 sphinx_gallery~=0.14
