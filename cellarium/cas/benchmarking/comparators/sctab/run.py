@@ -176,7 +176,7 @@ def _build_model(model_type: str, hp: dict, checkpoint: str):
     else:
         raise ValueError(f"Unknown --model-type '{model_type}' (expected tabnet, mlp, or linear).")
 
-    state_dict = torch.load(checkpoint, map_location="cpu", weights_only=False)["state_dict"]
+    state_dict = torch.load(checkpoint, map_location="cpu", weights_only=True)["state_dict"]
     classifier_weights = {k[len("classifier.") :]: v for k, v in state_dict.items() if k.startswith("classifier.")}
     if not classifier_weights:
         raise ValueError(f"No 'classifier.*' keys found in checkpoint {checkpoint}.")
