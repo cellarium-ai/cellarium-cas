@@ -43,12 +43,36 @@ runs:
       run: tox -e docs
       shell: bash
 
+    - name: Compute pillow ignore list for pip-audit
+      # Pillow CVE-2026-112395/112397/112400/112404/112895/112896/112897/112899 are
+      # fixed in 13.0.0, which requires Python >=3.11. Only 3.10 resolves vulnerable
+      # pillow 12.x here, so scope the ignore to 3.10 and keep 3.11/3.12 strict.
+      run: |
+        if [ "${{ inputs.python-version }}" = "3.10" ]; then
+          {
+            echo "PILLOW_IGNORES<<EOF"
+            echo "CVE-2026-112395"
+            echo "CVE-2026-112397"
+            echo "CVE-2026-112400"
+            echo "CVE-2026-112404"
+            echo "CVE-2026-112895"
+            echo "CVE-2026-112896"
+            echo "CVE-2026-112897"
+            echo "CVE-2026-112899"
+            echo "EOF"
+          } >> "$GITHUB_ENV"
+        else
+          echo "PILLOW_IGNORES=" >> "$GITHUB_ENV"
+        fi
+      shell: bash
+
     - name: Run pip-audit command through GHA
       # Check dependencies for security vulnerabilities.
       # Only run on a single python version (the one that does doc builds)
       # CVE-2026-25645 (requests): fix version 2.33.0 not yet released.
-      # CVE-2026-27205 (flask) and CVE-2025-66221, CVE-2026-21860, CVE-2026-27199 (werkzeug):
-      # cannot be fixed until dash drops its Flask<3.1 constraint (currently dash==2.17.1).
+      # CVE-2026-27205 (flask) and CVE-2025-66221, CVE-2026-21860, CVE-2026-27199,
+      #   PYSEC-2026-4312 (werkzeug):
+      #   cannot be fixed until dash drops its Flask<3.1 constraint (currently dash==2.17.1).
       if: ${{ env.DO_DOC_BUILD == 'true' }}
       uses: pypa/gh-action-pip-audit@v1.0.8
       with:
@@ -58,6 +82,8 @@ runs:
           CVE-2025-66221
           CVE-2026-21860
           CVE-2026-27199
+          PYSEC-2026-4312
+          ${{ env.PILLOW_IGNORES }}
         inputs: |
           requirements/base.txt
           requirements/dev.txt
