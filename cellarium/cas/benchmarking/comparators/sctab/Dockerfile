@@ -29,11 +29,12 @@ RUN pip install --no-cache-dir --only-binary :all: \
     "anndata==0.11.4" \
     "pyyaml==6.0.3" \
     "click==8.5.0" \
-    "tqdm==4.70.1" \
- # scTab is a source install pinned to commit 5ede7f2: no wheel exists, so
- # --only-binary :all: cannot apply (Sonar flags this line; the pinned commit
- # SHA is the version lock for it).
- RUN pip install --no-cache-dir --no-deps "git+https://github.com/theislab/scTab.git@5ede7f2"
+    "tqdm==4.70.1"
+
+# scTab is a source install pinned to commit 5ede7f2: no wheel exists, so
+# --only-binary :all: cannot apply (Sonar flags this line; the pinned commit
+# SHA is the version lock for it).
+RUN pip install --no-cache-dir --no-deps "git+https://github.com/theislab/scTab.git@5ede7f2"
 
 COPY run.py /scripts/run.py
 
