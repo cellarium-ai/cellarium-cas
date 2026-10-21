@@ -50,6 +50,10 @@ runs:
       # CVE-2026-27205 (flask) and CVE-2025-66221, CVE-2026-21860, CVE-2026-27199,
       #   PYSEC-2026-4312 (werkzeug):
       #   cannot be fixed until dash drops its Flask<3.1 constraint (currently dash==2.17.1).
+      # CVE-2026-112395, CVE-2026-112397, CVE-2026-112400, CVE-2026-112404,
+      #   CVE-2026-112895, CVE-2026-112896, CVE-2026-112897, CVE-2026-112899 (pillow):
+      #   fixed in Pillow 13.0.0, which requires Python >=3.11; CI still runs 3.7-3.10,
+      #   which resolve pillow 12.x and cannot install the fix.
       if: ${{ env.DO_DOC_BUILD == 'true' }}
       uses: pypa/gh-action-pip-audit@v1.0.8
       with:
@@ -60,6 +64,14 @@ runs:
           CVE-2026-21860
           CVE-2026-27199
           PYSEC-2026-4312
+          CVE-2026-112395
+          CVE-2026-112397
+          CVE-2026-112400
+          CVE-2026-112404
+          CVE-2026-112895
+          CVE-2026-112896
+          CVE-2026-112897
+          CVE-2026-112899
         inputs: |
           requirements/base.txt
           requirements/dev.txt
