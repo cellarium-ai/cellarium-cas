@@ -253,13 +253,35 @@ in a notebook::
 
     agg = aggregate_confusion_matrices(cms)
 
-Azimuth integration
-+++++++++++++++++++
+Comparator integrations
++++++++++++++++++++++++
 
-The ``cellarium.cas.benchmarking.azimuth`` helpers convert Azimuth annotation outputs
-into CAS-compatible annotate directories so they can be evaluated with the same pipeline.
-See ``cellarium.cas.benchmarking.azimuth.helpers.azimuth_to_cas_annotation`` for usage.
+Third-party cell-type annotation tools are integrated as **comparators** under
+``cellarium.cas.benchmarking.comparators``.  Each comparator ships a Docker image that
+annotates ``.h5ad`` inputs and host helpers that convert the annotations into the four
+files ``cellarium-cas benchmark`` expects.  Both comparators share the
+``ontology_response.json`` builder in
+``cellarium.cas.benchmarking.comparators.shared.cas_labels``.
+
+Azimuth
+~~~~~~~
+
+The ``cellarium.cas.benchmarking.comparators.azimuth`` helpers convert Azimuth
+annotation outputs into CAS-compatible annotate directories so they can be evaluated
+with the same pipeline.  See
+``cellarium.cas.benchmarking.comparators.azimuth.helpers.azimuth_to_cas_annotation``
+for usage.
 
 **Important:** when ``level_specs`` is auto-detected, Azimuth levels are ordered
 **most granular first** (rank 1 = finest level), matching CAS convention.  If you
 pass explicit ``level_specs``, list them most-granular first.
+
+scTab
+~~~~~
+
+The ``cellarium.cas.benchmarking.comparators.sctab`` helpers convert scTab top-k
+predictions (a 164-class cross-tissue classifier) into CAS-compatible annotate
+directories.  See
+``cellarium.cas.benchmarking.comparators.sctab.helpers.sctab_to_cas_annotation`` for
+usage.  Each scTab model type forms its own benchmark group via ``model_name``:
+``sctab_tabnet``, ``sctab_mlp``, or ``sctab_linear``.

@@ -6,6 +6,8 @@ from pathlib import Path
 import anndata
 import pandas as pd
 
+from cellarium.cas.benchmarking.comparators.shared.crosswalk import load_crosswalk_maps
+
 
 def _load_and_align_azimuth_df(azimuth_csv_path: str, obs_names: t.List[str]) -> t.Any:
     """Load the Azimuth CSV, validate barcode coverage, and reindex to *obs_names* order."""
@@ -30,34 +32,6 @@ def _validate_level_cols(level_specs: t.List[t.Tuple[str, str]], azimuth_df: t.A
             f"The following level columns are not present in the Azimuth CSV: {missing}. "
             f"Available columns: {list(azimuth_df.columns)}"
         )
-
-
-def _load_crosswalk_maps(
-    crosswalk_csv_path: str,
-    crosswalk_azimuth_col: str,
-    crosswalk_cl_id_col: str,
-    crosswalk_cl_label_col: t.Optional[str],
-) -> t.Tuple[t.Dict[str, str], t.Dict[str, str]]:
-    """Load crosswalk CSV and return ``(crosswalk_map, crosswalk_label_map)``."""
-    crosswalk_df = pd.read_csv(crosswalk_csv_path)
-    required_cols = [crosswalk_azimuth_col, crosswalk_cl_id_col]
-    if crosswalk_cl_label_col is not None:
-        required_cols.append(crosswalk_cl_label_col)
-    for col in required_cols:
-        if col not in crosswalk_df.columns:
-            raise ValueError(
-                f"Column '{col}' not found in crosswalk CSV. Available columns: {list(crosswalk_df.columns)}"
-            )
-    crosswalk_map: t.Dict[str, str] = dict(
-        zip(crosswalk_df[crosswalk_azimuth_col].astype(str), crosswalk_df[crosswalk_cl_id_col].astype(str))
-    )
-    if crosswalk_cl_label_col is not None:
-        crosswalk_label_map: t.Dict[str, str] = dict(
-            zip(crosswalk_df[crosswalk_azimuth_col].astype(str), crosswalk_df[crosswalk_cl_label_col].astype(str))
-        )
-    else:
-        crosswalk_label_map = {}
-    return crosswalk_map, crosswalk_label_map
 
 
 def _map_azimuth_label(
@@ -170,7 +144,6 @@ def map_azimuth_to_cas_labels(
     crosswalk_csv_path: str,
     crosswalk_azimuth_col: str,
     crosswalk_cl_id_col: str,
-    azimuth_ref_name: str,
     level_specs: t.Optional[t.List[t.Tuple[str, str]]] = None,
     crosswalk_cl_label_col: t.Optional[str] = None,
 ) -> t.Dict[str, str]:
@@ -184,8 +157,6 @@ def map_azimuth_to_cas_labels(
     :param crosswalk_azimuth_col: Column in the crosswalk containing Azimuth cell type labels.
     :param crosswalk_cl_id_col: Column in the crosswalk containing CL ontology term IDs
         (e.g. ``"CL:0000084"``).  Written to ``cas_cell_type_name_k`` columns.
-    :param azimuth_ref_name: Azimuth reference name (e.g. ``"pbmcref"``), used to build
-        the ``model_name`` field as ``azimuth_<ref_name>``.
     :param level_specs: List of ``(azimuth_label_col, azimuth_score_col)`` tuples ordered
         **most granular first** (rank 1 = finest level).  Each tuple names the columns in
         the Azimuth CSV for one annotation level.  If ``None`` (default), pairs are
@@ -208,8 +179,11 @@ def map_azimuth_to_cas_labels(
 
     azimuth_df = _load_and_align_azimuth_df(azimuth_csv_path, obs_names)
 
-    crosswalk_map, crosswalk_label_map = _load_crosswalk_maps(
-        crosswalk_csv_path, crosswalk_azimuth_col, crosswalk_cl_id_col, crosswalk_cl_label_col
+    crosswalk_map, crosswalk_label_map = load_crosswalk_maps(
+        crosswalk_csv_path,
+        crosswalk_label_col=crosswalk_azimuth_col,
+        crosswalk_cl_id_col=crosswalk_cl_id_col,
+        crosswalk_cl_label_col=crosswalk_cl_label_col,
     )
 
     if level_specs is None:
@@ -237,7 +211,7 @@ def map_azimuth_to_cas_labels(
     # --- metadata ---
     metadata = {
         "input_path": str(Path(h5ad_path).resolve()),
-        "model_name": f"azimuth_{azimuth_ref_name}",
+        "model_name": "azimuth",
         "n_cells": len(obs_names),
         "ontology_resource_name": None,
     }

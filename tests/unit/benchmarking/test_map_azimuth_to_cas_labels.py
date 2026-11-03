@@ -5,7 +5,7 @@ Unit tests for azimuth level-spec ordering in map_azimuth_to_cas_labels.
 import pandas as pd
 import pytest
 
-from cellarium.cas.benchmarking.azimuth.helpers.map_azimuth_to_cas_labels import infer_level_specs
+from cellarium.cas.benchmarking.comparators.azimuth.helpers.map_azimuth_to_cas_labels import infer_level_specs
 
 
 def _azimuth_df(columns: dict) -> pd.DataFrame:

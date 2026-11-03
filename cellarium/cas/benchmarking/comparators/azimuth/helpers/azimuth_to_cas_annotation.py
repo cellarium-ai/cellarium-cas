@@ -13,7 +13,8 @@ pipeline that writes the same four files produced by ``cellarium-cas annotate``:
 
 import typing as t
 
-from .build_ontology_response import build_ontology_response
+from cellarium.cas.benchmarking.comparators.shared.cas_labels import build_ontology_response
+
 from .map_azimuth_to_cas_labels import map_azimuth_to_cas_labels
 
 
@@ -23,7 +24,6 @@ def azimuth_to_cas_annotation(
     crosswalk_csv_path: str,
     crosswalk_azimuth_col: str,
     crosswalk_cl_id_col: str,
-    azimuth_ref_name: str,
     ontology_resource_path: str,
     output_dir: str,
     level_specs: t.Optional[t.List[t.Tuple[str, str]]] = None,
@@ -43,8 +43,6 @@ def azimuth_to_cas_annotation(
     :param crosswalk_csv_path: Path to the HRA crosswalk CSV mapping Azimuth labels to CL IDs.
     :param crosswalk_azimuth_col: Column in the crosswalk containing Azimuth cell type labels.
     :param crosswalk_cl_id_col: Column in the crosswalk containing CL ontology term IDs.
-    :param azimuth_ref_name: Azimuth reference name (e.g. ``"pbmcref"``).  Written into
-        ``model_name`` as ``azimuth_<ref_name>``.
     :param ontology_resource_path: Path to ``ontology_resource.json`` (saved by
         ``cellarium-cas annotate --save-ontology-resource``).  Passed to
         :func:`build_ontology_response`, which loads it and copies it to *output_dir*.
@@ -68,7 +66,6 @@ def azimuth_to_cas_annotation(
         crosswalk_csv_path=crosswalk_csv_path,
         crosswalk_azimuth_col=crosswalk_azimuth_col,
         crosswalk_cl_id_col=crosswalk_cl_id_col,
-        azimuth_ref_name=azimuth_ref_name,
         level_specs=level_specs,
         crosswalk_cl_label_col=crosswalk_cl_label_col,
     )
@@ -76,7 +73,7 @@ def azimuth_to_cas_annotation(
     build_ontology_response(
         inferred_labels_path=labels_result["inferred_labels_path"],
         ontology_resource_path=ontology_resource_path,
-        azimuth_ref_name=azimuth_ref_name,
+        model_name="azimuth",
         output_dir=output_dir,
     )
 

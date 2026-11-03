@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Build a CAS-compatible ``ontology_response.json`` from Azimuth cell type annotations.
+Build a CAS-compatible ``ontology_response.json`` from a comparator's per-level CL annotations.
 
-Each cell's Azimuth annotations (one per granularity level) are mapped to CL ontology
-terms via the HRA crosswalk and then propagated up the ontology ancestor chain.
+Each cell's annotations (one per granularity level) are mapped to CL ontology
+terms via the comparator's crosswalk and then propagated up the ontology ancestor chain.
 Propagation follows these rules:
 
 - Levels are processed **most granular first**.
@@ -14,24 +14,25 @@ Propagation follows these rules:
   pair and propagation continues independently for both.
 
 The resulting ``CellTypeOntologyAwareResults`` mimics the CAS API response format so
-that ``cellarium-cas benchmark ontology-aware`` can evaluate Azimuth on equal footing.
-Synthetic fields not produced by Azimuth are set as: ``total_neighbors=1``,
-``total_neighbors_unrecognized=0``, ``total_weight=<most_granular_level_score>``.
+that ``cellarium-cas benchmark ontology-aware`` can evaluate comparators on equal
+footing. Synthetic fields not produced by comparators are set as:
+``total_neighbors=1``, ``total_neighbors_unrecognized=0``,
+``total_weight=<most_granular_level_score>``.
 
 Usage
 -----
 ::
 
-    from cellarium.cas.benchmarking.azimuth.helpers.build_ontology_response import build_ontology_response
+    from cellarium.cas.benchmarking.comparators.shared.cas_labels import build_ontology_response
 
     build_ontology_response(
-        inferred_labels_path="/data/azimuth_annotate_dir/inferred_labels.csv",
+        inferred_labels_path="/data/annotate_dir/inferred_labels.csv",
         ontology_resource_path="/path/to/ontology_resource.json",
-        azimuth_ref_name="pbmcref",
-        output_dir="/data/azimuth_annotate_dir",
+        model_name="sctab_tabnet",
+        output_dir="/data/annotate_dir",
     )
 
-Run :func:`map_azimuth_to_cas_labels` first to produce ``inferred_labels.csv``.
+Run the comparator's label-mapping helper first to produce ``inferred_labels.csv``.
 The ontology resource is the ``ontology_resource.json`` saved by
 ``cellarium-cas annotate --save-ontology-resource``.
 """
@@ -191,27 +192,27 @@ def _build_annotation(
 def build_ontology_response(
     inferred_labels_path: str,
     ontology_resource_path: str,
-    azimuth_ref_name: str,
+    model_name: str,
     output_dir: str,
 ) -> CellTypeOntologyAwareResults:
     """
     Build a CAS-compatible ``CellTypeOntologyAwareResults`` from an ``inferred_labels.csv``
-    produced by :func:`map_azimuth_to_cas_labels`.
+    produced by a comparator's label-mapping helper.
 
     Reads ``cas_cell_type_name_k`` and ``cas_cell_type_score_k`` columns (rank 1 = most
     granular) and propagates each mapped CL term's score to all its ontology ancestors
     using ``max``-merge, so ancestor nodes reflect the highest-confidence prediction that
     flows through them.
 
-    :param inferred_labels_path: Path to ``inferred_labels.csv`` from
-        :func:`map_azimuth_to_cas_labels` (row index = barcodes, columns
-        ``cas_cell_type_name_k`` / ``cas_cell_type_score_k``).
+    :param inferred_labels_path: Path to ``inferred_labels.csv`` from the comparator's
+        label-mapping helper (row index = barcodes, columns ``cas_cell_type_name_k`` /
+        ``cas_cell_type_score_k``).
     :param ontology_resource_path: Path to ``ontology_resource.json`` (saved by
         ``cellarium-cas annotate --save-ontology-resource``).  Loaded to build the
         :class:`~cellarium.cas.postprocessing.cell_ontology.CellOntologyCache` and
         copied as-is to *output_dir*.
-    :param azimuth_ref_name: Azimuth reference name (e.g. ``"pbmcref"``), written into
-        ``model_name`` as ``azimuth_<ref_name>``.
+    :param model_name: Benchmark group label written into the response (e.g.
+        ``"azimuth"``, ``"sctab_tabnet"``).
     :param output_dir: Directory to write ``ontology_response.json`` and
         ``ontology_resource.json`` into (created if absent).
 
@@ -232,8 +233,7 @@ def build_ontology_response(
     top_k = _get_top_k(labels_df)
     if top_k == 0:
         raise ValueError(
-            f"No 'cas_cell_type_name_k' columns found in {inferred_labels_path}. "
-            "Run map_azimuth_to_cas_labels first."
+            f"No 'cas_cell_type_name_k' columns found in {inferred_labels_path}. " "Run the label-mapping helper first."
         )
 
     # --- pre-build ancestor traversal structures ---
@@ -257,7 +257,7 @@ def build_ontology_response(
 
     result = CellTypeOntologyAwareResults(
         data=annotations,
-        model_name=f"azimuth_{azimuth_ref_name}",
+        model_name=model_name,
     )
 
     output_dir_path = Path(output_dir)

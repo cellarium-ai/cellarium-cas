@@ -15,7 +15,9 @@ Directory structure::
     helpers/
         convert_h5ad.py               # converts .h5ad to 10x format for Seurat
         map_azimuth_to_cas_labels.py  # Azimuth CSV → inferred_labels.csv + metadata.json
-        build_ontology_response.py    # Azimuth CSV → ontology_response.json
+
+The shared ``ontology_response.json`` builder lives at
+``../shared/cas_labels.py`` and is used by both comparators.
 
 
 Public Docker Image
@@ -31,7 +33,7 @@ runs Azimuth, and writes the annotated cell metadata to a CSV file.
 
 To build the image from source (optional)::
 
-    cd benchmarking/azimuth
+    cd benchmarking/comparators/azimuth
     docker build -t run-azimuth:local .
 
 
@@ -93,7 +95,7 @@ Save it locally, e.g. as ``crosswalk.csv``.
 
 Run from the project root (``cellarium-cas`` must be installed)::
 
-    from cellarium.cas.benchmarking.azimuth.helpers.map_azimuth_to_cas_labels import map_azimuth_to_cas_labels
+    from cellarium.cas.benchmarking.comparators.azimuth.helpers.map_azimuth_to_cas_labels import map_azimuth_to_cas_labels
 
     map_azimuth_to_cas_labels(
         azimuth_csv_path="/data/azimuth_output.csv",
@@ -103,7 +105,6 @@ Run from the project root (``cellarium-cas`` must be installed)::
         crosswalk_azimuth_col="tool_cell_label",
         crosswalk_cl_id_col="cl_id",
         crosswalk_cl_label_col="cl_label",      # optional but recommended
-        azimuth_ref_name="pbmcref",
         level_specs=[
             ("predicted.celltype.l3", "predicted.celltype.l3.score"),
             ("predicted.celltype.l2", "predicted.celltype.l2.score"),
@@ -114,7 +115,7 @@ Run from the project root (``cellarium-cas`` must be installed)::
 List ``level_specs`` from **most granular to least granular**. This produces
 ``inferred_labels.csv`` and ``metadata.json`` inside the output directory.
 
-Alternatively, use :func:`~cellarium.cas.benchmarking.azimuth.helpers.azimuth_to_cas_annotation.azimuth_to_cas_annotation`
+Alternatively, use :func:`~cellarium.cas.benchmarking.comparators.azimuth.helpers.azimuth_to_cas_annotation.azimuth_to_cas_annotation`
 to run Steps 4 and 5 together (see below).
 
 **Step 5 — Build the CAS-compatible ontology response**
@@ -123,18 +124,18 @@ This step requires an ``ontology_resource.json`` file (saved by
 ``cellarium-cas annotate --save-ontology-resource``) and the
 ``inferred_labels.csv`` produced in Step 4::
 
-    from cellarium.cas.benchmarking.azimuth.helpers.build_ontology_response import build_ontology_response
+    from cellarium.cas.benchmarking.comparators.shared.cas_labels import build_ontology_response
 
     build_ontology_response(
         inferred_labels_path="/data/azimuth_annotate_dir/inferred_labels.csv",
         ontology_resource_path="/path/to/ontology_resource.json",
-        azimuth_ref_name="pbmcref",
+        model_name="azimuth",
         output_dir="/data/azimuth_annotate_dir",
     )
 
 Or run Steps 4 and 5 together with the combined helper::
 
-    from cellarium.cas.benchmarking.azimuth.helpers.azimuth_to_cas_annotation import azimuth_to_cas_annotation
+    from cellarium.cas.benchmarking.comparators.azimuth.helpers.azimuth_to_cas_annotation import azimuth_to_cas_annotation
 
     azimuth_to_cas_annotation(
         azimuth_csv_path="/data/azimuth_output.csv",
@@ -147,7 +148,6 @@ Or run Steps 4 and 5 together with the combined helper::
             ("predicted.celltype.l2", "predicted.celltype.l2.score"),
             ("predicted.celltype.l1", "predicted.celltype.l1.score"),
         ],
-        azimuth_ref_name="pbmcref",
         ontology_resource_path="/path/to/ontology_resource.json",
         output_dir="/data/azimuth_annotate_dir",
     )
@@ -174,9 +174,10 @@ annotate output directories to compare all tools in one run.
 Notes
 -----
 
-- The ``model_name`` field in outputs is set to ``azimuth_<ref_name>``
-  (e.g. ``azimuth_pbmcref``), which appears in the benchmark summary CSVs alongside
-  CAS model names.
+- The ``model_name`` field in outputs is the constant ``"azimuth"`` (regardless of
+  the Azimuth reference used), which appears in the benchmark summary CSVs alongside
+  CAS model names.  Multiple Azimuth references therefore merge into one benchmark
+  group.
 - ``cellarium-cas`` must be installed in the Python environment used to run the
   helpers (Steps 4 and 5).  The Docker image is only needed for Step 2.
 - The helpers require ``anndata``, ``pandas``, and ``scipy`` (already dependencies of
