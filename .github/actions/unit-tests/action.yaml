@@ -54,6 +54,7 @@ runs:
             echo "CVE-2026-112390"
             echo "CVE-2026-112391"
             echo "CVE-2026-112393"
+            echo "GHSA-78g4-xqwv-q3g8"
             echo "CVE-2026-112395"
             echo "CVE-2026-112397"
             echo "CVE-2026-112399"
