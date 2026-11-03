@@ -1,17 +1,18 @@
 FROM python:3.12-slim
 
-# g++ is required to build hnswlib from source (no wheel for this platform).
+# g++ builds hnswlib from source (PyPI ships an sdist only).
 RUN apt-get update && apt-get install -y --no-install-recommends g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# CPU-only torch from the PyTorch CPU index (extra index: PyPI stays primary so
-# torch's runtime deps resolve there). Installed before scimilarity so the
-# resolver sees the torch requirement already satisfied and never pulls CUDA wheels.
-RUN pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu \
+# Only the packages we install directly are pinned; scimilarity's transitive
+# deps resolve freely. torch is in the same command so the resolver keeps the
+# CPU build (+cpu local tag exists only on the CPU index; PyPI stays primary).
+# --only-binary :all: everywhere except hnswlib, which has no wheel.
+RUN pip install --no-cache-dir --only-binary :all: --no-binary hnswlib \
+    --extra-index-url https://download.pytorch.org/whl/cpu \
     "torch==2.5.1+cpu" \
-    && pip install --no-cache-dir \
     "scimilarity==0.4.1" \
-    click
+    "click==8.5.0"
 
 COPY run.py /scripts/run.py
 
