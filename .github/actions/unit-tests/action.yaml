@@ -43,22 +43,72 @@ runs:
       run: tox -e docs
       shell: bash
 
-    - name: Compute pillow ignore list for pip-audit
-      # Pillow CVE-2026-112395/112397/112400/112404/112895/112896/112897/112899 are
-      # fixed in 13.0.0, which requires Python >=3.11. Only 3.10 resolves vulnerable
-      # pillow 12.x here, so scope the ignore to 3.10 and keep 3.11/3.12 strict.
+    - name: Compute py3.10 ignore list for pip-audit
+      # pillow (fixed in 13.0.0), filelock (4.2.1) and tornado (6.6) advisories
+      # need Python >=3.11. Only 3.10 resolves the vulnerable releases here, so
+      # scope the ignore to 3.10 and keep 3.11/3.12 strict.
       run: |
         if [ "${{ inputs.python-version }}" = "3.10" ]; then
           {
             echo "PILLOW_IGNORES<<EOF"
+            echo "CVE-2026-112390"
+            echo "CVE-2026-112391"
+            echo "CVE-2026-112393"
             echo "CVE-2026-112395"
             echo "CVE-2026-112397"
+            echo "CVE-2026-112399"
             echo "CVE-2026-112400"
+            echo "CVE-2026-112401"
             echo "CVE-2026-112404"
+            echo "CVE-2026-112406"
+            echo "CVE-2026-112891"
+            echo "CVE-2026-112892"
+            echo "CVE-2026-112893"
+            echo "CVE-2026-112894"
             echo "CVE-2026-112895"
             echo "CVE-2026-112896"
             echo "CVE-2026-112897"
             echo "CVE-2026-112899"
+            echo "CVE-2026-112900"
+            echo "CVE-2026-112906"
+            echo "CVE-2026-112907"
+            echo "CVE-2026-112908"
+            echo "CVE-2026-112909"
+            echo "CVE-2026-112910"
+            echo "CVE-2026-112911"
+            echo "CVE-2026-112912"
+            echo "CVE-2026-112913"
+            echo "CVE-2026-112914"
+            echo "CVE-2026-112915"
+            echo "CVE-2026-112934"
+            echo "CVE-2026-112935"
+            echo "CVE-2026-112937"
+            echo "CVE-2026-112938"
+            echo "CVE-2026-112939"
+            echo "CVE-2026-112940"
+            echo "CVE-2026-112941"
+            echo "CVE-2026-115927"
+            echo "CVE-2026-116577"
+            echo "CVE-2026-116578"
+            echo "CVE-2026-96638"
+            echo "CVE-2026-96640"
+            echo "CVE-2026-96778"
+            echo "PYSEC-2026-4326"
+            echo "PYSEC-2026-4327"
+            echo "PYSEC-2026-4328"
+            echo "PYSEC-2026-4330"
+            echo "PYSEC-2026-4331"
+            echo "PYSEC-2026-4332"
+            echo "PYSEC-2026-4333"
+            echo "PYSEC-2026-4335"
+            echo "PYSEC-2026-4336"
+            echo "PYSEC-2026-4337"
+            echo "PYSEC-2026-4338"
+            echo "PYSEC-2026-4339"
+            echo "PYSEC-2026-4340"
+            echo "PYSEC-2026-4341"
+            echo "PYSEC-2026-4342"
+            echo "PYSEC-2026-4343"
             echo "EOF"
           } >> "$GITHUB_ENV"
         else
