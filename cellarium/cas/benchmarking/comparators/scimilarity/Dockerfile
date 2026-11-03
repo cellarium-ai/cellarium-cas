@@ -1,7 +1,17 @@
-FROM ghcr.io/genentech/scimilarity@sha256:ca30629a3737e318230400e8d4d3d26615a0d7370d926562cabce622db99d248
+FROM python:3.12-slim
 
-RUN python3 -m pip install --no-cache-dir "scimilarity==0.4.1" \
-    && ln -sf "$(command -v python3)" /usr/local/bin/python
+# g++ is required to build hnswlib from source (no wheel for this platform).
+RUN apt-get update && apt-get install -y --no-install-recommends g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# CPU-only torch from the PyTorch CPU index (extra index: PyPI stays primary so
+# torch's runtime deps resolve there). Installed before scimilarity so the
+# resolver sees the torch requirement already satisfied and never pulls CUDA wheels.
+RUN pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu \
+    "torch==2.5.1+cpu" \
+    && pip install --no-cache-dir \
+    "scimilarity==0.4.1" \
+    click
 
 COPY run.py /scripts/run.py
 
