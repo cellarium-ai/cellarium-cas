@@ -10,7 +10,7 @@ import pytest
 from cellarium.cas.benchmarking.comparators.pan_human_azimuth.helpers.pan_human_azimuth_to_cas_annotation import (
     pan_human_azimuth_to_cas_annotation,
 )
-from tests.unit.benchmarking._fixtures import MOCK_ONTOLOGY_RESOURCE
+from tests.benchmarking._fixtures import MOCK_ONTOLOGY_RESOURCE
 
 
 def _convert(tmp_path, *, predictions, crosswalk):

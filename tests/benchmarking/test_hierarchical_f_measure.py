@@ -15,7 +15,7 @@ import scipy.sparse
 
 from cellarium.cas.benchmarking.confusion_matrix import build_confusion_matrix
 from cellarium.cas.benchmarking.hierarchical_f_measure import compute_hierarchical_f_measure_from_cm
-from tests.unit.benchmarking._fixtures import LABEL_PATHS, LABELS, ONTOLOGY_CACHE
+from tests.benchmarking._fixtures import LABEL_PATHS, LABELS, ONTOLOGY_CACHE
 
 # ---------------------------------------------------------------------------
 # TP / FP / FN (hand-computed)

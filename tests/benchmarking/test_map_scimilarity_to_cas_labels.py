@@ -10,7 +10,7 @@ import pytest
 from cellarium.cas.benchmarking.comparators.scimilarity.helpers.map_scimilarity_to_cas_labels import (
     map_scimilarity_to_cas_labels,
 )
-from tests.unit.benchmarking._fixtures import MOCK_ONTOLOGY_RESOURCE
+from tests.benchmarking._fixtures import MOCK_ONTOLOGY_RESOURCE
 
 
 def _write_inputs(tmp_path, *, predictions, crosswalk):

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 from importlib.metadata import version
-from importlib.resources import files
+from importlib.resources import read_text
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -120,8 +120,7 @@ def _prepare_dataset(*, adata: anndata.AnnData) -> anndata.AnnData:
 
 def _model_genes() -> set[str]:
     """Read the packaged v1 feature panel (importing ``panhumanpy`` loads TensorFlow)."""
-    panel = files(f"panhumanpy._tools.{MODEL_VERSION}.inference_feature_panel")
-    text = panel.joinpath("inference_feature_panel.txt").read_text()
+    text = read_text(f"panhumanpy._tools.{MODEL_VERSION}.inference_feature_panel", "inference_feature_panel.txt")
     return {line.strip() for line in text.splitlines() if line.strip()}
 
 
