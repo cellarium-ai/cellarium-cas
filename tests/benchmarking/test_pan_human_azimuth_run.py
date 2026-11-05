@@ -108,12 +108,15 @@ def test_symbol_precedence_and_blank_symbols():
 
 
 def test_empty_and_duplicate_barcode_inputs_rejected():
+    no_cells = _adata(x=np.zeros((0, 2)), var_index=["A", "B"])
+    no_genes = _adata(x=np.zeros((2, 0)), var_index=[])
+    dup_barcodes = _adata(x=[[1], [1]], var_index=["A"], obs_index=["x", "x"])
     with pytest.raises(ValueError, match="no cells"):
-        run._prepare_dataset(adata=_adata(x=np.zeros((0, 2)), var_index=["A", "B"]))
+        run._prepare_dataset(adata=no_cells)
     with pytest.raises(ValueError, match="no genes"):
-        run._prepare_dataset(adata=_adata(x=np.zeros((2, 0)), var_index=[]))
+        run._prepare_dataset(adata=no_genes)
     with pytest.raises(ValueError, match="duplicate cell barcodes"):
-        run._prepare_dataset(adata=_adata(x=[[1], [1]], var_index=["A"], obs_index=["x", "x"]))
+        run._prepare_dataset(adata=dup_barcodes)
 
 
 def test_unassigned_in_any_level_rejects_dataset_with_bounded_unique_diagnostics():
@@ -151,10 +154,9 @@ def test_validate_native_reorders_and_checks_barcodes_and_columns():
     dup = pd.concat([native, native.iloc[:1]])
     with pytest.raises(ValueError, match="duplicate"):
         run._validate_native(cells_meta=dup, barcodes=barcodes, input_h5ad="x")
+    no_confidence = native.drop(columns="final_level_confidence")
     with pytest.raises(ValueError, match="missing columns"):
-        run._validate_native(
-            cells_meta=native.drop(columns="final_level_confidence"), barcodes=barcodes, input_h5ad="x"
-        )
+        run._validate_native(cells_meta=no_confidence, barcodes=barcodes, input_h5ad="x")
     empty = native.copy()
     empty["azimuth_medium"] = ["m", "", "m"]
     with pytest.raises(ValueError, match="azimuth_medium"):
