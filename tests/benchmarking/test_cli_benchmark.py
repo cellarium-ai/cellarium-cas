@@ -16,7 +16,7 @@ from cellarium.cas.cli._benchmark_impl import (
     run_hierarchical_f_measure_step,
 )
 from cellarium.cas.cli.benchmark import benchmark_group
-from tests.unit.benchmarking._fixtures import MOCK_ONTOLOGY_RESOURCE
+from tests.benchmarking._fixtures import MOCK_ONTOLOGY_RESOURCE
 
 
 def _write_json(path: Path, payload: t.Dict[str, t.Any]) -> None:

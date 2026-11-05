@@ -12,7 +12,7 @@ from cellarium.cas.benchmarking.confusion_matrix import (
     load_confusion_matrix,
     save_confusion_matrix,
 )
-from tests.unit.benchmarking._fixtures import LABELS, MOCK_ONTOLOGY_RESOURCE
+from tests.benchmarking._fixtures import LABELS, MOCK_ONTOLOGY_RESOURCE
 
 # ---------------------------------------------------------------------------
 # build_confusion_matrix
