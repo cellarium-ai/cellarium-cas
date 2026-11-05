@@ -119,20 +119,28 @@ Python use
 This needs the same runtime dependencies as the image (``panhumanpy==1.0.0``,
 ``click``, TensorFlow, and so on) and reloads model objects for each input.
 
-Crosswalk
----------
+Cell Ontology mapping
+---------------------
 
-Supply a Pan-Human Azimuth-specific CSV with a label column, ``cl_id``, and
-optionally ``cl_label``. This repository does not ship one. The mapped vocabulary
-is the union of the ``azimuth_fine``, ``azimuth_medium``, and ``azimuth_broad``
-labels. Require every label at every level to appear in the crosswalk, ``cl_id``
-values to exist in the benchmark ``ontology_resource.json``, and never
-fuzzy-match labels.
+Native labels are mapped to Cell Ontology ids with the vendor's own table,
+``cell_ontology_map.csv`` shipped in ``panhumanpy`` (read from the installed
+package without importing TensorFlow, or pass ``vendor_map_csv_path``). No
+label crosswalk is needed. The vendor table is not always exact: its
+``CL_Match`` column marks many rows ``skos:narrowMatch``, and those are used
+as supplied.
+
+Every resulting CL id must exist in the benchmark ``ontology_resource.json``.
+If some do not (for example ids from a different CL release), supply an optional
+CL-to-CL crosswalk CSV with a source (vendor) CL id column, a target CL id
+column, and optionally a target label column. Listed ids are translated; others
+pass through unchanged. Ids still absent from the ontology fail with the
+missing ids listed.
 
 Convert and benchmark
 ---------------------
 
-Run conversion from the project root::
+Run conversion from the project root (omit the ``crosswalk_*`` arguments when
+no translation is needed)::
 
     from cellarium.cas.benchmarking.comparators.pan_human_azimuth.helpers.pan_human_azimuth_to_cas_annotation import (
         pan_human_azimuth_to_cas_annotation,
@@ -141,12 +149,12 @@ Run conversion from the project root::
     pan_human_azimuth_to_cas_annotation(
         predictions_csv_path="/data/pan_human_azimuth_sample/pan_human_azimuth_predictions.csv",
         h5ad_path="/data/sample.h5ad",
-        crosswalk_csv_path="/data/pan_human_azimuth_crosswalk.csv",
-        crosswalk_label_col="pan_human_label",
-        crosswalk_cl_id_col="cl_id",
-        crosswalk_cl_label_col="cl_label",
         ontology_resource_path="/data/ontology_resource.json",
         output_dir="/data/pan_human_azimuth_annotate_dir",
+        crosswalk_csv_path="/data/cl_crosswalk.csv",
+        crosswalk_source_cl_id_col="old_cl",
+        crosswalk_target_cl_id_col="new_cl",
+        crosswalk_cl_label_col="new_label",
     )
 
 The helper writes ``inferred_labels.csv`` with three ranks, as in the existing
@@ -156,6 +164,6 @@ Ranks are granularity levels, not alternative guesses; a parent term can repeat
 a child's term and is kept. Refined levels have no native confidence, so
 ``cas_cell_type_score_k`` is empty, not invented. It also writes ``metadata.json``
 (model group ``pan_human_azimuth_v1``), ``ontology_response.json``, and
-``ontology_resource.json``. It rejects missing barcodes, crosswalk labels, and
+``ontology_resource.json``. It rejects missing barcodes, labels absent from the vendor table, and
 ontology terms. Benchmark with ``--inferred-label cas_cell_type_name_1`` and
 ``--f-measure-top-k 3``.
