@@ -158,9 +158,23 @@ def test_validate_native_reorders_and_checks_barcodes_and_columns():
     with pytest.raises(ValueError, match="missing columns"):
         run._validate_native(cells_meta=no_confidence, barcodes=barcodes, input_h5ad="x")
     empty = native.copy()
-    empty["azimuth_medium"] = ["m", "", "m"]
-    with pytest.raises(ValueError, match="azimuth_medium"):
+    empty.loc["b", list(run.LEVEL_COLUMNS)] = ""
+    with pytest.raises(ValueError, match="no label at any level"):
         run._validate_native(cells_meta=empty, barcodes=barcodes, input_h5ad="x")
+
+
+def test_blank_levels_filled_from_nearest_finer_else_coarser():
+    barcodes = pd.Index(["a", "b", "c", "d"])
+    native = _native(barcodes=barcodes)
+    native["azimuth_fine"] = ["f", "f", "", "f"]
+    native["azimuth_medium"] = ["", "m", "m", ""]
+    native["azimuth_broad"] = ["b", "b", "b", ""]
+
+    filled = run._validate_native(cells_meta=native, barcodes=barcodes, input_h5ad="x")
+
+    assert filled["azimuth_fine"].tolist() == ["f", "f", "m", "f"]
+    assert filled["azimuth_medium"].tolist() == ["f", "m", "m", "f"]
+    assert filled["azimuth_broad"].tolist() == ["b", "b", "b", "f"]
 
 
 def test_run_writes_native_columns_unchanged_in_input_order(tmp_path, fake_model):
