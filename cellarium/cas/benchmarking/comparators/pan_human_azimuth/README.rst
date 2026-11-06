@@ -91,6 +91,15 @@ one refined annotation, not ranked alternatives. The refined levels have no nati
 confidence. ``final_level_confidence`` belongs only to ``final_level_labels``, which
 can differ from ``azimuth_fine``. No scores or ranks are synthesized.
 
+Blank levels
+------------
+
+If the model leaves a level blank for a cell (for example ``azimuth_medium`` for a ``ProB cell``),
+the blank is filled from the nearest finer level, else the nearest coarser one (fine, then medium,
+then broad). This runs before the ``Unassigned`` check and is written to the predictions CSV, so
+those columns are no longer the package's unmodified output for such cells. A cell with no label at
+any level fails the dataset.
+
 Unassigned cells
 ----------------
 

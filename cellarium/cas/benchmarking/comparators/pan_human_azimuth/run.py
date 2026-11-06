@@ -152,7 +152,7 @@ def _annotate(*, prepared: anndata.AnnData, batch_size: int) -> pd.DataFrame:
 
 
 def _validate_native(*, cells_meta: pd.DataFrame, barcodes: pd.Index, input_h5ad: str) -> pd.DataFrame:
-    """Align native metadata to input barcodes and reject invalid or ``Unassigned`` annotations.
+    """Align native metadata to input barcodes, fill blank levels, and reject ``Unassigned`` annotations.
 
     :param cells_meta: Native metadata returned by Pan-Human Azimuth.
     :param barcodes: Input barcodes in original order.
@@ -175,10 +175,14 @@ def _validate_native(*, cells_meta: pd.DataFrame, barcodes: pd.Index, input_h5ad
     native = cells_meta.loc[:, list(NATIVE_COLUMNS)].copy()
     native.index = index
     native = native.reindex(barcodes)
-    for column in LEVEL_COLUMNS:
-        labels = native[column]
-        if labels.isna().any() or (labels.astype(str).str.strip() == "").any():
-            raise ValueError(f"Native column '{column}' contains missing or empty labels.")
+    # Fill a blank level from the nearest finer level, else the nearest coarser one (columns run
+    # fine -> medium -> broad). Only cells with no label at any level are rejected.
+    levels = native[list(LEVEL_COLUMNS)].astype(object)
+    levels = levels.mask(levels.isna() | (levels.astype(str).apply(lambda col: col.str.strip()) == ""))
+    levels = levels.ffill(axis=1).bfill(axis=1)
+    if levels.isna().any(axis=None):
+        raise ValueError("Native annotations contain cells with no label at any level.")
+    native[list(LEVEL_COLUMNS)] = levels
 
     unassigned = np.zeros(len(native), dtype=bool)
     for column in LEVEL_COLUMNS:
