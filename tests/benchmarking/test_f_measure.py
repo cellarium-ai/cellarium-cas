@@ -8,7 +8,7 @@ from sklearn.metrics import f1_score, precision_score, recall_score
 
 from cellarium.cas.benchmarking.confusion_matrix import build_confusion_matrix
 from cellarium.cas.benchmarking.f_measure import compute_f_measure_from_cm
-from tests.unit.benchmarking._fixtures import LABELS
+from tests.benchmarking._fixtures import LABELS
 
 # ---------------------------------------------------------------------------
 # compute_f_measure_from_cm
