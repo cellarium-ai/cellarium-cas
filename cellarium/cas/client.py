@@ -52,9 +52,12 @@ class CASClient:
         `Default:` ``3``
     """
 
-    def __print_models(self, models):
+    def print_models(self) -> None:
+        """
+        Print the list of models available in Cellarium CAS with their descriptions, schemas and embedding dimensions.
+        """
         s = "Allowed model list in Cellarium CAS:\n"
-        for model in models:
+        for model in self.model_objects_list:
             model_name = model["model_name"]
             description = model["description"]
             model_schema = model["schema_name"]
@@ -78,7 +81,7 @@ class CASClient:
             api_token=api_token, api_url=api_url, client_session_id=self.client_session_id
         )
 
-        logger.info(f"Connecting to the Cellarium Cloud backend with session {self.client_session_id}...")
+        logger.info(f"Connecting to the Cellarium CAS server with session {self.client_session_id}...")
         self.user_info = self.cas_api_service.validate_token()
         username = self.user_info["username"]
         self.__print(f"User is {username}")
@@ -101,9 +104,7 @@ class CASClient:
         self._ontology_cache: t.Dict[str, t.Any] = {}
 
         self.num_attempts_per_chunk = num_attempts_per_chunk
-        self.__print(f"Authenticated in Cellarium Cloud v. {application_info['application_version']}")
-
-        self.__print_models(self.model_objects_list)
+        self.__print(f"Authenticated in Cellarium CAS server v. {application_info['application_version']}")
 
         self.print_user_quota()
 
