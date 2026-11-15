@@ -307,7 +307,7 @@ def get_most_granular_top_k_calls(
     min_acceptable_score: float,
     top_k: int = 1,
     root_note: str = CL_CELL_ROOT_NODE,
-    use_shortest_path: bool = True,
+    use_shortest_path: bool = False,
 ) -> t.List[tuple]:
     if use_shortest_path:
         depth_map = cl.get_shortest_path_lengths_from_target(root_note)
@@ -333,7 +333,7 @@ def compute_most_granular_top_k_calls_single(
     top_k: int = 3,
     obs_prefix: str = "cas_cell_type",
     root_note: str = CL_CELL_ROOT_NODE,
-    use_shortest_path: bool = True,
+    use_shortest_path: bool = False,
 ):
     top_k_calls_dict = defaultdict(list)
     scores_array_nc = adata.obsm[CAS_CL_SCORES_ANNDATA_OBSM_KEY].toarray()
@@ -441,7 +441,7 @@ def compute_most_granular_top_k_calls_knn(
     top_k: int = 3,
     obs_prefix: str = "cas_knn_cell_type",
     root_note: str = CL_CELL_ROOT_NODE,
-    use_shortest_path: bool = True,
+    use_shortest_path: bool = False,
 ):
     """
     Assign the most granular top-k cell type calls per kNN neighborhood in ``adata.obs``.
@@ -510,7 +510,7 @@ def compute_most_granular_top_k_calls_cluster(
     top_k: int = 3,
     obs_prefix: str = "cas_cell_type",
     root_note: str = CL_CELL_ROOT_NODE,
-    use_shortest_path: bool = True,
+    use_shortest_path: bool = False,
 ):
     top_k_calls_dict = {}
     for k in range(top_k):

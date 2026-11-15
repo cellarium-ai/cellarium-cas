@@ -44,13 +44,13 @@ runs:
       shell: bash
 
     - name: Compute py3.10 ignore list for pip-audit
-      # pillow (fixed in 13.0.0), filelock (4.2.1) and tornado (6.6) advisories
+      # pillow (13.0.0), filelock (4.2.1), tornado (6.6.1) and soupsieve (3.0.2/4.0.0) advisories
       # need Python >=3.11. Only 3.10 resolves the vulnerable releases here, so
       # scope the ignore to 3.10 and keep 3.11/3.12 strict.
       run: |
         if [ "${{ inputs.python-version }}" = "3.10" ]; then
           {
-            echo "PILLOW_IGNORES<<EOF"
+            echo "PY310_IGNORES<<EOF"
             echo "CVE-2026-112390"
             echo "CVE-2026-112391"
             echo "CVE-2026-112393"
@@ -110,10 +110,17 @@ runs:
             echo "PYSEC-2026-4341"
             echo "PYSEC-2026-4342"
             echo "PYSEC-2026-4343"
+            echo "PYSEC-2026-4363"
+            echo "CVE-2026-128066"
+            echo "CVE-2026-128067"
+            echo "CVE-2026-126347"
+            echo "CVE-2026-126190"
+            echo "CVE-2026-126191"
+            echo "CVE-2026-126193"
             echo "EOF"
           } >> "$GITHUB_ENV"
         else
-          echo "PILLOW_IGNORES=" >> "$GITHUB_ENV"
+          echo "PY310_IGNORES=" >> "$GITHUB_ENV"
         fi
       shell: bash
 
@@ -134,7 +141,7 @@ runs:
           CVE-2026-21860
           CVE-2026-27199
           PYSEC-2026-4312
-          ${{ env.PILLOW_IGNORES }}
+          ${{ env.PY310_IGNORES }}
         inputs: |
           requirements/base.txt
           requirements/dev.txt

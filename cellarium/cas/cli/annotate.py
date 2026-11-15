@@ -49,6 +49,7 @@ def annotate(
     output_h5ad: t.Optional[str] = None,
     cluster_label_obs_column: t.Optional[str] = None,
     knn_smoothing: t.Optional[int] = None,
+    use_shortest_path: bool = False,
 ) -> t.Dict[str, t.Any]:
     """
     Annotate a single-cell dataset using the CAS ontology-aware strategy and save outputs to disk.
@@ -79,6 +80,7 @@ def annotate(
     :param knn_smoothing: If provided, run kNN-based score smoothing with this many query-cell neighbors and
         include ``cas_knn_cell_type_*`` columns in ``inferred_labels.csv``. Results are also written to the h5ad
         when ``output_h5ad`` is set.
+    :param use_shortest_path: Rank top-k calls by shortest (True) or longest (False) ontology path depth.
 
     :returns: Dict of paths written:
         ``output_dir``, ``ontology_response_path``, and optionally
@@ -133,6 +135,7 @@ def annotate(
             adata=adata,
             min_acceptable_score=min_acceptable_score,
             top_k=top_k,
+            use_shortest_path=use_shortest_path,
         )
 
     if cluster_label_obs_column is not None:
@@ -142,6 +145,7 @@ def annotate(
             cluster_label_obs_column=cluster_label_obs_column,
             top_k=top_k,
             obs_prefix="cas_cluster_type",
+            use_shortest_path=use_shortest_path,
         )
 
     if knn_smoothing is not None:
@@ -151,6 +155,7 @@ def annotate(
             k_neighbors=knn_smoothing,
             top_k=top_k,
             obs_prefix="cas_knn_cell_type",
+            use_shortest_path=use_shortest_path,
         )
 
     if infer_labels or cluster_label_obs_column is not None or knn_smoothing is not None:
@@ -315,6 +320,13 @@ def annotate(
     type=click.IntRange(min=0),
     help="Run kNN-based CAS score smoothing with this many query-cell neighbors and include results in inferred_labels.csv.",
 )
+@click.option(
+    "--shortest-path/--longest-path",
+    "use_shortest_path",
+    default=False,
+    show_default=True,
+    help="Rank top-k calls by shortest or longest ontology path depth. Used with --infer-labels, --cluster-label, --knn-smoothing.",
+)
 def annotate_command(
     input_path: str,
     output_dir: str,
@@ -335,6 +347,7 @@ def annotate_command(
     output_h5ad: t.Optional[str],
     cluster_label: t.Optional[str],
     knn_smoothing: t.Optional[int],
+    use_shortest_path: bool,
 ) -> None:
     """Annotate a single-cell dataset using the CAS ontology-aware strategy."""
     if cas_api_token is None:
@@ -365,6 +378,7 @@ def annotate_command(
         output_h5ad=output_h5ad,
         cluster_label_obs_column=cluster_label,
         knn_smoothing=knn_smoothing,
+        use_shortest_path=use_shortest_path,
     )
 
     click.echo(f"Saved ontology response → {result['ontology_response_path']}")
