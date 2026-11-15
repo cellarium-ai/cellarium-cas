@@ -48,6 +48,7 @@ Changed
 - ``use_shortest_path`` now defaults to ``False`` (longest-path depth) in ``CASClient.compute_most_granular_top_k_calls_*``, ``get_most_granular_top_k_calls`` and the other postprocessing functions, and in the ``annotate`` CLI.
 - ``CellOntologyCache`` now accepts a precomputed resource dictionary from the backend instead of loading an OWL file; removed ``owlready2`` and ``networkx`` runtime dependencies
 - Per-chunk ``Submitting``/``Received``/``Resubmitting`` messages are replaced by a single ``tqdm`` progress bar (``tqdm.auto``) in all sharded CAS requests. If any chunk fails after all retries, a single ``cellarium.cas.exceptions.IncompleteResultsError`` listing the failed chunks and their last errors is raised instead of returning partial results.
+- The model list is no longer printed on ``CASClient`` initialization; call the new public ``CASClient.print_models()`` to print it (``CASClient.allowed_models_list`` still returns the names).
 - Removed ``owlready2`` and ``networkx`` from ``requirements/base.txt``
 - Increased ``MAX_NUM_REQUESTS_AT_A_TIME`` from 8 to 15
 - Removed ``cas_model_name`` parameter from postprocessing methods; model name is now carried in ``CellTypeOntologyAwareResults.model_name``
