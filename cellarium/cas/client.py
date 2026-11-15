@@ -473,7 +473,8 @@ class CASClient:
                         break
                     else:
                         del errors[chunk_index]
-                        pbar.update(1)
+                        pbar.update(chunk_end_i - chunk_start_i)
+                        pbar.set_postfix_str(f"{pbar.format_dict['elapsed'] / pbar.n * 1000:.1f}s/1000 cells")
                         break
 
         return sharded_request_task
@@ -493,7 +494,13 @@ class CASClient:
             number_of_chunks = self.__get_number_of_chunks(adata, chunk_size=chunk_size)
             results = [[] for _ in range(number_of_chunks)]
             errors: t.Dict[int, str] = {}
-            pbar = tqdm(total=number_of_chunks, desc="Processing chunks", unit="chunk")
+            pbar = tqdm(
+                total=len(adata),
+                desc="Processing cells",
+                unit="cell",
+                unit_scale=True,
+                bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {postfix}]",
+            )
 
             try:
                 for chunk_index in range(number_of_chunks):
