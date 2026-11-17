@@ -21,16 +21,35 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
   Fixed
   ~~~~~
 
-1.8.1 - unreleased
--------------------
+1.9.0 - 2026-11-17
+------------------
 
 Added
 ~~~~~
 - Added ``annotate --shortest-path/--longest-path`` CLI option (and ``use_shortest_path`` argument to ``cellarium.cas.cli.annotate.annotate``) to choose ontology path depth for top-k ranking.
 - Added ``compute_most_granular_top_k_calls_knn`` post-processing strategy, ``CASClient.compute_most_granular_top_k_calls_knn`` convenience method, and ``annotate --knn-smoothing`` CLI option. Keeps single-cell resolution by aggregating each cell's CAS scores over the cell plus its ``k`` nearest query-cell neighbors (instead of a hard Leiden cluster). The neighborhood comes from the scanpy-style kNN graph in ``adata.obsp['distances']``; if absent, it is computed with ``scanpy.pp.neighbors`` (``compute_neighbors_if_missing=True``, the default) on ``adata.X`` or a configurable ``adata.obsm`` key. Neighbor extraction lives in ``get_knn_neighbor_indices``.
+- Added scTab and scimilarity comparators under ``cellarium.cas.benchmarking.comparators`` (prediction, conversion to CAS labels, benchmarking), with shared helpers in ``comparators/shared``.
+- Added public ``CASClient.print_models`` method to print the available models (previously private and called on initialization).
+
+Changed
+~~~~~~~
+- ``use_shortest_path`` now defaults to ``False`` (longest-path depth) in ``CASClient.compute_most_granular_top_k_calls_*``, ``get_most_granular_top_k_calls`` and the other postprocessing functions, and in the ``annotate`` CLI.
+- Per-chunk ``Submitting``/``Received``/``Resubmitting`` messages are replaced by a single ``tqdm`` progress bar (``tqdm.auto``) in all sharded CAS requests. If any chunk fails after all retries, a single ``cellarium.cas.exceptions.IncompleteResultsError`` listing the failed chunks and their last errors is raised instead of returning partial results.
+- The model list is no longer printed on ``CASClient`` initialization; call the new public ``CASClient.print_models()`` to print it (``CASClient.allowed_models_list`` still returns the names).
+- Increased ``MAX_NUM_REQUESTS_AT_A_TIME`` from 15 to 100.
+- Moved ``cellarium.cas.benchmarking.azimuth`` to ``cellarium.cas.benchmarking.comparators.azimuth`` (breaking import/path change).
+
+Fixed
+~~~~~
+- Fixed Azimuth label crosswalk ordering (#135).
+
+1.8.1 - 2026-07-01
+------------------
+
+Added
+~~~~~
 - Added macro precision and recall (``precision_macro``/``recall_macro`` and hierarchical ``h_precision_macro``/``h_recall_macro`` counterparts) to ``compute_f_measure_from_cm`` and ``compute_hierarchical_f_measure_from_cm``, completing the micro/macro/weighted triad for all three averaging strategies. All new columns flow into the benchmarking F-measure CSVs automatically.
 - Added support-weighted precision, recall, and F1 (``precision_weighted``/``recall_weighted``/``f1_weighted`` and hierarchical ``h_*_weighted`` counterparts) to ``compute_f_measure_from_cm`` and ``compute_hierarchical_f_measure_from_cm``; new columns flow into the benchmarking F-measure CSVs.
-
 
 1.8.0 - 2026-04-29
 ------------------
@@ -45,10 +64,7 @@ Added
 
 Changed
 ~~~~~~~
-- ``use_shortest_path`` now defaults to ``False`` (longest-path depth) in ``CASClient.compute_most_granular_top_k_calls_*``, ``get_most_granular_top_k_calls`` and the other postprocessing functions, and in the ``annotate`` CLI.
 - ``CellOntologyCache`` now accepts a precomputed resource dictionary from the backend instead of loading an OWL file; removed ``owlready2`` and ``networkx`` runtime dependencies
-- Per-chunk ``Submitting``/``Received``/``Resubmitting`` messages are replaced by a single ``tqdm`` progress bar (``tqdm.auto``) in all sharded CAS requests. If any chunk fails after all retries, a single ``cellarium.cas.exceptions.IncompleteResultsError`` listing the failed chunks and their last errors is raised instead of returning partial results.
-- The model list is no longer printed on ``CASClient`` initialization; call the new public ``CASClient.print_models()`` to print it (``CASClient.allowed_models_list`` still returns the names).
 - Removed ``owlready2`` and ``networkx`` from ``requirements/base.txt``
 - Increased ``MAX_NUM_REQUESTS_AT_A_TIME`` from 8 to 15
 - Removed ``cas_model_name`` parameter from postprocessing methods; model name is now carried in ``CellTypeOntologyAwareResults.model_name``
