@@ -157,7 +157,7 @@ class CASClient:
         min_acceptable_score: float,
         top_k: int = 3,
         obs_prefix: str = "cas_cell_type",
-        use_shortest_path: bool = True,
+        use_shortest_path: bool = False,
     ) -> None:
         """
         Assign the most granular top-k cell type calls to individual cells in ``adata.obs``.
@@ -189,7 +189,7 @@ class CASClient:
         cluster_label_obs_column: str,
         top_k: int = 3,
         obs_prefix: str = "cas_cell_type",
-        use_shortest_path: bool = True,
+        use_shortest_path: bool = False,
     ) -> None:
         """
         Assign the most granular top-k cell type calls per cluster in ``adata.obs``.
@@ -225,7 +225,7 @@ class CASClient:
         compute_neighbors_if_missing: bool = True,
         top_k: int = 3,
         obs_prefix: str = "cas_knn_cell_type",
-        use_shortest_path: bool = True,
+        use_shortest_path: bool = False,
     ) -> None:
         """
         Assign the most granular top-k cell type calls per kNN neighborhood in ``adata.obs``.

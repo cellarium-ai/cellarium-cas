@@ -99,6 +99,17 @@ it computes one with ``scanpy.pp.neighbors`` by default. Set
 ``compute_neighbors_if_missing=False`` to require a precomputed graph. The graph must
 contain at least ``k_neighbors`` non-self neighbors per cell.
 
+All three methods accept ``use_shortest_path`` (default ``False``). By default calls are ranked
+by longest ontology path depth from the cell root; pass ``use_shortest_path=True`` to rank by
+shortest path depth instead::
+
+    cas.compute_most_granular_top_k_calls_single(
+        adata=adata,
+        min_acceptable_score=0.2,
+        top_k=3,
+        use_shortest_path=True,
+    )
+
 Interactive visualization
 --------------------------
 
