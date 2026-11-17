@@ -13,6 +13,7 @@ from uuid import UUID, uuid4
 import anndata
 from anndata import ImplicitModificationWarning
 from deprecated import deprecated
+from tqdm.auto import tqdm
 
 from cellarium.cas.logging import logger
 from cellarium.cas.service import action_context_manager
@@ -51,9 +52,12 @@ class CASClient:
         `Default:` ``3``
     """
 
-    def __print_models(self, models):
+    def print_models(self) -> None:
+        """
+        Print the list of models available in Cellarium CAS with their descriptions, schemas and embedding dimensions.
+        """
         s = "Allowed model list in Cellarium CAS:\n"
-        for model in models:
+        for model in self.model_objects_list:
             model_name = model["model_name"]
             description = model["description"]
             model_schema = model["schema_name"]
@@ -77,7 +81,7 @@ class CASClient:
             api_token=api_token, api_url=api_url, client_session_id=self.client_session_id
         )
 
-        logger.info(f"Connecting to the Cellarium Cloud backend with session {self.client_session_id}...")
+        logger.info(f"Connecting to the Cellarium CAS server with session {self.client_session_id}...")
         self.user_info = self.cas_api_service.validate_token()
         username = self.user_info["username"]
         self.__print(f"User is {username}")
@@ -100,9 +104,7 @@ class CASClient:
         self._ontology_cache: t.Dict[str, t.Any] = {}
 
         self.num_attempts_per_chunk = num_attempts_per_chunk
-        self.__print(f"Authenticated in Cellarium Cloud v. {application_info['application_version']}")
-
-        self.__print_models(self.model_objects_list)
+        self.__print(f"Authenticated in Cellarium CAS server v. {application_info['application_version']}")
 
         self.print_user_quota()
 
@@ -426,6 +428,8 @@ class CASClient:
         chunk_end_i: int,
         semaphore: asyncio.Semaphore,
         service_request_callback: t.Callable,
+        pbar: tqdm,
+        errors: t.Dict[int, str],
     ) -> t.Callable:
         """
         A wrapper around POST request that handles HTTP and client errors, and resubmits the task if necessary.
@@ -448,34 +452,30 @@ class CASClient:
         async def sharded_request_task(**callback_kwargs):
             async with semaphore:
                 retry_delay = settings.START_RETRY_DELAY
+                errors[chunk_index] = "no attempts made"
 
                 for _ in range(self.num_attempts_per_chunk):
                     try:
                         results[chunk_index] = await service_request_callback(**callback_kwargs)
 
                     except (exceptions.HTTPError5XX, exceptions.HTTPClientError) as e:
-                        self.__print(str(e))
-                        self.__print(
-                            f"Resubmitting chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, "
-                            f"{chunk_end_i:5.0f}) to CAS ..."
-                        )
+                        errors[chunk_index] = str(e)
                         await asyncio.sleep(retry_delay)
                         retry_delay = min(retry_delay * 2, settings.MAX_RETRY_DELAY)
                         continue
                     except exceptions.HTTPError401:
-                        self.__print("Unauthorized token. Please check your API token or request a new one.")
+                        errors[chunk_index] = "Unauthorized token. Please check your API token or request a new one."
                         break
                     except exceptions.HTTPError403 as e:
-                        self.__print(str(e))
+                        errors[chunk_index] = str(e)
                         break
                     except Exception as e:
-                        self.__print(f"Unexpected error: {e.__class__.__name__}; Message: {str(e)}")
+                        errors[chunk_index] = f"Unexpected error: {e.__class__.__name__}; Message: {str(e)}"
                         break
                     else:
-                        self.__print(
-                            f"Received the result for cell chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, "
-                            f"{chunk_end_i:5.0f}) ..."
-                        )
+                        del errors[chunk_index]
+                        pbar.update(chunk_end_i - chunk_start_i)
+                        pbar.set_postfix_str(f"{pbar.format_dict['elapsed'] / pbar.n * 1000:.1f}s/1000 cells")
                         break
 
         return sharded_request_task
@@ -494,33 +494,48 @@ class CASClient:
             semaphore = asyncio.Semaphore(settings.MAX_NUM_REQUESTS_AT_A_TIME)
             number_of_chunks = self.__get_number_of_chunks(adata, chunk_size=chunk_size)
             results = [[] for _ in range(number_of_chunks)]
+            errors: t.Dict[int, str] = {}
+            pbar = tqdm(
+                total=len(adata),
+                desc="Processing cells",
+                unit="cell",
+                unit_scale=True,
+                bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {postfix}]",
+            )
 
-            for chunk_index in range(number_of_chunks):
-                chunk = adata[i:j, :]
-                chunk_start_i = i
-                chunk_end_i = i + len(chunk)
-                self.__print(
-                    f"Submitting cell chunk #{chunk_index + 1:2.0f} ({chunk_start_i:5.0f}, {chunk_end_i:5.0f}) "
-                    f"to CAS ..."
-                )
+            try:
+                for chunk_index in range(number_of_chunks):
+                    chunk = adata[i:j, :]
+                    chunk_start_i = i
+                    chunk_end_i = i + len(chunk)
 
-                chunk_bytes = _io.adata_to_bytes(adata=chunk)
-                async_sharded_request_callback = self.__get_async_sharded_request_callback(
-                    results=results,
-                    chunk_index=chunk_index,
-                    chunk_start_i=chunk_start_i,
-                    chunk_end_i=chunk_end_i,
-                    semaphore=semaphore,
-                    service_request_callback=request_callback,
-                )
-                async_sharded_request_task = asyncio.create_task(
-                    async_sharded_request_callback(adata_bytes=chunk_bytes, **request_callback_kwargs)
-                )
-                tasks.append(async_sharded_request_task)
-                i = j
-                j += chunk_size
+                    chunk_bytes = _io.adata_to_bytes(adata=chunk)
+                    async_sharded_request_callback = self.__get_async_sharded_request_callback(
+                        results=results,
+                        chunk_index=chunk_index,
+                        chunk_start_i=chunk_start_i,
+                        chunk_end_i=chunk_end_i,
+                        semaphore=semaphore,
+                        service_request_callback=request_callback,
+                        pbar=pbar,
+                        errors=errors,
+                    )
+                    async_sharded_request_task = asyncio.create_task(
+                        async_sharded_request_callback(adata_bytes=chunk_bytes, **request_callback_kwargs)
+                    )
+                    tasks.append(async_sharded_request_task)
+                    i = j
+                    j += chunk_size
 
-            await asyncio.wait(tasks)
+                await asyncio.wait(tasks)
+            finally:
+                pbar.close()
+
+            if errors:
+                details = "; ".join(f"chunk #{k + 1}: {v}" for k, v in sorted(errors.items()))
+                raise exceptions.IncompleteResultsError(
+                    f"{len(errors)} of {number_of_chunks} chunks failed and results are incomplete. {details}"
+                )
             return functools.reduce(operator.iconcat, results, [])
 
         return asyncio.run(sharded_request())
