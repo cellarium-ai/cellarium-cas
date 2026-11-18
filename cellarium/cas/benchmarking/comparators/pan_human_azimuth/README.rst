@@ -91,14 +91,24 @@ Each accepted input gets one directory containing:
 one refined annotation, not ranked alternatives. The refined levels have no native
 confidence. ``final_level_confidence`` belongs only to ``final_level_labels``, which
 can differ from ``azimuth_fine``. No scores or ranks are synthesized.
+Missing refined levels
+----------------------
 
-Blank levels
-------------
+A level can be missing for a cell in two ways: it is blank (for example ``azimuth_medium`` for a
+``ProB cell``), or it holds the literal ``False``, which is what the package writes when its
+refinement cannot produce a consistent hierarchy for that cell. Both count as missing.
 
-If the model leaves a level blank for a cell (for example ``azimuth_medium`` for a ``ProB cell``),
-the blank is filled from the nearest finer level, else the nearest coarser one (fine, then medium,
-then broad). It is written to the predictions CSV, so those columns are no longer the package's
-unmodified output for such cells. A cell with no label at any level fails the dataset.
+- A cell with some levels present is filled from the nearest finer level, else the nearest coarser
+  one (columns run fine, medium, broad).
+- A cell with all three levels missing falls back to ``final_level_labels``, which holds the model's
+  most specific label for the cell and is written to all three ranks.
+- A cell with no label at any level, including an unusable ``final_level_labels``, fails the dataset.
+
+Cells are written to the predictions CSV with the fill applied, so those columns are no longer the
+package's unmodified output for such cells. The conversion helper applies the same rule, so
+prediction CSVs written before the fill existed (``False`` left in place) convert correctly too.
+
+In the two test extracts, roughly 11-13% of cells hit the ``False`` case.
 
 Unassigned cells
 ----------------

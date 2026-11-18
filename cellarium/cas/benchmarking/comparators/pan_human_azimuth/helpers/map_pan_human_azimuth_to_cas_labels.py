@@ -13,6 +13,8 @@ from cellarium.cas.benchmarking.comparators.shared.crosswalk import load_crosswa
 from cellarium.cas.postprocessing.cell_ontology.cell_ontology_cache import CellOntologyCache
 
 UNASSIGNED = "Unassigned"  # same literal as run.py; not imported so the mapper stays free of run.py's deps
+# panhumanpy writes this into the refined level columns when it cannot refine a cell's hierarchy.
+REFINEMENT_FAILED = "False"
 MODEL_NAME = "pan_human_azimuth_v1"
 # Rank 1 = most granular, matching the CAS convention and the existing Azimuth comparator.
 LEVEL_COLUMNS = ("azimuth_fine", "azimuth_medium", "azimuth_broad")
@@ -25,6 +27,16 @@ def _vendor_map_path() -> Path:
     if spec is None or not spec.submodule_search_locations:
         raise ValueError("panhumanpy is not installed; pass vendor_map_csv_path.")
     return Path(spec.submodule_search_locations[0]) / "_tools" / "v1" / "cell_ontology_map" / "cell_ontology_map.csv"
+
+
+def _unusable_labels(labels: pd.DataFrame | pd.Series, *, missing: tuple[str, ...]) -> pd.DataFrame | pd.Series:
+    """Return a boolean mask of labels that carry no cell type: NaN or one of *missing* after stripping.
+
+    Kept local (rather than imported from ``run.py``) so the mapper stays free of run.py's runtime deps.
+    """
+    text = labels.astype(str)
+    stripped = text.str.strip() if isinstance(text, pd.Series) else text.apply(lambda col: col.str.strip())
+    return labels.isna() | stripped.isin(missing)
 
 
 def map_pan_human_azimuth_to_cas_labels(
@@ -72,10 +84,19 @@ def map_pan_human_azimuth_to_cas_labels(
             f"{len(missing_barcodes)} barcodes in the H5AD are missing from the predictions CSV: "
             f"{sorted(missing_barcodes)[:5]}"
         )
-    levels = predictions.loc[obs_names, list(LEVEL_COLUMNS)].astype(str)
+    levels = predictions.loc[obs_names, list(LEVEL_COLUMNS)].astype(str).astype(object)
     # A cell the model left ``Unassigned`` at any level has no prediction: empty (NaN) at every rank.
-    levels = levels.astype(object)
-    levels.loc[(levels == UNASSIGNED).any(axis=1)] = None
+    unassigned = (levels == UNASSIGNED).any(axis=1)
+    # ``False`` marks a refinement panhumanpy could not perform. A cell left without any refined level
+    # falls back to ``final_level_labels``, mirroring run.py for CSVs written before that fill existed.
+    levels = levels.mask(_unusable_labels(levels, missing=("", REFINEMENT_FAILED, UNASSIGNED)))
+    fallback = predictions["final_level_labels"].astype(object) if "final_level_labels" in predictions else None
+    if fallback is not None:
+        fallback = fallback.mask(_unusable_labels(fallback, missing=("", REFINEMENT_FAILED, UNASSIGNED)))
+        no_refined_level = levels.isna().all(axis=1) & ~unassigned
+        levels.loc[no_refined_level, list(LEVEL_COLUMNS)] = fallback[no_refined_level].to_numpy()[:, None]
+    levels.loc[unassigned, list(LEVEL_COLUMNS)] = None
+    levels = levels.ffill(axis=1).bfill(axis=1)
 
     vendor = pd.read_csv(vendor_map_csv_path or _vendor_map_path())
     for col in (VENDOR_LABEL_COL, VENDOR_CL_ID_COL, VENDOR_CL_LABEL_COL):

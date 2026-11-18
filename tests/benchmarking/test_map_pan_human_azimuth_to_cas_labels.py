@@ -109,3 +109,24 @@ def test_unassigned_cell_gets_empty_labels_at_every_rank(tmp_path):
     assert labels.loc["cell2"].isna().all()
     assert labels.loc["cell1", "cas_cell_type_name_1"] == "CL:0000002"
     assert json.loads(open(result["ontology_response_path"]).read())["data"][0]["matches"] == []
+
+
+def test_refinement_failure_uses_final_level_labels(tmp_path):
+    predictions = {level: {**cells, "cell2": "False"} for level, cells in PREDICTIONS.items()}
+    predictions["final_level_labels"] = {"cell1": "x", "cell2": "top"}
+
+    result = _convert(tmp_path, predictions=predictions)
+
+    labels = pd.read_csv(result["inferred_labels_path"], index_col=0)
+    assert labels.loc["cell2", "cas_cell_type_name_1"] == "CL:0000003"
+    assert labels.loc["cell2", "cas_cell_type_name_3"] == "CL:0000003"
+
+
+def test_unassigned_wins_over_final_level_labels(tmp_path):
+    predictions = {level: {**cells, "cell2": "Unassigned"} for level, cells in PREDICTIONS.items()}
+    predictions["final_level_labels"] = {"cell1": "x", "cell2": "Unassigned"}
+
+    result = _convert(tmp_path, predictions=predictions)
+
+    labels = pd.read_csv(result["inferred_labels_path"], index_col=0)
+    assert labels.loc["cell2"].isna().all()

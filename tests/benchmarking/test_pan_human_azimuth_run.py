@@ -151,7 +151,7 @@ def test_validate_native_reorders_and_checks_barcodes_and_columns():
     with pytest.raises(ValueError, match="missing columns"):
         run._validate_native(cells_meta=no_confidence, barcodes=barcodes)
     empty = native.copy()
-    empty.loc["b", list(run.LEVEL_COLUMNS)] = ""
+    empty.loc["b", [*run.LEVEL_COLUMNS, "final_level_labels"]] = ""
     with pytest.raises(ValueError, match="no label at any level"):
         run._validate_native(cells_meta=empty, barcodes=barcodes)
 
@@ -260,3 +260,16 @@ def test_unassigned_cells_do_not_fail_dataset_and_are_counted(tmp_path, fake_mod
     predictions = pd.read_csv(tmp_path / "o_s" / run.PREDICTIONS_FILENAME, index_col=0)
     assert predictions.loc["b", "azimuth_fine"] == "Unassigned"
     assert stats[0]["n_unassigned"] == 1
+
+
+def test_refinement_failure_falls_back_to_final_level_labels():
+    barcodes = pd.Index(["a", "b", "c"])
+    native = _native(barcodes=barcodes)
+    native.loc["a", ["azimuth_fine", "azimuth_medium", "azimuth_broad"]] = "False"
+    native.loc["a", "final_level_labels"] = "Treg cell"
+    native.loc["b", "azimuth_medium"] = "False"  # one missing level: fill from the finer one, not the fallback
+
+    filled = run._validate_native(cells_meta=native, barcodes=barcodes)
+
+    assert filled.loc["a", list(run.LEVEL_COLUMNS)].tolist() == ["Treg cell"] * 3
+    assert filled.loc["b", list(run.LEVEL_COLUMNS)].tolist() == ["Fine", "Fine", "Broad"]

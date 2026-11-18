@@ -27,6 +27,8 @@ NATIVE_COLUMNS = (
     "full_consistent_hierarchy",
 )
 UNASSIGNED = "Unassigned"
+# panhumanpy writes this into the refined level columns when it cannot refine a cell's hierarchy.
+REFINEMENT_FAILED = "False"
 TARGET_SUM = 10_000
 
 
@@ -150,6 +152,18 @@ def _annotate(*, prepared: anndata.AnnData, batch_size: int) -> pd.DataFrame:
     return azimuth.cells_meta
 
 
+def _unusable_labels(labels: pd.DataFrame | pd.Series, *, missing: tuple[str, ...]) -> pd.DataFrame | pd.Series:
+    """Return a boolean mask of labels that carry no cell type: NaN or one of *missing* after stripping.
+
+    :param labels: Native label columns to inspect, as object dtype.
+    :param missing: Treat these stripped literal values as absent.
+    :returns: Return a boolean mask aligned to *labels*.
+    """
+    text = labels.astype(str)
+    stripped = text.str.strip() if isinstance(text, pd.Series) else text.apply(lambda col: col.str.strip())
+    return labels.isna() | stripped.isin(missing)
+
+
 def _validate_native(*, cells_meta: pd.DataFrame, barcodes: pd.Index) -> pd.DataFrame:
     """Align native metadata to input barcodes and fill blank levels.
 
@@ -176,9 +190,14 @@ def _validate_native(*, cells_meta: pd.DataFrame, barcodes: pd.Index) -> pd.Data
     native.index = index
     native = native.reindex(barcodes)
     # Fill a blank level from the nearest finer level, else the nearest coarser one (columns run
-    # fine -> medium -> broad). Only cells with no label at any level are rejected.
+    # fine -> medium -> broad). ``False`` marks a refinement the package could not perform, so it
+    # counts as missing. A cell with none of the three levels falls back to ``final_level_labels``.
     levels = native[list(LEVEL_COLUMNS)].astype(object)
-    levels = levels.mask(levels.isna() | (levels.astype(str).apply(lambda col: col.str.strip()) == ""))
+    levels = levels.mask(_unusable_labels(levels, missing=("", REFINEMENT_FAILED)))
+    no_refined_level = levels.isna().all(axis=1)
+    fallback = native["final_level_labels"].astype(object)
+    fallback = fallback.mask(_unusable_labels(fallback, missing=("", REFINEMENT_FAILED, UNASSIGNED)))
+    levels.loc[no_refined_level, list(LEVEL_COLUMNS)] = fallback[no_refined_level].to_numpy()[:, None]
     levels = levels.ffill(axis=1).bfill(axis=1)
     if levels.isna().any(axis=None):
         raise ValueError("Native annotations contain cells with no label at any level.")
