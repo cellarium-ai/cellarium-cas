@@ -1,4 +1,5 @@
 import typing as t
+import warnings
 
 import anndata
 import numpy as np
@@ -7,6 +8,8 @@ import scipy.sparse as sp
 
 from cellarium.cas import constants
 from cellarium.cas.preprocessing import callbacks
+
+MIN_FEATURE_OVERLAP_WARNING = 0.5
 
 
 def _get_adata_var_index_or_by_column(adata: anndata.AnnData, var_column_name: str) -> t.List[str]:
@@ -61,6 +64,20 @@ def sanitize(
     cas_feature_schema_set = set(cas_feature_schema_list)
     adata_feature_schema_set = set(adata_feature_schema_list)
     feature_id_intersection = adata_feature_schema_set.intersection(cas_feature_schema_set)
+    if not feature_id_intersection:
+        raise ValueError(
+            "None of the input features match the CAS feature schema. Check that `feature_ids_column_name` "
+            "points to Ensembl gene ids that conform to the schema of the selected model."
+        )
+    overlap = len(feature_id_intersection) / len(cas_feature_schema_list)
+    if overlap < MIN_FEATURE_OVERLAP_WARNING:
+        warnings.warn(
+            f"Only {overlap:.1%} of the CAS feature schema ({len(feature_id_intersection)} of "
+            f"{len(cas_feature_schema_list)} features) is present in the input data. "
+            f"Annotation quality may be poor.",
+            UserWarning,
+            stacklevel=2,
+        )
 
     cas_feature_id_map = {feature_id: index for index, feature_id in enumerate(cas_feature_schema_list)}
     adata_feature_id_map = {feature_id: index for index, feature_id in enumerate(adata_feature_schema_list)}
