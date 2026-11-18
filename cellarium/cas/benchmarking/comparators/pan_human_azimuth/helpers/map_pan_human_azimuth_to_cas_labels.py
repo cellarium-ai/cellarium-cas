@@ -18,7 +18,7 @@ REFINEMENT_FAILED = "False"
 MODEL_NAME = "pan_human_azimuth_v1"
 # Rank 1 = most granular, matching the CAS convention and the existing Azimuth comparator.
 LEVEL_COLUMNS = ("azimuth_fine", "azimuth_medium", "azimuth_broad")
-VENDOR_LABEL_COL, VENDOR_CL_ID_COL, VENDOR_CL_LABEL_COL = "Annotation_Label", "CL_ID", "CL_Label"
+VENDOR_LABEL_COL, VENDOR_CL_ID_COL = "Annotation_Label", "CL_ID"
 
 
 def _vendor_map_path() -> Path:
@@ -49,14 +49,15 @@ def map_pan_human_azimuth_to_cas_labels(
     crosswalk_csv_path: str | None = None,
     crosswalk_source_cl_id_col: str | None = None,
     crosswalk_target_cl_id_col: str | None = None,
-    crosswalk_cl_label_col: str | None = None,
 ) -> dict[str, str]:
     """Convert Pan-Human Azimuth predictions into CAS labels and metadata.
 
     Native labels map to Cell Ontology ids through the vendor's own table. An optional crosswalk then
     translates those CL ids to the benchmark ontology's ids; ids absent from it pass through unchanged.
-    Rank 1, 2, 3 are ``azimuth_fine``, ``azimuth_medium``, ``azimuth_broad``. Refined levels have no native
-    confidence, so ``cas_cell_type_score_k`` is left empty rather than invented.
+    Rank 1, 2, 3 are ``azimuth_fine``, ``azimuth_medium``, ``azimuth_broad``. Refined levels have no
+    native confidence, so every rank's ``cas_cell_type_score_k`` carries ``final_level_confidence``
+    (the model's confidence in ``final_level_labels``), or is empty when that column is absent.
+    ``Unassigned`` cells keep every column empty.
 
     :param predictions_csv_path: Read ``pan_human_azimuth_predictions.csv`` from this path.
     :param h5ad_path: Read source observations and their order from this H5AD.
@@ -67,7 +68,6 @@ def map_pan_human_azimuth_to_cas_labels(
     :param crosswalk_csv_path: Optionally translate vendor CL ids to benchmark CL ids using this CSV.
     :param crosswalk_source_cl_id_col: Read vendor CL ids from this crosswalk column.
     :param crosswalk_target_cl_id_col: Read benchmark CL ids from this crosswalk column.
-    :param crosswalk_cl_label_col: Read display labels for the target ids from this optional column.
 
     :raises ValueError: If barcodes, columns, labels, or Cell Ontology IDs are invalid.
     :returns: Return paths to inferred labels and metadata.
@@ -99,11 +99,10 @@ def map_pan_human_azimuth_to_cas_labels(
     levels = levels.ffill(axis=1).bfill(axis=1)
 
     vendor = pd.read_csv(vendor_map_csv_path or _vendor_map_path())
-    for col in (VENDOR_LABEL_COL, VENDOR_CL_ID_COL, VENDOR_CL_LABEL_COL):
+    for col in (VENDOR_LABEL_COL, VENDOR_CL_ID_COL):
         if col not in vendor.columns:
             raise ValueError(f"Column '{col}' not found in vendor map. Available columns: {list(vendor.columns)}")
     label_to_cl = dict(zip(vendor[VENDOR_LABEL_COL].astype(str), vendor[VENDOR_CL_ID_COL].astype(str)))
-    cl_to_label = dict(zip(vendor[VENDOR_CL_ID_COL].astype(str), vendor[VENDOR_CL_LABEL_COL].astype(str)))
 
     labels = set(levels.stack().dropna())
     unmapped = sorted(labels - set(label_to_cl))
@@ -115,28 +114,27 @@ def map_pan_human_azimuth_to_cas_labels(
     if crosswalk_csv_path is not None:
         if crosswalk_source_cl_id_col is None or crosswalk_target_cl_id_col is None:
             raise ValueError("crosswalk_source_cl_id_col and crosswalk_target_cl_id_col are required with a crosswalk.")
-        cl_translation, cl_translation_labels = load_crosswalk_maps(
+        cl_translation, _ = load_crosswalk_maps(
             crosswalk_csv_path=crosswalk_csv_path,
             crosswalk_label_col=crosswalk_source_cl_id_col,
             crosswalk_cl_id_col=crosswalk_target_cl_id_col,
-            crosswalk_cl_label_col=crosswalk_cl_label_col,
+            crosswalk_cl_label_col=None,
         )
     else:
-        cl_translation, cl_translation_labels = {}, {}
+        cl_translation = {}
+
+    ontology_cache = CellOntologyCache(json.load(open(ontology_resource_path)))
 
     def final_id(label: str) -> str:
         vendor_id = label_to_cl[label]
         return cl_translation.get(vendor_id, vendor_id)
 
     def final_label(label: str) -> str:
-        vendor_id = label_to_cl[label]
-        if vendor_id in cl_translation:
-            return cl_translation_labels.get(vendor_id, cl_translation[vendor_id])
-        return cl_to_label[vendor_id]
+        # The display label is the ontology's own name for the id, matching the other comparators.
+        cl_id = final_id(label)
+        return ontology_cache.cl_names_to_labels_map.get(cl_id, cl_id)
 
-    with open(ontology_resource_path) as file:
-        known_cl_ids = set(CellOntologyCache(json.load(file)).cl_names_to_idx_map)
-    non_ontology = sorted({final_id(label) for label in labels} - known_cl_ids)
+    non_ontology = sorted({final_id(label) for label in labels} - set(ontology_cache.cl_names_to_idx_map))
     if non_ontology:
         raise ValueError(
             f"CL ids absent from the ontology resource: {non_ontology[:20]} ({len(non_ontology)}); "
@@ -144,10 +142,17 @@ def map_pan_human_azimuth_to_cas_labels(
         )
 
     out = pd.DataFrame(index=pd.Index(obs_names, name=None))
+    # The model reports one confidence, for ``final_level_labels``. Refined levels carry none, so that
+    # single value is written to every rank rather than inventing a per-level score.
+    if "final_level_confidence" in predictions.columns:
+        confidence = predictions.loc[obs_names, "final_level_confidence"].astype(object)
+    else:
+        confidence = pd.Series(float("nan"), index=obs_names)
+    confidence = confidence.mask(unassigned.to_numpy())
     for rank, column in enumerate(LEVEL_COLUMNS, start=1):
         out[f"cas_cell_type_label_{rank}"] = levels[column].map(final_label, na_action="ignore")
         out[f"cas_cell_type_name_{rank}"] = levels[column].map(final_id, na_action="ignore")
-        out[f"cas_cell_type_score_{rank}"] = float("nan")
+        out[f"cas_cell_type_score_{rank}"] = confidence
     ranks = range(1, len(LEVEL_COLUMNS) + 1)
     out = out[[f"cas_cell_type_{kind}_{rank}" for kind in ("label", "name", "score") for rank in ranks]]
 

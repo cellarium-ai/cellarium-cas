@@ -21,7 +21,6 @@ def pan_human_azimuth_to_cas_annotation(
     crosswalk_csv_path: str | None = None,
     crosswalk_source_cl_id_col: str | None = None,
     crosswalk_target_cl_id_col: str | None = None,
-    crosswalk_cl_label_col: str | None = None,
 ) -> dict[str, str]:
     """Build four CAS annotation files from Pan-Human Azimuth predictions.
 
@@ -33,7 +32,6 @@ def pan_human_azimuth_to_cas_annotation(
     :param crosswalk_csv_path: Optionally translate vendor CL ids to benchmark CL ids using this CSV.
     :param crosswalk_source_cl_id_col: Read vendor CL ids from this crosswalk column.
     :param crosswalk_target_cl_id_col: Read benchmark CL ids from this crosswalk column.
-    :param crosswalk_cl_label_col: Read display labels for the target ids from this optional column.
 
     :raises ValueError: If source predictions cannot map to valid Cell Ontology IDs.
     :returns: Return paths to all four CAS annotation files.
@@ -47,7 +45,6 @@ def pan_human_azimuth_to_cas_annotation(
         crosswalk_csv_path=crosswalk_csv_path,
         crosswalk_source_cl_id_col=crosswalk_source_cl_id_col,
         crosswalk_target_cl_id_col=crosswalk_target_cl_id_col,
-        crosswalk_cl_label_col=crosswalk_cl_label_col,
     )
     build_ontology_response(
         inferred_labels_path=labels_result["inferred_labels_path"],

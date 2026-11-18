@@ -38,7 +38,6 @@ def _convert(tmp_path, *, predictions=PREDICTIONS, vendor=VENDOR, crosswalk=None
             crosswalk_csv_path=str(tmp_path / "x.csv"),
             crosswalk_source_cl_id_col="old_cl",
             crosswalk_target_cl_id_col="new_cl",
-            crosswalk_cl_label_col="new_label",
         )
     return pan_human_azimuth_to_cas_annotation(
         predictions_csv_path=str(tmp_path / "p.csv"),
@@ -63,7 +62,7 @@ def test_without_crosswalk_vendor_cl_ids_are_used_as_ranks_fine_first(tmp_path):
         "CL:0000002",
         "CL:0000003",
     ]
-    assert labels.loc["cell2", "cas_cell_type_label_1"] == "vendor_b"
+    assert labels.loc["cell2", "cas_cell_type_label_1"] == "child_b"
     assert labels[[f"cas_cell_type_score_{k}" for k in (1, 2, 3)]].isna().all().all()
     assert json.loads((tmp_path / "out" / "metadata.json").read_text())["model_name"] == "pan_human_azimuth_v1"
     assert (tmp_path / "out" / "ontology_response.json").is_file()
@@ -76,9 +75,9 @@ def test_crosswalk_translates_listed_cl_ids_and_passes_others_through(tmp_path):
 
     labels = pd.read_csv(result["inferred_labels_path"], index_col=0)
     assert labels.loc["cell1", "cas_cell_type_name_1"] == "CL:0000003"
-    assert labels.loc["cell1", "cas_cell_type_label_1"] == "renamed"
+    assert labels.loc["cell1", "cas_cell_type_label_1"] == "child_b"  # ontology name, not a crosswalk label
     assert labels.loc["cell2", "cas_cell_type_name_1"] == "CL:0000003"
-    assert labels.loc["cell2", "cas_cell_type_label_1"] == "vendor_b"
+    assert labels.loc["cell2", "cas_cell_type_label_1"] == "child_b"
 
 
 def test_rejects_labels_missing_from_vendor_map(tmp_path):
@@ -130,3 +129,22 @@ def test_unassigned_wins_over_final_level_labels(tmp_path):
 
     labels = pd.read_csv(result["inferred_labels_path"], index_col=0)
     assert labels.loc["cell2"].isna().all()
+
+
+def test_confidence_is_written_to_every_rank(tmp_path):
+    predictions = {level: dict(cells) for level, cells in PREDICTIONS.items()}
+    predictions["final_level_confidence"] = {"cell1": 0.25, "cell2": 0.75}
+
+    result = _convert(tmp_path, predictions=predictions)
+
+    labels = pd.read_csv(result["inferred_labels_path"], index_col=0)
+    for k in (1, 2, 3):
+        assert labels.loc["cell1", f"cas_cell_type_score_{k}"] == 0.25
+        assert labels.loc["cell2", f"cas_cell_type_score_{k}"] == 0.75
+
+
+def test_scores_are_empty_without_a_confidence_column_or_a_prediction(tmp_path):
+    result = _convert(tmp_path)
+
+    labels = pd.read_csv(result["inferred_labels_path"], index_col=0)
+    assert labels[[f"cas_cell_type_score_{k}" for k in (1, 2, 3)]].isna().all().all()

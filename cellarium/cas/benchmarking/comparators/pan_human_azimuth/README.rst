@@ -90,7 +90,9 @@ Each accepted input gets one directory containing:
 ``azimuth_fine``, ``azimuth_medium``, and ``azimuth_broad`` are three resolutions of
 one refined annotation, not ranked alternatives. The refined levels have no native
 confidence. ``final_level_confidence`` belongs only to ``final_level_labels``, which
-can differ from ``azimuth_fine``. No scores or ranks are synthesized.
+can differ from ``azimuth_fine``; it equals the fine level for about 52% of the cells in the test
+extracts and the medium level for about 56%. No ranks are synthesized, and the only score carried
+through is ``final_level_confidence``.
 Missing refined levels
 ----------------------
 
@@ -169,19 +171,21 @@ no translation is needed)::
         crosswalk_csv_path="/data/cl_crosswalk.csv",
         crosswalk_source_cl_id_col="old_cl",
         crosswalk_target_cl_id_col="new_cl",
-        crosswalk_cl_label_col="new_label",
     )
 
 The helper writes ``inferred_labels.csv`` with three ranks, as in the existing
 Azimuth comparator: rank 1 = ``azimuth_fine``, rank 2 = ``azimuth_medium``,
 rank 3 = ``azimuth_broad`` (label, name, and score columns, rows in H5AD order).
 Ranks are granularity levels, not alternative guesses; a parent term can repeat
-a child's term and is kept. Refined levels have no native confidence, so
-``cas_cell_type_score_k`` is empty, not invented. It also writes ``metadata.json``
+a child's term and is kept. Refined levels have no native confidence, so every rank's
+``cas_cell_type_score_k`` carries ``final_level_confidence``, the model's confidence in
+``final_level_labels``. It is one value per cell, not a per-level score. ``cas_cell_type_name_k`` holds the Cell Ontology
+id and ``cas_cell_type_label_k`` its official name from the ontology resource, as in the other
+comparators (the vendor table's own label strings are not used). It also writes ``metadata.json``
 (model group ``pan_human_azimuth_v1``), ``ontology_response.json``, and
 ``ontology_resource.json``. It rejects missing barcodes, labels absent from the vendor table, and
-ontology terms. A cell that is ``Unassigned`` at any level gets empty ``cas_cell_type_label_k``,
-``cas_cell_type_name_k`` and ``cas_cell_type_score_k`` at every rank, and an empty ontology response
-entry. ``cellarium-cas benchmark`` leaves such cells out and lists them in ``missing_predictions.csv``.
-ontology terms. Benchmark with ``--inferred-label cas_cell_type_name_1`` and
+CL ids absent from the ontology resource. A cell that is ``Unassigned`` at any level gets empty
+``cas_cell_type_label_k``, ``cas_cell_type_name_k`` and ``cas_cell_type_score_k`` at every rank, and
+an empty ontology response entry. ``cellarium-cas benchmark`` leaves such cells out and lists them in
+``missing_predictions.csv``. Benchmark with ``--inferred-label cas_cell_type_name_1`` and
 ``--f-measure-top-k 3``.
