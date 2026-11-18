@@ -119,22 +119,15 @@ def test_empty_and_duplicate_barcode_inputs_rejected():
         run._prepare_dataset(adata=dup_barcodes)
 
 
-def test_unassigned_in_any_level_rejects_dataset_with_bounded_unique_diagnostics():
-    barcodes = pd.Index([f"bc{i}" for i in range(8)])
+def test_unassigned_is_kept_as_returned_by_the_model():
+    barcodes = pd.Index(["a", "b"])
     native = _native(barcodes=barcodes)
-    native.loc[barcodes[:7], "azimuth_fine"] = "Unassigned"
-    native.loc[barcodes[:2], "azimuth_broad"] = "Unassigned"  # same cells, counted once
+    native.loc["a", list(run.LEVEL_COLUMNS)] = "Unassigned"
 
-    with pytest.raises(ValueError) as error:
-        run._validate_native(cells_meta=native, barcodes=barcodes, input_h5ad="in.h5ad")
+    kept = run._validate_native(cells_meta=native, barcodes=barcodes)
 
-    assert str(error.value) == (
-        "Pan-Human Azimuth produced Unassigned annotations for 7 cells in 'in.h5ad' "
-        "(first 5 barcodes): ['bc0', 'bc1', 'bc2', 'bc3', 'bc4']"
-    )
-    only_broad = _native(barcodes=barcodes, broad="Unassigned")
-    with pytest.raises(ValueError, match="for 8 cells"):
-        run._validate_native(cells_meta=only_broad, barcodes=barcodes, input_h5ad="in.h5ad")
+    assert kept.loc["a", list(run.LEVEL_COLUMNS)].tolist() == ["Unassigned"] * 3
+    assert kept.loc["b", list(run.LEVEL_COLUMNS)].tolist() == ["Fine", "Medium", "Broad"]
 
 
 def test_validate_native_reorders_and_checks_barcodes_and_columns():
@@ -142,25 +135,25 @@ def test_validate_native_reorders_and_checks_barcodes_and_columns():
     native = _native(barcodes=barcodes)
     native["azimuth_fine"] = ["fa", "fb", "fc"]
 
-    aligned = run._validate_native(cells_meta=native.iloc[::-1], barcodes=barcodes, input_h5ad="x")
+    aligned = run._validate_native(cells_meta=native.iloc[::-1], barcodes=barcodes)
     assert aligned.index.tolist() == ["a", "b", "c"]
     assert aligned["azimuth_fine"].tolist() == ["fa", "fb", "fc"]
 
     with pytest.raises(ValueError, match="1 missing"):
-        run._validate_native(cells_meta=native.iloc[:2], barcodes=barcodes, input_h5ad="x")
+        run._validate_native(cells_meta=native.iloc[:2], barcodes=barcodes)
     extra = pd.concat([native, _native(barcodes=["d"])])
     with pytest.raises(ValueError, match="1 unexpected"):
-        run._validate_native(cells_meta=extra, barcodes=barcodes, input_h5ad="x")
+        run._validate_native(cells_meta=extra, barcodes=barcodes)
     dup = pd.concat([native, native.iloc[:1]])
     with pytest.raises(ValueError, match="duplicate"):
-        run._validate_native(cells_meta=dup, barcodes=barcodes, input_h5ad="x")
+        run._validate_native(cells_meta=dup, barcodes=barcodes)
     no_confidence = native.drop(columns="final_level_confidence")
     with pytest.raises(ValueError, match="missing columns"):
-        run._validate_native(cells_meta=no_confidence, barcodes=barcodes, input_h5ad="x")
+        run._validate_native(cells_meta=no_confidence, barcodes=barcodes)
     empty = native.copy()
     empty.loc["b", list(run.LEVEL_COLUMNS)] = ""
     with pytest.raises(ValueError, match="no label at any level"):
-        run._validate_native(cells_meta=empty, barcodes=barcodes, input_h5ad="x")
+        run._validate_native(cells_meta=empty, barcodes=barcodes)
 
 
 def test_blank_levels_filled_from_nearest_finer_else_coarser():
@@ -170,7 +163,7 @@ def test_blank_levels_filled_from_nearest_finer_else_coarser():
     native["azimuth_medium"] = ["", "m", "m", ""]
     native["azimuth_broad"] = ["b", "b", "b", ""]
 
-    filled = run._validate_native(cells_meta=native, barcodes=barcodes, input_h5ad="x")
+    filled = run._validate_native(cells_meta=native, barcodes=barcodes)
 
     assert filled["azimuth_fine"].tolist() == ["f", "f", "m", "f"]
     assert filled["azimuth_medium"].tolist() == ["f", "m", "m", "f"]
@@ -252,18 +245,18 @@ def test_output_collision_and_nonempty_directory_fail_without_overwrite(tmp_path
     assert fake_model["calls"] == 0
 
 
-def test_later_unassigned_input_leaves_earlier_outputs_and_writes_nothing_for_itself(tmp_path, fake_model):
-    good = _write_h5ad(tmp_path / "good.h5ad", x=[[1, 2]], var_index=["A", "B"], obs_index=["g"])
-    bad = _write_h5ad(tmp_path / "bad.h5ad", x=[[1, 2]], var_index=["A", "B"], obs_index=["b"])
+def test_unassigned_cells_do_not_fail_dataset_and_are_counted(tmp_path, fake_model):
+    path = _write_h5ad(tmp_path / "s.h5ad", x=[[1, 2], [3, 4]], var_index=["A", "B"], obs_index=["g", "b"])
 
     def native(prepared):
-        return _native(barcodes=prepared.obs_names, medium="Unassigned" if prepared.obs_names[0] == "b" else "ok")
+        meta = _native(barcodes=prepared.obs_names)
+        meta.loc["b", ["azimuth_fine", "azimuth_medium", "azimuth_broad"]] = "Unassigned"
+        return meta
 
     fake_model["native"] = native
 
-    with pytest.raises(ValueError, match="Unassigned annotations for 1 cells"):
-        run.run_pan_human_azimuth(input_h5ad=(good, bad), output_dir_template=str(tmp_path / "o_{stem}"))
+    stats = run.run_pan_human_azimuth(input_h5ad=(path,), output_dir_template=str(tmp_path / "o_{stem}"))
 
-    assert (tmp_path / "o_good" / run.PREDICTIONS_FILENAME).is_file()
-    assert (tmp_path / "o_good" / run.STATS_FILENAME).is_file()
-    assert not (tmp_path / "o_bad").exists()
+    predictions = pd.read_csv(tmp_path / "o_s" / run.PREDICTIONS_FILENAME, index_col=0)
+    assert predictions.loc["b", "azimuth_fine"] == "Unassigned"
+    assert stats[0]["n_unassigned"] == 1

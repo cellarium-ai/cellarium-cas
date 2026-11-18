@@ -84,6 +84,7 @@ After the command completes, ``benchmark_results/`` contains::
     ...                              # one directory per k up to --f-measure-top-k
     cm_aggregate_k1/                 # per-model aggregated confusion matrices (top-1)
     ...                              # one directory per k
+    cm_raw_k1/<sample>/missing_predictions.csv  # only if cells had no prediction: cell_id, gt_label
     f_measure_per_sample.csv         # F-measure per annotate run (wide format; columns suffixed _k{n})
     f_measure_per_group.csv          # F-measure per model (aggregated; wide format)
     hierarchical_f_measure_per_sample.csv
@@ -130,6 +131,9 @@ Metric columns are repeated for each k value and suffixed with ``_k{n}`` (e.g.
      - Description
    * - ``model_name`` / ``group_name``
      - Model name (per-sample has ``model_name`` + ``test_sample``; per-group has ``group_name``).
+   * - ``n_cells_total`` / ``n_cells_missing`` / ``coverage``
+     - Cells in the sample, cells excluded because ``--inferred-label`` was empty, and the share
+       still scored. Empty for confusion matrices built before these were tracked.
    * - ``tp_k{n}``
      - Global true positives (trace of the confusion matrix) for top-k hit predictions.
    * - ``fp_k{n}``

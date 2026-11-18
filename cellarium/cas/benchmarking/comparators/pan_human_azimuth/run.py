@@ -27,7 +27,6 @@ NATIVE_COLUMNS = (
     "full_consistent_hierarchy",
 )
 UNASSIGNED = "Unassigned"
-MAX_SAMPLE_BARCODES = 5
 TARGET_SUM = 10_000
 
 
@@ -151,14 +150,15 @@ def _annotate(*, prepared: anndata.AnnData, batch_size: int) -> pd.DataFrame:
     return azimuth.cells_meta
 
 
-def _validate_native(*, cells_meta: pd.DataFrame, barcodes: pd.Index, input_h5ad: str) -> pd.DataFrame:
-    """Align native metadata to input barcodes, fill blank levels, and reject ``Unassigned`` annotations.
+def _validate_native(*, cells_meta: pd.DataFrame, barcodes: pd.Index) -> pd.DataFrame:
+    """Align native metadata to input barcodes and fill blank levels.
+
+    ``Unassigned`` labels are kept as the model returned them; the mapper turns them into missing predictions.
 
     :param cells_meta: Native metadata returned by Pan-Human Azimuth.
     :param barcodes: Input barcodes in original order.
-    :param input_h5ad: Name the input in error messages.
 
-    :raises ValueError: If barcodes or native columns are invalid, or any level is ``Unassigned``.
+    :raises ValueError: If barcodes or native columns are invalid, or a cell has no label at any level.
     :returns: Return the seven native columns indexed by ``barcodes``.
     """
     index = pd.Index(cells_meta.index.astype(str))
@@ -183,17 +183,6 @@ def _validate_native(*, cells_meta: pd.DataFrame, barcodes: pd.Index, input_h5ad
     if levels.isna().any(axis=None):
         raise ValueError("Native annotations contain cells with no label at any level.")
     native[list(LEVEL_COLUMNS)] = levels
-
-    unassigned = np.zeros(len(native), dtype=bool)
-    for column in LEVEL_COLUMNS:
-        unassigned |= (native[column].astype(str) == UNASSIGNED).to_numpy()
-    if unassigned.any():
-        affected = barcodes[unassigned]
-        sample = list(affected[:MAX_SAMPLE_BARCODES])
-        raise ValueError(
-            f"Pan-Human Azimuth produced Unassigned annotations for {len(affected)} cells in "
-            f"'{input_h5ad}' (first {len(sample)} barcodes): {sample}"
-        )
     return native
 
 
@@ -239,8 +228,8 @@ def run_pan_human_azimuth(
     :param output_dir_template: Write each result under this fresh directory template containing ``{stem}``.
     :param batch_size: Evaluate this many cells per inference minibatch.
 
-    :raises ValueError: If options, inputs, counts, gene overlap, or native annotations are invalid,
-        or any native annotation is ``Unassigned``. Earlier completed inputs remain written.
+    :raises ValueError: If options, inputs, counts, gene overlap, or native annotations are invalid.
+        Earlier completed inputs remain written. ``Unassigned`` cells do not fail a dataset.
     :returns: Return per-input statistics.
     """
     if batch_size <= 0:
@@ -263,9 +252,7 @@ def run_pan_human_azimuth(
             )
 
         cells_meta = _annotate(prepared=prepared, batch_size=batch_size)
-        native = _validate_native(
-            cells_meta=cells_meta, barcodes=prepared.obs_names, input_h5ad=str(Path(input_path).resolve())
-        )
+        native = _validate_native(cells_meta=cells_meta, barcodes=prepared.obs_names)
         stats: dict[str, object] = {
             "input_h5ad": str(Path(input_path).resolve()),
             "n_cells": int(prepared.n_obs),
@@ -275,6 +262,7 @@ def run_pan_human_azimuth(
             "overlap_ratio": matched / len(model_genes),
             "api_version": _api_version(),
             "model_version": MODEL_VERSION,
+            "n_unassigned": int((native[list(LEVEL_COLUMNS)] == UNASSIGNED).any(axis=1).sum()),
         }
         _write_outputs(output_dir=output_dir, native=native, stats=stats)
         stats_list.append({"stem": Path(input_path).stem, **stats})

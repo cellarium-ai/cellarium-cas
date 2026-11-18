@@ -84,7 +84,8 @@ Each accepted input gets one directory containing:
     Keys: ``input_h5ad``, ``n_cells``, ``n_input_genes`` (source gene columns before
     consolidation), ``n_model_genes``, ``n_matched_genes`` (consolidated input
     symbols found in the model panel), ``overlap_ratio``, ``api_version``
-    (installed ``panhumanpy``), ``model_version`` (``v1``).
+    (installed ``panhumanpy``), ``model_version`` (``v1``), ``n_unassigned`` (cells
+    with ``Unassigned`` at any level).
 
 ``azimuth_fine``, ``azimuth_medium``, and ``azimuth_broad`` are three resolutions of
 one refined annotation, not ranked alternatives. The refined levels have no native
@@ -96,21 +97,16 @@ Blank levels
 
 If the model leaves a level blank for a cell (for example ``azimuth_medium`` for a ``ProB cell``),
 the blank is filled from the nearest finer level, else the nearest coarser one (fine, then medium,
-then broad). This runs before the ``Unassigned`` check and is written to the predictions CSV, so
-those columns are no longer the package's unmodified output for such cells. A cell with no label at
-any level fails the dataset.
+then broad). It is written to the predictions CSV, so those columns are no longer the package's
+unmodified output for such cells. A cell with no label at any level fails the dataset.
 
 Unassigned cells
 ----------------
 
 Model ``v1`` can label poor-quality profiles (for example low-UMI or ambient-RNA
-cells) ``Unassigned``. If any cell has ``Unassigned`` at any of the three levels,
-the whole input dataset is rejected and none of its outputs are written::
-
-    Pan-Human Azimuth produced Unassigned annotations for 3 cells in '/data/sample.h5ad' (first 3 barcodes): ['AAAC', 'AAAG', 'AACT']
-
-Barcodes are counted once per cell and at most five are shown. A multi-input run
-stops at the first failed dataset; outputs of datasets completed earlier are kept.
+cells) ``Unassigned``. ``run.py`` writes these labels as returned and does not fail the dataset;
+``n_unassigned`` in the stats JSON counts cells with ``Unassigned`` at any level. The conversion
+helper treats such a cell as having no prediction (see below), and the benchmark excludes it.
 
 Python use
 ----------
@@ -174,5 +170,8 @@ a child's term and is kept. Refined levels have no native confidence, so
 ``cas_cell_type_score_k`` is empty, not invented. It also writes ``metadata.json``
 (model group ``pan_human_azimuth_v1``), ``ontology_response.json``, and
 ``ontology_resource.json``. It rejects missing barcodes, labels absent from the vendor table, and
+ontology terms. A cell that is ``Unassigned`` at any level gets empty ``cas_cell_type_label_k``,
+``cas_cell_type_name_k`` and ``cas_cell_type_score_k`` at every rank, and an empty ontology response
+entry. ``cellarium-cas benchmark`` leaves such cells out and lists them in ``missing_predictions.csv``.
 ontology terms. Benchmark with ``--inferred-label cas_cell_type_name_1`` and
 ``--f-measure-top-k 3``.

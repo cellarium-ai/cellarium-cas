@@ -12,6 +12,7 @@ import pandas as pd
 from cellarium.cas.benchmarking.comparators.shared.crosswalk import load_crosswalk_maps
 from cellarium.cas.postprocessing.cell_ontology.cell_ontology_cache import CellOntologyCache
 
+UNASSIGNED = "Unassigned"  # same literal as run.py; not imported so the mapper stays free of run.py's deps
 MODEL_NAME = "pan_human_azimuth_v1"
 # Rank 1 = most granular, matching the CAS convention and the existing Azimuth comparator.
 LEVEL_COLUMNS = ("azimuth_fine", "azimuth_medium", "azimuth_broad")
@@ -72,6 +73,9 @@ def map_pan_human_azimuth_to_cas_labels(
             f"{sorted(missing_barcodes)[:5]}"
         )
     levels = predictions.loc[obs_names, list(LEVEL_COLUMNS)].astype(str)
+    # A cell the model left ``Unassigned`` at any level has no prediction: empty (NaN) at every rank.
+    levels = levels.astype(object)
+    levels.loc[(levels == UNASSIGNED).any(axis=1)] = None
 
     vendor = pd.read_csv(vendor_map_csv_path or _vendor_map_path())
     for col in (VENDOR_LABEL_COL, VENDOR_CL_ID_COL, VENDOR_CL_LABEL_COL):
@@ -80,7 +84,7 @@ def map_pan_human_azimuth_to_cas_labels(
     label_to_cl = dict(zip(vendor[VENDOR_LABEL_COL].astype(str), vendor[VENDOR_CL_ID_COL].astype(str)))
     cl_to_label = dict(zip(vendor[VENDOR_CL_ID_COL].astype(str), vendor[VENDOR_CL_LABEL_COL].astype(str)))
 
-    labels = set(levels.stack())
+    labels = set(levels.stack().dropna())
     unmapped = sorted(labels - set(label_to_cl))
     if unmapped:
         raise ValueError(
@@ -120,8 +124,8 @@ def map_pan_human_azimuth_to_cas_labels(
 
     out = pd.DataFrame(index=pd.Index(obs_names, name=None))
     for rank, column in enumerate(LEVEL_COLUMNS, start=1):
-        out[f"cas_cell_type_label_{rank}"] = levels[column].map(final_label)
-        out[f"cas_cell_type_name_{rank}"] = levels[column].map(final_id)
+        out[f"cas_cell_type_label_{rank}"] = levels[column].map(final_label, na_action="ignore")
+        out[f"cas_cell_type_name_{rank}"] = levels[column].map(final_id, na_action="ignore")
         out[f"cas_cell_type_score_{rank}"] = float("nan")
     ranks = range(1, len(LEVEL_COLUMNS) + 1)
     out = out[[f"cas_cell_type_{kind}_{rank}" for kind in ("label", "name", "score") for rank in ranks]]

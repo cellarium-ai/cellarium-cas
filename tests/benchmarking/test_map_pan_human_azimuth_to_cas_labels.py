@@ -98,3 +98,14 @@ def test_rejects_cl_ids_absent_from_ontology(tmp_path):
 def test_rejects_missing_prediction_columns(tmp_path):
     with pytest.raises(ValueError, match="missing columns"):
         _convert(tmp_path, predictions={"azimuth_fine": PREDICTIONS["azimuth_fine"]})
+
+
+def test_unassigned_cell_gets_empty_labels_at_every_rank(tmp_path):
+    predictions = {level: {**cells, "cell2": "Unassigned"} for level, cells in PREDICTIONS.items()}
+
+    result = _convert(tmp_path, predictions=predictions)
+
+    labels = pd.read_csv(result["inferred_labels_path"], index_col=0)
+    assert labels.loc["cell2"].isna().all()
+    assert labels.loc["cell1", "cas_cell_type_name_1"] == "CL:0000002"
+    assert json.loads(open(result["ontology_response_path"]).read())["data"][0]["matches"] == []
