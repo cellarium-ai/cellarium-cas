@@ -707,7 +707,8 @@ class TestCasClient:
         d = NP_RANDOM_STATE.randint(0, 500, size=(num_cells, num_features))
         X = sp.csr_matrix(d)
         obs = pd.DataFrame(index=[f"cell{i}" for i in range(num_cells)])
-        return anndata.AnnData(X=X, obs=obs, dtype=np.float32)
+        var = pd.DataFrame(index=[f"field{i}" for i in range(num_features)])
+        return anndata.AnnData(X=X.astype(np.float32), obs=obs, var=var)
 
     def __mock_response(
         self,
