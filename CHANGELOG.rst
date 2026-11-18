@@ -21,6 +21,7 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
 
   Fixed
   ~~~~~
+  - ``ValueError`` is now raised when none of the input features match the CAS feature schema (#145).
 
 1.9.0 - 2026-11-17
 ------------------

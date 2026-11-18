@@ -61,6 +61,11 @@ def sanitize(
     cas_feature_schema_set = set(cas_feature_schema_list)
     adata_feature_schema_set = set(adata_feature_schema_list)
     feature_id_intersection = adata_feature_schema_set.intersection(cas_feature_schema_set)
+    if not feature_id_intersection:
+        raise ValueError(
+            "None of the input features match the CAS feature schema. Check that `feature_ids_column_name` "
+            "points to Ensembl gene ids that conform to the schema of the selected model."
+        )
 
     cas_feature_id_map = {feature_id: index for index, feature_id in enumerate(cas_feature_schema_list)}
     adata_feature_id_map = {feature_id: index for index, feature_id in enumerate(adata_feature_schema_list)}
