@@ -17,6 +17,7 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
 
   Changed
   ~~~~~~~
+  - Decreased ``MAX_NUM_REQUESTS_AT_A_TIME`` from 100 to 30.
 
   Fixed
   ~~~~~
