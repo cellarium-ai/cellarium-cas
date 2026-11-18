@@ -99,6 +99,9 @@ def annotate(
 
     adata = read_h5_or_h5ad(input_path)
 
+    if cluster_label_obs_column is not None and cluster_label_obs_column not in adata.obs.columns:
+        raise ValueError(f"Cluster label column '{cluster_label_obs_column}' not found in `adata.obs`.")
+
     client_kwargs: t.Dict[str, t.Any] = {"api_token": cas_api_token}
     if cas_api_url is not None:
         client_kwargs["api_url"] = cas_api_url
