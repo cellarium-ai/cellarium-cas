@@ -98,9 +98,7 @@ def _load_sample_data(
             f"Available columns: {sorted(labels_df.columns.tolist())}"
         )
     if len(y_true) != len(labels_df):
-        raise ValueError(
-            f"{input_path} has {len(y_true)} cells but {labels_csv} has {len(labels_df)} rows."
-        )
+        raise ValueError(f"{input_path} has {len(y_true)} cells but {labels_csv} has {len(labels_df)} rows.")
 
     no_prediction = labels_df[inferred_label].isna().to_numpy()
     missing = pd.DataFrame(
