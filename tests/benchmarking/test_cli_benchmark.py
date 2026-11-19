@@ -16,7 +16,7 @@ from cellarium.cas.cli._benchmark_impl import (
     run_hierarchical_f_measure_step,
 )
 from cellarium.cas.cli.benchmark import benchmark_group
-from tests.unit.benchmarking._fixtures import MOCK_ONTOLOGY_RESOURCE
+from tests.benchmarking._fixtures import MOCK_ONTOLOGY_RESOURCE
 
 
 def _write_json(path: Path, payload: t.Dict[str, t.Any]) -> None:
@@ -156,3 +156,30 @@ def test_top_k_option_is_only_on_matrix_build_commands():
     assert "--f-measure-top-k" in confusion_matrix_help.output
     assert "--f-measure-top-k" in all_help.output
     assert "--f-measure-top-k" not in hierarchical_help.output
+
+
+def test_cells_without_prediction_are_excluded_and_reported(tmp_path):
+    annotate_parent, benchmark_dir = _write_benchmark_fixture(tmp_path)
+    labels_path = annotate_parent / "run_model_a_sample_1" / "inferred_labels.csv"
+    labels = pd.read_csv(labels_path, index_col=0)
+    labels.loc["cell_2"] = np.nan
+    labels.to_csv(labels_path)
+
+    _run_pipeline(annotate_parent, benchmark_dir)
+
+    missing = pd.read_csv(benchmark_dir / "cm_raw_k1" / "run_model_a_sample_1" / "missing_predictions.csv")
+    assert missing.to_dict("records") == [{"cell_id": "cell_2", "gt_label": "CL:0000003"}]
+    per_sample = pd.read_csv(benchmark_dir / "f_measure_per_sample.csv")
+    assert per_sample[["n_cells_total", "n_cells_missing"]].iloc[0].tolist() == [3, 1]
+    assert per_sample["coverage"].iloc[0] == pytest.approx(2 / 3)
+    per_group = pd.read_csv(benchmark_dir / "f_measure_per_group.csv")
+    assert per_group[["n_cells_total", "n_cells_missing"]].iloc[0].tolist() == [3, 1]
+
+
+def test_no_missing_predictions_file_when_every_cell_is_predicted(tmp_path):
+    annotate_parent, benchmark_dir = _write_benchmark_fixture(tmp_path)
+
+    _run_pipeline(annotate_parent, benchmark_dir)
+
+    assert not (benchmark_dir / "cm_raw_k1" / "run_model_a_sample_1" / "missing_predictions.csv").exists()
+    assert pd.read_csv(benchmark_dir / "f_measure_per_sample.csv")["coverage"].iloc[0] == 1.0

@@ -21,6 +21,22 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
   Fixed
   ~~~~~
 
+1.9.2 - unreleased
+------------------
+
+Added
+~~~~~
+- Pan-Human Azimuth now carries the model's confidence into the annotation: every rank's ``cas_cell_type_score_k`` holds ``final_level_confidence`` (empty for ``Unassigned`` cells).
+- Pan-Human Azimuth ``cas_cell_type_label_k`` now holds the ontology resource's own name for the mapped CL id instead of panhumanpy's vendor label string; the retired ``crosswalk_cl_label_col`` argument is gone.
+- Added Pan-Human Azimuth comparator under ``cellarium.cas.benchmarking.comparators.pan_human_azimuth`` (``panhumanpy`` v1 inference with refinement, conversion to CAS labels, benchmarking). The three levels ``azimuth_fine``, ``azimuth_medium`` and ``azimuth_broad`` become ranks 1, 2 and 3. Labels map to Cell Ontology IDs through the vendor table bundled with ``panhumanpy``; an optional CL-to-CL crosswalk translates them to the benchmark ontology.
+- Pan-Human Azimuth missing levels are filled from the nearest finer level, else the nearest coarser one. The literal ``False``, which the package writes when it cannot refine a cell's hierarchy (about 11-13% of cells in the test extracts), counts as missing, and a cell with no refined level falls back to ``final_level_labels``. A cell with no label at any level fails the dataset.
+- Pan-Human Azimuth ``Unassigned`` cells no longer fail a dataset. ``run.py`` writes them as returned and counts them in ``n_unassigned`` in the stats JSON, and the conversion helper writes empty labels and scores at every rank for them.
+- ``cellarium-cas benchmark confusion-matrix`` now excludes cells whose ``--inferred-label`` is empty and writes them to ``cm_raw_k1/<sample>/missing_predictions.csv`` (``cell_id``, ``gt_label``). ``n_cells_total`` and ``n_cells_missing`` are recorded in the confusion-matrix metadata, and ``f_measure_per_sample.csv`` and ``f_measure_per_group.csv`` gain ``n_cells_total``, ``n_cells_missing`` and ``coverage`` columns (empty for confusion matrices built before this change).
+
+Changed
+~~~~~~~
+- ``cellarium-cas benchmark confusion-matrix`` now raises a ``ValueError`` when the h5ad and ``inferred_labels.csv`` have different numbers of cells.
+
 1.9.1 - 2026-11-18
 ------------------
 

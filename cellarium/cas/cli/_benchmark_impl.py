@@ -54,6 +54,8 @@ _BENCHMARK_REQUIRED_FILES = (
     ONTOLOGY_RESOURCE_FILENAME,
 )
 
+MISSING_PREDICTIONS_FILENAME = "missing_predictions.csv"
+
 
 def _ranked_inferred_label_columns(inferred_label: str, top_k: int) -> t.List[str]:
     if top_k == 1:
@@ -72,8 +74,12 @@ def _load_sample_data(
     gt_label: str,
     inferred_label: str,
     metadata: t.Dict[str, t.Any],
-) -> t.Tuple[t.List[str], t.List[str], pd.DataFrame, t.List[str]]:
-    """Load ground-truth labels, top-1 predictions, the full inferred-labels DataFrame, and the label order."""
+) -> t.Tuple[t.List[str], t.List[str], pd.DataFrame, t.List[str], pd.DataFrame]:
+    """Load ground-truth labels, top-1 predictions, inferred labels, the label order and missing predictions.
+
+    Cells whose *inferred_label* is empty (NaN) have no prediction. They are removed from the returned
+    ground truth, predictions and ``labels_df``, and returned as a ``cell_id``/``gt_label`` DataFrame.
+    """
     input_path = metadata["input_path"]
 
     adata = anndata.read_h5ad(input_path)
@@ -91,12 +97,24 @@ def _load_sample_data(
             f"Inferred-label column '{inferred_label}' not found in {labels_csv}.\n"
             f"Available columns: {sorted(labels_df.columns.tolist())}"
         )
+    if len(y_true) != len(labels_df):
+        raise ValueError(f"{input_path} has {len(y_true)} cells but {labels_csv} has {len(labels_df)} rows.")
+
+    no_prediction = labels_df[inferred_label].isna().to_numpy()
+    missing = pd.DataFrame(
+        {
+            "cell_id": labels_df.index[no_prediction],
+            "gt_label": [label for label, absent in zip(y_true, no_prediction) if absent],
+        }
+    )
+    y_true = [label for label, absent in zip(y_true, no_prediction) if not absent]
+    labels_df = labels_df.loc[~no_prediction]
     y_pred = labels_df[inferred_label].astype(str).tolist()
 
     ontology_resource = load_ontology_resource(annotate_dir)
     label_order: t.List[str] = ontology_resource["cl_names"]
 
-    return y_true, y_pred, labels_df, label_order
+    return y_true, y_pred, labels_df, label_order, missing
 
 
 def _build_f_measure_predictions(
@@ -151,6 +169,23 @@ def _effective_inferred_labels(
     return effective
 
 
+def _sum_or_none(metas: t.List[t.Dict[str, t.Any]], key: str) -> t.Optional[int]:
+    """Sum *key* across metadata dicts; ``None`` if any lacks it (artifact predates cell-count tracking)."""
+    values = [m.get(key) for m in metas]
+    return None if any(v is None for v in values) else sum(values)
+
+
+def _coverage(meta: t.Dict[str, t.Any]) -> t.Dict[str, t.Any]:
+    """Return ``n_cells_total``, ``n_cells_missing`` and ``coverage`` from confusion-matrix metadata.
+
+    Values are ``None`` for artifacts written before missing predictions were tracked.
+    """
+    total = meta.get("n_cells_total")
+    missing = meta.get("n_cells_missing")
+    coverage = None if total is None or missing is None or total == 0 else (total - missing) / total
+    return {"n_cells_total": total, "n_cells_missing": missing, "coverage": coverage}
+
+
 def _process_annotate_dir(
     annotate_dir: Path,
     k_cm_dirs: t.Dict[int, Path],
@@ -160,8 +195,12 @@ def _process_annotate_dir(
     label_order: t.List[str],
     meta_base: t.Dict[str, t.Any],
     inferred_label: str,
+    missing: pd.DataFrame,
 ) -> None:
-    """Build and save one confusion matrix per k value for a single annotate directory."""
+    """Build and save one confusion matrix per k value for a single annotate directory.
+
+    When *missing* is non-empty it is written as ``missing_predictions.csv`` beside the ``k=1`` matrix.
+    """
     for k, cm_dir in k_cm_dirs.items():
         effective_cols = _effective_inferred_labels(inferred_label, k, labels_df)
         f_measure_y_pred = _build_f_measure_predictions(y_true, y_pred, labels_df, effective_cols)
@@ -174,6 +213,14 @@ def _process_annotate_dir(
         }
         sample_cm_dir = cm_dir / annotate_dir.name
         save_confusion_matrix(cm, meta, sample_cm_dir)
+        if k == 1 and not missing.empty:
+            missing.to_csv(sample_cm_dir / MISSING_PREDICTIONS_FILENAME, index=False)
+            logger.warning(
+                "%d of %d cells have no prediction and were excluded -> %s",
+                len(missing),
+                meta_base["n_cells_total"],
+                sample_cm_dir / MISSING_PREDICTIONS_FILENAME,
+            )
         logger.info("Saved k=%d confusion matrix (%d x %d) -> %s", k, cm.shape[0], cm.shape[1], sample_cm_dir)
 
 
@@ -221,7 +268,9 @@ def run_confusion_matrix_step(
         model_name = metadata.get("model_name", "unknown")
         logger.info("Processing: %s  (model=%s)", annotate_dir, model_name)
 
-        y_true, y_pred, labels_df, label_order = _load_sample_data(annotate_dir, gt_label, inferred_label, metadata)
+        y_true, y_pred, labels_df, label_order, missing = _load_sample_data(
+            annotate_dir, gt_label, inferred_label, metadata
+        )
 
         meta_base: t.Dict[str, t.Any] = {
             "model_name": model_name,
@@ -230,9 +279,11 @@ def run_confusion_matrix_step(
             "gt_label": gt_label,
             "inferred_label": inferred_label,
             "label_order": label_order,
+            "n_cells_total": len(y_true) + len(missing),
+            "n_cells_missing": len(missing),
         }
         _process_annotate_dir(
-            annotate_dir, k_cm_dirs, y_true, y_pred, labels_df, label_order, meta_base, inferred_label
+            annotate_dir, k_cm_dirs, y_true, y_pred, labels_df, label_order, meta_base, inferred_label, missing
         )
 
     return {"n_samples": len(dirs), "cm_raw_k1_dir": str(k_cm_dirs[1])}
@@ -293,7 +344,11 @@ def run_f_measure_step(output_dir: t.Union[str, Path]) -> t.Dict[str, t.Any]:
     per_sample_rows: t.List[t.Dict[str, t.Any]] = []
     for sample_dir in _iter_cm_dirs(k_raw_dirs[1]):
         _, meta_k1 = load_confusion_matrix(sample_dir)
-        row: t.Dict[str, t.Any] = {"model_name": meta_k1["model_name"], "test_sample": meta_k1["test_sample"]}
+        row: t.Dict[str, t.Any] = {
+            "model_name": meta_k1["model_name"],
+            "test_sample": meta_k1["test_sample"],
+            **_coverage(meta_k1),
+        }
         for k, raw_k_dir in sorted(k_raw_dirs.items()):
             cm, _ = load_confusion_matrix(raw_k_dir / sample_dir.name)
             metrics = compute_f_measure_from_cm(cm)
@@ -308,7 +363,7 @@ def run_f_measure_step(output_dir: t.Union[str, Path]) -> t.Dict[str, t.Any]:
     per_group_rows: t.List[t.Dict[str, t.Any]] = []
     for group_dir in _iter_cm_dirs(k_aggregate_dirs[1]):
         _, meta_k1 = load_confusion_matrix(group_dir)
-        row = {"group_name": meta_k1["model_name"]}
+        row = {"group_name": meta_k1["model_name"], **_coverage(meta_k1)}
         for k, agg_k_dir in sorted(k_aggregate_dirs.items()):
             cm, _ = load_confusion_matrix(agg_k_dir / group_dir.name)
             metrics = compute_f_measure_from_cm(cm)
@@ -449,12 +504,14 @@ def _aggregate_cm_tree(cm_raw_dir: Path, cm_aggregate_dir: Path) -> int:
 
         cms: t.List[scipy.sparse.csr_matrix] = []
         source_annotate_dirs: t.List[str] = []
+        sample_metas: t.List[t.Dict[str, t.Any]] = []
         n_samples = len(entries)
 
         for sample_dir, _, _ in entries:
             cm, meta = load_confusion_matrix(sample_dir)
             cms.append(cm)
             source_annotate_dirs.append(meta["annotate_dir"])
+            sample_metas.append(meta)
 
         agg_cm = aggregate_confusion_matrices(cms)
         safe_name = _safe_dirname(model_name)
@@ -465,6 +522,8 @@ def _aggregate_cm_tree(cm_raw_dir: Path, cm_aggregate_dir: Path) -> int:
             "label_order": label_order,
             "matrix_shape": list(agg_cm.shape),
             "n_samples_aggregated": n_samples,
+            "n_cells_total": _sum_or_none(sample_metas, "n_cells_total"),
+            "n_cells_missing": _sum_or_none(sample_metas, "n_cells_missing"),
         }
         save_confusion_matrix(agg_cm, agg_meta, group_dir)
         logger.info("Saved aggregated CM for model '%s' (%d samples) -> %s", model_name, n_samples, group_dir)
