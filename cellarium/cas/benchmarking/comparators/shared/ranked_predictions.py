@@ -67,6 +67,7 @@ def _build_cell_row(
     top_k: int,
     crosswalk_map: dict[str, str],
     crosswalk_label_map: dict[str, str],
+    duplicate_score_aggregation: str = "sum",
 ) -> dict[str, Any]:
     """Build one CAS row, merging duplicate Cell Ontology IDs."""
     entries: dict[str, list[Any]] = {}
@@ -80,7 +81,10 @@ def _build_cell_row(
         score = predictions_df.at[barcode, f"predicted_score_{rank}"]
         score = float(score) if score is not None and not pd.isna(score) else 0.0
         if cl_id in entries:
-            entries[cl_id][1] += score
+            if duplicate_score_aggregation == "max":
+                entries[cl_id][1] = max(entries[cl_id][1], score)
+            else:
+                entries[cl_id][1] += score
         else:
             entries[cl_id] = [cl_label, score]
 
@@ -106,6 +110,7 @@ def map_ranked_predictions_to_cas_labels(
     comparator_name: str,
     crosswalk_cl_label_col: str | None = None,
     top_k: int = 5,
+    duplicate_score_aggregation: str = "sum",
 ) -> dict[str, str]:
     """Convert ranked predictions into CAS labels and metadata.
 
@@ -120,10 +125,13 @@ def map_ranked_predictions_to_cas_labels(
     :param comparator_name: Use this comparator name in validation errors.
     :param crosswalk_cl_label_col: Read display labels from this optional crosswalk column.
     :param top_k: Read and write this many prediction ranks.
+    :param duplicate_score_aggregation: Merge scores of labels sharing a Cell Ontology ID by ``"sum"`` or ``"max"``.
 
-    :raises ValueError: If barcodes, labels, or Cell Ontology IDs are invalid.
+    :raises ValueError: If aggregation is unknown, or barcodes, labels, or Cell Ontology IDs are invalid.
     :returns: Return paths to inferred labels and metadata.
     """
+    if duplicate_score_aggregation not in ("sum", "max"):
+        raise ValueError(f"duplicate_score_aggregation must be 'sum' or 'max', got {duplicate_score_aggregation!r}.")
     output_dir_path = Path(output_dir)
     output_dir_path.mkdir(parents=True, exist_ok=True)
 
@@ -161,6 +169,7 @@ def map_ranked_predictions_to_cas_labels(
             top_k=top_k,
             crosswalk_map=crosswalk_map,
             crosswalk_label_map=crosswalk_label_map,
+            duplicate_score_aggregation=duplicate_score_aggregation,
         )
         for barcode in obs_names
     ]
