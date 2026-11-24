@@ -338,11 +338,9 @@ def get_most_granular_call(
     Select the single most granular ontology term by curated granularity depth.
 
     Only terms with ``score >= min_acceptable_score`` and a non-zero curated depth in
-    ``granularity_cache`` are eligible. The selected term maximizes
-    ``(curated_depth, longest_path_depth, score)``, so that within one curated level the most granular
-    term in the ontology is preferred; ties are broken deterministically by CL term ID ascending. Terms
-    absent from the ontology path lengths have longest path depth 0. L1-L4 annotations are retrieved from
-    the selected term's curated mapping.
+    ``granularity_cache`` are eligible. The selected term maximizes ``(curated_depth, score)``; ties are
+    broken deterministically by CL term ID ascending. L1-L4 annotations are retrieved from the selected
+    term's curated mapping.
 
     :param aggregated_scores: Aggregated CAS ontology-aware evidence scores.
     :param cl: The CellOntologyCache used to resolve human-readable labels.
@@ -351,7 +349,6 @@ def get_most_granular_call(
 
     :returns: The selected call, or :data:`MISSING_GRANULARITY_CELL_TYPE_CALL` if no term is eligible.
     """
-    longest_path_depths = cl.get_longest_path_lengths_from_target(CL_CELL_ROOT_NODE)
     best_key = None
     best_name = None
     for score, cl_name in zip(aggregated_scores.aggregated_scores_c, aggregated_scores.cl_names):
@@ -360,7 +357,7 @@ def get_most_granular_call(
         depth = granularity_cache.get_depth(cl_name)
         if depth == 0:
             continue
-        key = (depth, longest_path_depths.get(cl_name, 0), score)
+        key = (depth, score)
         if best_key is None or key > best_key or (key == best_key and cl_name < best_name):
             best_key, best_name = key, cl_name
     if best_key is None:
@@ -375,7 +372,7 @@ def get_most_granular_call(
         if name in level_names
     }
     return GranularityCellTypeCall(
-        score=float(best_key[2]),
+        score=float(best_key[1]),
         cl_name=cl_name,
         label=cl.cl_names_to_labels_map.get(cl_name),
         levels=levels,
@@ -546,7 +543,7 @@ def compute_most_granular_top_k_calls_knn(
     aggregation_op: CellOntologyScoresAggregationOp = CellOntologyScoresAggregationOp.MEAN,
     aggregation_domain: CellOntologyScoresAggregationDomain = CellOntologyScoresAggregationDomain.ALL_CELLS,
     aggregation_score_threshold: float = 1e-4,
-    obs_prefix: str = "cas_knn_cell_type",
+    obs_prefix: str = "cas_cell_type_knn",
     fill_missing_levels: bool = True,
 ):
     """
@@ -609,7 +606,7 @@ def compute_most_granular_top_k_calls_cluster(
     aggregation_op: CellOntologyScoresAggregationOp = CellOntologyScoresAggregationOp.MEAN,
     aggregation_domain: CellOntologyScoresAggregationDomain = CellOntologyScoresAggregationDomain.ALL_CELLS,
     aggregation_score_threshod: float = 1e-4,
-    obs_prefix: str = "cas_cell_type",
+    obs_prefix: str = "cas_cell_type_cluster",
     fill_missing_levels: bool = True,
 ):
     """

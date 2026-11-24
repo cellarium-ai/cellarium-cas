@@ -92,7 +92,7 @@ Or smooth scores over each cell's local kNN neighborhood while keeping one resul
         adata=adata,
         min_acceptable_score=0.2,
         k_neighbors=30,
-        obs_prefix="cas_knn_cell_type",
+        obs_prefix="cas_cell_type_knn",
     )
 
 This reuses ``adata.obsp['distances']`` when a kNN graph is already present. Otherwise,
@@ -106,9 +106,8 @@ offline testing, preload ``client._granularity_cache[resource_name]`` before cal
 client methods.
 
 Candidates below ``min_acceptable_score`` or without a curated granularity mapping are
-excluded. The single selected term maximizes curated depth, then Cell Ontology longest path
-depth (so the most granular term within one curated level wins), then evidence score, with CL
-term ID as a deterministic tie-breaker.
+excluded. The single selected term maximizes curated depth, then evidence score, with CL term ID as a
+deterministic tie-breaker. Cell Ontology graph depth is not used.
 
 The selected term's curated mapping is written as four granularity positions, from most to least
 granular (position ``1`` is the lookup's ``l4``, position ``4`` its ``l1``):

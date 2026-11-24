@@ -216,7 +216,7 @@ class CASClient:
         adata: "anndata.AnnData",
         min_acceptable_score: float,
         cluster_label_obs_column: str,
-        obs_prefix: str = "cas_cell_type",
+        obs_prefix: str = "cas_cell_type_cluster",
         fill_missing_levels: bool = True,
     ) -> None:
         """
@@ -254,7 +254,7 @@ class CASClient:
         k_neighbors: int = 5,
         representation_obsm_key: t.Optional[str] = None,
         compute_neighbors_if_missing: bool = True,
-        obs_prefix: str = "cas_knn_cell_type",
+        obs_prefix: str = "cas_cell_type_knn",
         fill_missing_levels: bool = True,
     ) -> None:
         """

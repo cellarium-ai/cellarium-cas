@@ -24,13 +24,13 @@ from cellarium.cas.postprocessing.cell_ontology.granularity_cache import CellGra
 from cellarium.cas.postprocessing.ontology_aware import (
     CAS_CL_SCORES_ANNDATA_OBSM_KEY,
     CAS_METADATA_ANNDATA_UNS_KEY,
+    MISSING_GRANULARITY_CELL_TYPE_CALL,
     AggregatedCellOntologyScores,
     CellOntologyScoresAggregationDomain,
     CellOntologyScoresAggregationOp,
     compute_most_granular_top_k_calls_cluster,
     compute_most_granular_top_k_calls_knn,
     compute_most_granular_top_k_calls_single,
-    MISSING_GRANULARITY_CELL_TYPE_CALL,
     get_most_granular_call,
 )
 
@@ -148,14 +148,7 @@ def test_deeper_candidate_wins_over_higher_scoring_shallow_candidate():
     assert call.levels == TEST_GRANULARITY_RESOURCE["CL:0000004"]
 
 
-def test_longest_path_depth_breaks_ties_within_same_curated_depth_before_score():
-    cl = _make_cl()
-    cl._longest_path_lengths["CL:0000005"] = 7  # same curated depth 4 as CL:0000004, deeper in CL
-    call = _select({"CL:0000004": 0.9, "CL:0000005": 0.3, "CL:0000003": 0.99}, cl=cl)
-    assert call.cl_name == "CL:0000005"
-
-
-def test_highest_score_wins_within_same_curated_and_path_depth():
+def test_highest_score_wins_within_same_curated_depth():
     assert _select({"CL:0000004": 0.4, "CL:0000005": 0.8}).cl_name == "CL:0000005"
 
 
