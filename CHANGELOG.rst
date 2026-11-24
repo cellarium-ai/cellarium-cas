@@ -26,23 +26,21 @@ Unreleased
 
 Added
 ~~~~~
-- Added ``CellGranularityCache`` for the curated L1-L4 granularity lookup, and ``GranularityCellTypeCall`` / ``MISSING_GRANULARITY_CELL_TYPE_CALL`` for selected annotations.
+- Added ``compute_annotation_levels_single``, ``compute_annotation_levels_cluster`` and ``compute_annotation_levels_knn`` post-processing functions and matching ``CASClient`` methods. They select one source term per cell/cluster/neighborhood by curated granularity depth (1-4), then evidence score, then CL term ID, and write its curated L1-L4 mapping as four granularity positions ``{obs_prefix}_{label,name,score}_{n}`` for ``n`` = 1 (most granular, lookup ``l4``) to 4 (least granular, lookup ``l1``). Cell Ontology path depth is not used. With ``fill_missing_levels=True`` (default) an undefined level inherits the nearest shallower defined level of the same term; ``False`` leaves it null. A call without an eligible term is written as ``None``. Default ``obs_prefix`` is ``cas_annotation``, ``cas_annotation_cluster`` and ``cas_annotation_knn``.
+- Added ``CellGranularityCache`` for the curated L1-L4 granularity lookup, ``get_most_granular_call``, and ``GranularityCellTypeCall`` / ``MISSING_GRANULARITY_CELL_TYPE_CALL`` for selected annotations.
+- ``CASClient`` fetches and caches the curated granularity resource from the backend, using the same ontology resource name as the cell ontology resource. A prefilled ``client._granularity_cache`` can override the source for offline tests.
 
 Changed
 ~~~~~~~
-- The cell type call is now selected by curated granularity depth (1-4) instead of Cell Ontology path depth. Deeper curated terms win over higher-scoring shallower terms; evidence score breaks ties within the same curated depth, then CL term ID provides deterministic ordering.
-- ``CASClient`` now fetches and caches the curated granularity resource from the backend, using the same ontology resource name as the cell ontology resource. A prefilled ``client._granularity_cache`` can override the source for offline tests.
-- ``compute_most_granular_top_k_calls_{single,cluster,knn}`` now select one source term per cell/cluster/neighborhood and write its curated mapping as four granularity positions: ``{obs_prefix}_{label,name,score}_{n}`` for ``n`` = 1 (most granular, lookup ``l4``) to 4 (least granular, lookup ``l1``). With ``fill_missing_levels=True`` (default) an undefined level inherits the nearest shallower defined level of the same term; ``False`` leaves it null.
-- ``get_most_granular_top_k_calls`` is replaced by ``get_most_granular_call``, which returns a single ``GranularityCellTypeCall``.
-- ``annotate`` CLI writes the granularity position columns to ``inferred_labels.csv``.
-- Default ``obs_prefix`` is now ``cas_cell_type`` (single), ``cas_cell_type_cluster`` (cluster) and ``cas_cell_type_knn`` (kNN) in ``compute_most_granular_top_k_calls_*`` and the matching ``CASClient`` methods.
+- ``annotate`` CLI now uses ``compute_annotation_levels_*`` and writes ``cas_annotation_*``, ``cas_annotation_cluster_*`` and ``cas_annotation_knn_*`` position columns to ``inferred_labels.csv``.
+
+Deprecated
+~~~~~~~~~~
+- Deprecated ``compute_most_granular_top_k_calls_single``, ``compute_most_granular_top_k_calls_cluster``, ``compute_most_granular_top_k_calls_knn`` (functions and ``CASClient`` methods) in favor of ``compute_annotation_levels_*``. Their behavior is unchanged.
 
 Removed
 ~~~~~~~
-- Removed the ``top_k`` argument from ``compute_most_granular_top_k_calls_*``, ``CASClient`` methods and the ``annotate --top-k`` CLI option; output is always the four granularity positions.
-- Removed ``use_shortest_path`` and ``root_note`` from annotation selection; path-depth ranking is retired.
-- Removed the ``annotate --shortest-path/--longest-path`` CLI option.
-- Removed fabricated root-cell padding: a call without an eligible term is written as ``None``.
+- Removed the ``annotate --top-k`` and ``annotate --shortest-path/--longest-path`` CLI options (and the ``top_k`` / ``use_shortest_path`` arguments of ``cellarium.cas.cli.annotate.annotate``); the CLI no longer uses the path-depth top-k API.
 
 Fixed
 ~~~~~

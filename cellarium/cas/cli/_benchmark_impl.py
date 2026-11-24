@@ -196,7 +196,7 @@ def run_confusion_matrix_step(
     :param gt_label: Column name in the original ``.h5ad`` ``obs`` that contains
         ground-truth cell type labels.
     :param inferred_label: Column name in ``inferred_labels.csv`` that contains the
-        top-ranked predicted cell type labels (e.g. ``cas_cell_type_name_1``).
+        top-ranked predicted cell type labels (e.g. ``cas_annotation_name_1``).
     :param f_measure_top_k: Maximum k to evaluate.  Metrics are computed for every k
         from 1 to this value.  Hierarchical F-measure always uses k=1.
     :returns: Dict with ``n_samples`` (int) and ``cm_raw_k1_dir`` (str).

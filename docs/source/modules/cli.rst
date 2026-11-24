@@ -22,8 +22,8 @@ to a directory. The output directory will contain ``ontology_response.json``,
 to also write ``inferred_labels.csv`` with per-cell cell type assignments at four granularity positions.
 Pass ``--cluster-label`` to additionally compute cluster-level label calls. Pass
 ``--knn-smoothing K`` to smooth CAS scores for each cell over its ``K`` nearest query-cell
-neighbors while preserving single-cell resolution; this writes ``cas_knn_cell_type_*`` columns.
-Call selection uses the curated L1-L4 granularity lookup. The lookup is fetched from the
+neighbors while preserving single-cell resolution; this writes ``cas_annotation_knn_*`` columns.
+Call selection uses ``compute_annotation_levels_*`` and the curated L1-L4 granularity lookup. The lookup is fetched from the
 backend with the same ontology resource name as the cell ontology resource and cached on the
 ``CASClient``.
 
@@ -59,13 +59,16 @@ The pipeline has four ordered steps plus a convenience command that runs all of 
         --annotate-dirs ./annotate_outputs \
         --output-dir    ./benchmark_results \
         --gt-label      cell_type_ontology_term_id \
-        --inferred-label cas_cell_type_name_1
+        --inferred-label cas_annotation_name_1
 
     # Or step by step
     cellarium-cas benchmark confusion-matrix ...
     cellarium-cas benchmark aggregate        ...
     cellarium-cas benchmark f-measure        ...
     cellarium-cas benchmark hierarchical     ...
+
+Keep ``--f-measure-top-k 1`` for ``cas_annotation_*`` columns: their numeric suffixes
+are granularity levels, not alternative prediction ranks.
 
 See :doc:`benchmarking` for full documentation of the pipeline and output columns.
 

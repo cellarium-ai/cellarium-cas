@@ -47,7 +47,7 @@ _inferred_label_option = click.option(
     required=True,
     help=(
         "Column name in inferred_labels.csv that contains the predicted cell type labels "
-        "(e.g. 'cas_cell_type_name_1')."
+        "(e.g. 'cas_annotation_name_1')."
     ),
 )
 
@@ -58,7 +58,8 @@ _f_measure_top_k_option = click.option(
     show_default=True,
     help=(
         "Number of ranked inferred-label columns to consider for flat F-measure. Columns are derived from "
-        "--inferred-label by replacing its trailing rank; hierarchical F-measure remains top-1."
+        "--inferred-label by replacing its trailing rank; hierarchical F-measure remains top-1. "
+        "Use 1 for cas_annotation_* columns: their suffixes are granularity levels, not prediction ranks."
     ),
 )
 

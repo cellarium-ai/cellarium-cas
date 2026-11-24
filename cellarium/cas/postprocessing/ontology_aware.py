@@ -1,11 +1,13 @@
 import typing as t
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
+from operator import itemgetter
 
 import numpy as np
 import scipy.sparse as sp
 from anndata import AnnData
+from deprecated import deprecated
 
 from cellarium.cas.logging import logger
 from cellarium.cas.models import CellTypeOntologyAwareResults
@@ -301,6 +303,199 @@ def generate_phyloxml_from_scored_cell_ontology_tree(
     return phyloxml_string
 
 
+# Deprecated path-depth top-k API, kept for backward compatibility.
+
+
+# Helper of the deprecated ``compute_most_granular_top_k_calls_*`` functions; superseded by ``get_most_granular_call``.
+def get_most_granular_top_k_calls(
+    aggregated_scores: AggregatedCellOntologyScores,
+    cl: CellOntologyCache,
+    min_acceptable_score: float,
+    top_k: int = 1,
+    root_note: str = CL_CELL_ROOT_NODE,
+    use_shortest_path: bool = False,
+) -> t.List[tuple]:
+    if use_shortest_path:
+        depth_map = cl.get_shortest_path_lengths_from_target(root_note)
+    else:
+        depth_map = cl.get_longest_path_lengths_from_target(root_note)
+    trunc_list = sorted(
+        (
+            (score, depth_map[cl_name], cl_name)
+            for score, cl_name in zip(aggregated_scores.aggregated_scores_c, aggregated_scores.cl_names)
+            if score >= min_acceptable_score
+        ),
+        key=itemgetter(1, 0),
+        reverse=True,
+    )[:top_k]
+    trunc_list += [(1.0, 0, root_note)] * (top_k - len(trunc_list))
+    return trunc_list
+
+
+@deprecated(
+    version="1.10.0",
+    reason="Use :func:`compute_annotation_levels_single` instead. It ranks by curated granularity depth and writes four granularity levels.",
+)
+def compute_most_granular_top_k_calls_single(
+    adata: AnnData,
+    cl: CellOntologyCache,
+    min_acceptable_score: float,
+    top_k: int = 3,
+    obs_prefix: str = "cas_cell_type",
+    root_note: str = CL_CELL_ROOT_NODE,
+    use_shortest_path: bool = False,
+):
+    top_k_calls_dict = defaultdict(list)
+    scores_array_nc = adata.obsm[CAS_CL_SCORES_ANNDATA_OBSM_KEY].toarray()
+
+    # make a wrapped aggregated scores dataclass for the single cell in question
+    aggregated_scores = AggregatedCellOntologyScores(
+        aggregation_op=CellOntologyScoresAggregationOp.MEAN,
+        aggregation_domain=CellOntologyScoresAggregationDomain.ALL_CELLS,
+        threshold=0.0,
+        aggregated_scores_c=np.zeros((len(cl.cl_names))),
+        fraction_over_threshold_c=np.ones((len(cl.cl_names))),
+        cl_labels=cl.cl_labels,
+        cl_names=cl.cl_names,
+    )
+
+    for i_cell in range(adata.n_obs):
+        aggregated_scores.aggregated_scores_c = scores_array_nc[i_cell]
+        top_k_output = get_most_granular_top_k_calls(
+            aggregated_scores, cl, min_acceptable_score, top_k, root_note, use_shortest_path
+        )
+        for k in range(top_k):
+            top_k_calls_dict[f"{obs_prefix}_score_{k + 1}"].append(top_k_output[k][0])
+            top_k_calls_dict[f"{obs_prefix}_name_{k + 1}"].append(top_k_output[k][2])
+            top_k_calls_dict[f"{obs_prefix}_label_{k + 1}"].append(cl.cl_names_to_labels_map[top_k_output[k][2]])
+
+    for k, v in top_k_calls_dict.items():
+        adata.obs[k] = v
+
+
+@deprecated(
+    version="1.10.0",
+    reason="Use :func:`compute_annotation_levels_knn` instead. It ranks by curated granularity depth and writes four granularity levels.",
+)
+def compute_most_granular_top_k_calls_knn(
+    adata: AnnData,
+    cl: CellOntologyCache,
+    min_acceptable_score: float,
+    k_neighbors: int = 5,
+    representation_obsm_key: t.Optional[str] = None,
+    compute_neighbors_if_missing: bool = True,
+    aggregation_op: CellOntologyScoresAggregationOp = CellOntologyScoresAggregationOp.MEAN,
+    aggregation_domain: CellOntologyScoresAggregationDomain = CellOntologyScoresAggregationDomain.ALL_CELLS,
+    aggregation_score_threshold: float = 1e-4,
+    top_k: int = 3,
+    obs_prefix: str = "cas_knn_cell_type",
+    root_note: str = CL_CELL_ROOT_NODE,
+    use_shortest_path: bool = False,
+):
+    """
+    Assign the most granular top-k cell type calls per kNN neighborhood in ``adata.obs``.
+
+    Keeps single-cell resolution: for each cell, its CAS scores are aggregated over the cell itself
+    plus its ``k_neighbors`` nearest query-cell neighbors (instead of over a hard Leiden cluster).
+    Neighborhoods overlap, so every cell keeps its own refined annotation.
+
+    :param adata: AnnData object with ``cas_cl_scores`` already inserted via :meth:`insert_ontology_aware_response`.
+    :param cl: The CellOntologyCache object containing cell ontology term names and labels.
+    :param min_acceptable_score: Minimum evidence score for a cell type call to be considered.
+    :param representation_obsm_key: Optional ``adata.obsm`` key holding the query-cell representation used to
+        build the kNN graph when it is missing. ``None`` (default) uses ``adata.X``.
+    :param compute_neighbors_if_missing: If True and no kNN graph is stored in ``adata.obsp['distances']``,
+        compute one with ``scanpy.pp.neighbors``. Defaults to True.
+    :raises ValueError: If no graph exists and computation is disabled, or if the graph has fewer than
+        ``k_neighbors`` non-self neighbors for any cell.
+    :param aggregation_op: The aggregation operation to apply to the CAS scores within each neighborhood.
+    :param aggregation_domain: The domain over which to perform the aggregation.
+    :param aggregation_score_threshold: The threshold value for considering a CAS score as non-zero.
+    :param top_k: Number of top calls to make per neighborhood.
+    :param obs_prefix: Prefix for the ``.obs`` columns to write results into.
+    :param root_note: Root node of the cell ontology used for ranking.
+    :param use_shortest_path: Whether to use shortest (True) or longest (False) path depth for ranking.
+    """
+    neighbor_indices = get_knn_neighbor_indices(
+        adata=adata,
+        k_neighbors=k_neighbors,
+        representation_obsm_key=representation_obsm_key,
+        compute_neighbors_if_missing=compute_neighbors_if_missing,
+    )
+
+    n_obs = adata.n_obs
+    top_k_calls_dict = {}
+    for k in range(top_k):
+        top_k_calls_dict[f"{obs_prefix}_score_{k + 1}"] = [None] * n_obs
+        top_k_calls_dict[f"{obs_prefix}_name_{k + 1}"] = [None] * n_obs
+        top_k_calls_dict[f"{obs_prefix}_label_{k + 1}"] = [None] * n_obs
+
+    for i_cell in range(n_obs):
+        # self + its k nearest query-cell neighbors
+        obs_indices = np.concatenate(([i_cell], neighbor_indices[i_cell]))
+        aggregated_scores = get_aggregated_cas_ontology_aware_scores(
+            adata, obs_indices, aggregation_op, aggregation_domain, aggregation_score_threshold
+        )
+        top_k_output = get_most_granular_top_k_calls(
+            aggregated_scores, cl, min_acceptable_score, top_k, root_note, use_shortest_path
+        )
+        for k in range(top_k):
+            top_k_calls_dict[f"{obs_prefix}_score_{k + 1}"][i_cell] = top_k_output[k][0]
+            top_k_calls_dict[f"{obs_prefix}_name_{k + 1}"][i_cell] = top_k_output[k][2]
+            top_k_calls_dict[f"{obs_prefix}_label_{k + 1}"][i_cell] = cl.cl_names_to_labels_map[top_k_output[k][2]]
+
+    for k, v in top_k_calls_dict.items():
+        adata.obs[k] = v
+
+
+@deprecated(
+    version="1.10.0",
+    reason="Use :func:`compute_annotation_levels_cluster` instead. It ranks by curated granularity depth and writes four granularity levels.",
+)
+def compute_most_granular_top_k_calls_cluster(
+    adata: AnnData,
+    cl: CellOntologyCache,
+    min_acceptable_score: float,
+    cluster_label_obs_column: str,
+    aggregation_op: CellOntologyScoresAggregationOp = CellOntologyScoresAggregationOp.MEAN,
+    aggregation_domain: CellOntologyScoresAggregationDomain = CellOntologyScoresAggregationDomain.ALL_CELLS,
+    aggregation_score_threshod: float = 1e-4,
+    top_k: int = 3,
+    obs_prefix: str = "cas_cell_type",
+    root_note: str = CL_CELL_ROOT_NODE,
+    use_shortest_path: bool = False,
+):
+    top_k_calls_dict = {}
+    for k in range(top_k):
+        top_k_calls_dict[f"{obs_prefix}_score_{k + 1}"] = [None] * adata.n_obs
+        top_k_calls_dict[f"{obs_prefix}_name_{k + 1}"] = [None] * adata.n_obs
+        top_k_calls_dict[f"{obs_prefix}_label_{k + 1}"] = [None] * adata.n_obs
+
+    def _update_list(target_list, indices, value):
+        for idx in indices:
+            target_list[idx] = value
+
+    for cluster_label in adata.obs[cluster_label_obs_column].cat.categories:
+        obs_indices = get_obs_indices_for_cluster(adata, cluster_label_obs_column, cluster_label)
+        aggregated_scores = get_aggregated_cas_ontology_aware_scores(
+            adata, obs_indices, aggregation_op, aggregation_domain, aggregation_score_threshod
+        )
+        top_k_output = get_most_granular_top_k_calls(
+            aggregated_scores, cl, min_acceptable_score, top_k, root_note, use_shortest_path
+        )
+        for k in range(top_k):
+            _update_list(top_k_calls_dict[f"{obs_prefix}_score_{k + 1}"], obs_indices, top_k_output[k][0])
+            _update_list(top_k_calls_dict[f"{obs_prefix}_name_{k + 1}"], obs_indices, top_k_output[k][2])
+            _update_list(
+                top_k_calls_dict[f"{obs_prefix}_label_{k + 1}"],
+                obs_indices,
+                cl.cl_names_to_labels_map[top_k_output[k][2]],
+            )
+
+    for k, v in top_k_calls_dict.items():
+        adata.obs[k] = v
+
+
 @dataclass(frozen=True)
 class GranularityCellTypeCall:
     """
@@ -421,12 +616,12 @@ def _assign_call(
                 columns[column_name][idx] = value
 
 
-def compute_most_granular_top_k_calls_single(
+def compute_annotation_levels_single(
     adata: AnnData,
     cl: CellOntologyCache,
     granularity_cache: CellGranularityCache,
     min_acceptable_score: float,
-    obs_prefix: str = "cas_cell_type",
+    obs_prefix: str = "cas_annotation",
     fill_missing_levels: bool = True,
 ):
     """
@@ -532,7 +727,7 @@ def get_knn_neighbor_indices(
     return neighbor_indices
 
 
-def compute_most_granular_top_k_calls_knn(
+def compute_annotation_levels_knn(
     adata: AnnData,
     cl: CellOntologyCache,
     granularity_cache: CellGranularityCache,
@@ -543,7 +738,7 @@ def compute_most_granular_top_k_calls_knn(
     aggregation_op: CellOntologyScoresAggregationOp = CellOntologyScoresAggregationOp.MEAN,
     aggregation_domain: CellOntologyScoresAggregationDomain = CellOntologyScoresAggregationDomain.ALL_CELLS,
     aggregation_score_threshold: float = 1e-4,
-    obs_prefix: str = "cas_cell_type_knn",
+    obs_prefix: str = "cas_annotation_knn",
     fill_missing_levels: bool = True,
 ):
     """
@@ -597,7 +792,7 @@ def compute_most_granular_top_k_calls_knn(
         adata.obs[column_name] = values
 
 
-def compute_most_granular_top_k_calls_cluster(
+def compute_annotation_levels_cluster(
     adata: AnnData,
     cl: CellOntologyCache,
     granularity_cache: CellGranularityCache,
@@ -606,7 +801,7 @@ def compute_most_granular_top_k_calls_cluster(
     aggregation_op: CellOntologyScoresAggregationOp = CellOntologyScoresAggregationOp.MEAN,
     aggregation_domain: CellOntologyScoresAggregationDomain = CellOntologyScoresAggregationDomain.ALL_CELLS,
     aggregation_score_threshod: float = 1e-4,
-    obs_prefix: str = "cas_cell_type_cluster",
+    obs_prefix: str = "cas_annotation_cluster",
     fill_missing_levels: bool = True,
 ):
     """

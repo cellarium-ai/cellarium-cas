@@ -71,28 +71,28 @@ ontology resource name as the cell ontology resource, and caches the resulting
 
 Assign the most granular cell type call to individual cells::
 
-    cas.compute_most_granular_top_k_calls_single(
+    cas.compute_annotation_levels_single(
         adata=adata,
         min_acceptable_score=0.2,
-        obs_prefix="cas_cell_type",
+        obs_prefix="cas_annotation",
     )
 
 Or assign calls per cluster::
 
-    cas.compute_most_granular_top_k_calls_cluster(
+    cas.compute_annotation_levels_cluster(
         adata=adata,
         min_acceptable_score=0.2,
         cluster_label_obs_column="cluster_label",
-        obs_prefix="cas_cell_type_cluster",
+        obs_prefix="cas_annotation_cluster",
     )
 
 Or smooth scores over each cell's local kNN neighborhood while keeping one result per cell::
 
-    cas.compute_most_granular_top_k_calls_knn(
+    cas.compute_annotation_levels_knn(
         adata=adata,
         min_acceptable_score=0.2,
         k_neighbors=30,
-        obs_prefix="cas_cell_type_knn",
+        obs_prefix="cas_annotation_knn",
     )
 
 This reuses ``adata.obsp['distances']`` when a kNN graph is already present. Otherwise,
@@ -120,6 +120,19 @@ By default (``fill_missing_levels=True``) an undefined level inherits the neares
 defined level of the selected term (for example a missing L4 repeats L3); pass
 ``fill_missing_levels=False`` to leave it null. When no eligible term exists, all columns are
 ``None`` rather than a fabricated root-cell prediction.
+
+Deprecated top-k API
+~~~~~~~~~~~~~~~~~~~~
+
+``compute_most_granular_top_k_calls_single``, ``compute_most_granular_top_k_calls_cluster`` and
+``compute_most_granular_top_k_calls_knn`` emit a ``DeprecationWarning``. The superseded
+``get_most_granular_top_k_calls`` selector remains available without a warning.
+Legacy methods keep their original behavior: the top ``top_k`` terms ranked by Cell Ontology
+longest (or, with ``use_shortest_path=True``, shortest) path depth then score, written as
+``{obs_prefix}_{score,name,label}_{k}`` where ``k`` is the candidate rank, with a root-cell prediction
+padding missing ranks. Their default prefixes are ``cas_cell_type``, ``cas_cell_type`` and
+``cas_knn_cell_type``, which differ from the ``compute_annotation_levels_*`` defaults, so both can
+be run side by side. Use ``compute_annotation_levels_*`` instead.
 
 Interactive visualization
 --------------------------

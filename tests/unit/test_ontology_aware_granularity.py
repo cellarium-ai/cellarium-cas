@@ -28,9 +28,9 @@ from cellarium.cas.postprocessing.ontology_aware import (
     AggregatedCellOntologyScores,
     CellOntologyScoresAggregationDomain,
     CellOntologyScoresAggregationOp,
-    compute_most_granular_top_k_calls_cluster,
-    compute_most_granular_top_k_calls_knn,
-    compute_most_granular_top_k_calls_single,
+    compute_annotation_levels_cluster,
+    compute_annotation_levels_knn,
+    compute_annotation_levels_single,
     get_most_granular_call,
 )
 
@@ -132,6 +132,42 @@ def test_missing_levels_and_unknown_values_are_normalized():
     assert cache.get_levels("CL:MISSING") == {"l1": None, "l2": None, "l3": None, "l4": None}
 
 
+def test_deprecated_path_depth_api_is_kept_and_warns():
+    import pytest
+
+    from cellarium.cas.postprocessing.ontology_aware import compute_most_granular_top_k_calls_single
+
+    cl = _make_cl()
+    cl._longest_path_lengths.update({"CL:0000002": 1, "CL:0000003": 5})
+    cl.cl_names_to_labels_map["CL:0000000"] = "cell"  # root used for padding
+    adata = _make_adata(np.array([[0.0, 0.9, 0.5, 0.0, 0.0, 0.0]]))
+    with pytest.warns(DeprecationWarning):
+        compute_most_granular_top_k_calls_single(adata=adata, cl=cl, min_acceptable_score=0.2, top_k=3)
+    # ranked by ontology path depth, padded with the root cell when candidates run out
+    assert adata.obs["cas_cell_type_name_1"].iloc[0] == "CL:0000003"
+    assert adata.obs["cas_cell_type_name_2"].iloc[0] == "CL:0000002"
+    assert adata.obs["cas_cell_type_name_3"].iloc[0] == "CL:0000000"
+    assert adata.obs["cas_cell_type_score_3"].iloc[0] == 1.0
+
+    # New curated-level defaults coexist with legacy rank columns.
+    compute_annotation_levels_single(
+        adata=adata,
+        cl=cl,
+        granularity_cache=CellGranularityCache(TEST_GRANULARITY_RESOURCE),
+        min_acceptable_score=0.2,
+    )
+    assert adata.obs["cas_annotation_name_1"].iloc[0] == "CL:0000003"
+    assert adata.obs["cas_cell_type_name_1"].iloc[0] == "CL:0000003"
+
+    cl._shortest_path_lengths.update({"CL:0000002": 7, "CL:0000003": 1})
+    with pytest.warns(DeprecationWarning):
+        compute_most_granular_top_k_calls_single(
+            adata=adata, cl=cl, min_acceptable_score=0.2, top_k=2, use_shortest_path=True
+        )
+    assert adata.obs["cas_cell_type_name_1"].iloc[0] == "CL:0000002"
+    assert adata.obs["cas_annotation_name_1"].iloc[0] == "CL:0000003"
+
+
 def _select(scores: t.Dict[str, float], cl: t.Optional[CellOntologyCache] = None, min_score: float = 0.2):
     return get_most_granular_call(
         aggregated_scores=_aggregated_scores(scores),
@@ -179,7 +215,7 @@ def test_level_scores_hold_aggregated_scores_of_level_terms_even_below_threshold
 
 def _run_single(scores_row, min_score: float = 0.2, **kwargs) -> AnnData:
     adata = _make_adata(np.array([scores_row]))
-    compute_most_granular_top_k_calls_single(
+    compute_annotation_levels_single(
         adata=adata,
         cl=_make_cl(),
         granularity_cache=CellGranularityCache(TEST_GRANULARITY_RESOURCE),
@@ -193,49 +229,49 @@ def test_single_positions_run_from_most_to_least_granular_level():
     # CL:0000004 is selected (depth 4): position 1 = l4 ... position 4 = l1.
     adata = _run_single([0.9, 0.8, 0.7, 0.6, 0.0, 0.0])
     obs = adata.obs
-    assert [obs[f"cas_cell_type_name_{n}"].iloc[0] for n in range(1, 5)] == [
+    assert [obs[f"cas_annotation_name_{n}"].iloc[0] for n in range(1, 5)] == [
         "CL:0000004",
         "CL:0000003",
         "CL:0000002",
         "CL:0000001",
     ]
-    assert [obs[f"cas_cell_type_label_{n}"].iloc[0] for n in range(1, 5)] == [
+    assert [obs[f"cas_annotation_label_{n}"].iloc[0] for n in range(1, 5)] == [
         "label_CL:0000004",
         "label_CL:0000003",
         "label_CL:0000002",
         "label_CL:0000001",
     ]
-    assert np.allclose([obs[f"cas_cell_type_score_{n}"].iloc[0] for n in range(1, 5)], [0.6, 0.7, 0.8, 0.9])
-    assert not [c for c in obs.columns if c.startswith("cas_cell_type_") and c.endswith(("_5", "_0"))]
+    assert np.allclose([obs[f"cas_annotation_score_{n}"].iloc[0] for n in range(1, 5)], [0.6, 0.7, 0.8, 0.9])
+    assert not [c for c in obs.columns if c.startswith("cas_annotation_") and c.endswith(("_5", "_0"))]
 
 
 def test_identical_l3_l4_term_fills_two_positions():
     adata = _run_single([0.0, 0.0, 0.0, 0.0, 0.7, 0.0])
-    assert adata.obs["cas_cell_type_name_1"].iloc[0] == "CL:0000005"
-    assert adata.obs["cas_cell_type_name_2"].iloc[0] == "CL:0000005"
-    assert adata.obs["cas_cell_type_name_3"].iloc[0] == "CL:0000002"
+    assert adata.obs["cas_annotation_name_1"].iloc[0] == "CL:0000005"
+    assert adata.obs["cas_annotation_name_2"].iloc[0] == "CL:0000005"
+    assert adata.obs["cas_annotation_name_3"].iloc[0] == "CL:0000002"
 
 
 def test_fill_missing_levels_flag_controls_undefined_levels():
     # CL:0000003 selected (depth 3): lookup l4 is undefined.
     row = [0.9, 0.8, 0.7, 0.0, 0.0, 0.0]
     filled = _run_single(row, fill_missing_levels=True).obs
-    assert filled["cas_cell_type_name_1"].iloc[0] == "CL:0000003"
-    assert filled["cas_cell_type_label_1"].iloc[0] == "label_CL:0000003"
-    assert filled["cas_cell_type_score_1"].iloc[0] == 0.7
+    assert filled["cas_annotation_name_1"].iloc[0] == "CL:0000003"
+    assert filled["cas_annotation_label_1"].iloc[0] == "label_CL:0000003"
+    assert filled["cas_annotation_score_1"].iloc[0] == 0.7
 
     unfilled = _run_single(row, fill_missing_levels=False).obs
-    assert pd.isna(unfilled["cas_cell_type_name_1"].iloc[0])
-    assert pd.isna(unfilled["cas_cell_type_label_1"].iloc[0])
-    assert pd.isna(unfilled["cas_cell_type_score_1"].iloc[0])
-    assert unfilled["cas_cell_type_name_2"].iloc[0] == "CL:0000003"
+    assert pd.isna(unfilled["cas_annotation_name_1"].iloc[0])
+    assert pd.isna(unfilled["cas_annotation_label_1"].iloc[0])
+    assert pd.isna(unfilled["cas_annotation_score_1"].iloc[0])
+    assert unfilled["cas_annotation_name_2"].iloc[0] == "CL:0000003"
 
 
 def test_no_eligible_candidates_do_not_fabricate_confidence():
     adata = _run_single([0.1] * 6)
     for position in range(1, 5):
         for suffix in ("name", "label", "score"):
-            assert pd.isna(adata.obs[f"cas_cell_type_{suffix}_{position}"].iloc[0])
+            assert pd.isna(adata.obs[f"cas_annotation_{suffix}_{position}"].iloc[0])
 
 
 def test_cluster_outputs_use_aggregated_scores():
@@ -249,21 +285,21 @@ def test_cluster_outputs_use_aggregated_scores():
     adata = _make_adata(scores)
     adata.obs["cluster_label"] = pd.Categorical(["A", "A", "B", "B"])
 
-    compute_most_granular_top_k_calls_cluster(
+    compute_annotation_levels_cluster(
         adata=adata,
         cl=cl,
         granularity_cache=cache,
         min_acceptable_score=0.2,
         cluster_label_obs_column="cluster_label",
-        obs_prefix="cas_cluster_type",
+        obs_prefix="cas_annotation_cluster",
     )
 
     # CL:0000002 selected; lookup l3/l4 undefined so positions 1-3 repeat it; position 4 is l1.
     for position in (1, 2, 3):
-        assert adata.obs[f"cas_cluster_type_name_{position}"].tolist() == ["CL:0000002"] * 4
-        assert np.allclose(adata.obs[f"cas_cluster_type_score_{position}"].to_numpy(), [0.5, 0.5, 0.3, 0.3])
-    assert adata.obs["cas_cluster_type_name_4"].tolist() == ["CL:0000001"] * 4
-    assert np.allclose(adata.obs["cas_cluster_type_score_4"].to_numpy(), [0.8] * 4)
+        assert adata.obs[f"cas_annotation_cluster_name_{position}"].tolist() == ["CL:0000002"] * 4
+        assert np.allclose(adata.obs[f"cas_annotation_cluster_score_{position}"].to_numpy(), [0.5, 0.5, 0.3, 0.3])
+    assert adata.obs["cas_annotation_cluster_name_4"].tolist() == ["CL:0000001"] * 4
+    assert np.allclose(adata.obs["cas_annotation_cluster_score_4"].to_numpy(), [0.8] * 4)
 
 
 def test_knn_outputs_use_neighborhood_aggregation():
@@ -279,16 +315,16 @@ def test_knn_outputs_use_neighborhood_aggregation():
     cols = np.array([1, 2, 0, 2, 0, 1])
     adata.obsp["distances"] = sp.csr_matrix((np.ones(6), (rows, cols)), shape=(3, 3))
 
-    compute_most_granular_top_k_calls_knn(
+    compute_annotation_levels_knn(
         adata=adata,
         cl=cl,
         granularity_cache=cache,
         min_acceptable_score=0.2,
         k_neighbors=2,
-        obs_prefix="cas_knn_cell_type",
+        obs_prefix="cas_annotation_knn",
     )
 
     expected_score = np.mean(scores[:, 2])
-    assert adata.obs["cas_knn_cell_type_name_1"].tolist() == ["CL:0000003"] * 3
-    assert np.allclose(pd.to_numeric(adata.obs["cas_knn_cell_type_score_1"]).to_numpy(), expected_score)
-    assert adata.obs["cas_knn_cell_type_name_2"].tolist() == ["CL:0000003"] * 3
+    assert adata.obs["cas_annotation_knn_name_1"].tolist() == ["CL:0000003"] * 3
+    assert np.allclose(pd.to_numeric(adata.obs["cas_annotation_knn_score_1"]).to_numpy(), expected_score)
+    assert adata.obs["cas_annotation_knn_name_2"].tolist() == ["CL:0000003"] * 3

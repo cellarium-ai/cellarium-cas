@@ -554,7 +554,7 @@ class TestCasClient:
             headers=ANY,
         )
 
-    def test_compute_most_granular_top_k_calls_single(self):
+    def test_compute_annotation_levels_single(self):
         num_cells = 10
         self.__mock_constructor_calls()
         self.__mock_annotate_matrix_cell_type_ontology_aware_strategy_calls(num_cells=num_cells)
@@ -565,17 +565,17 @@ class TestCasClient:
         adata = self.__mock_anndata_matrix(num_cells=num_cells)
         response = cas_client.annotate_matrix_cell_type_ontology_aware_strategy(matrix=adata, chunk_size=10)
         cas_client.insert_ontology_aware_response(response, adata)
-        cas_client.compute_most_granular_top_k_calls_single(adata=adata, min_acceptable_score=0.2)
+        cas_client.compute_annotation_levels_single(adata=adata, min_acceptable_score=0.2)
 
         for k in range(1, 5):
-            assert f"cas_cell_type_score_{k}" in adata.obs
-            assert f"cas_cell_type_name_{k}" in adata.obs
-            assert f"cas_cell_type_label_{k}" in adata.obs
-        assert adata.obs["cas_cell_type_name_1"].iloc[0] == "CL:0000540"
-        assert not [c for c in adata.obs.columns if c.startswith("cas_cell_type_") and c.endswith("_5")]
+            assert f"cas_annotation_score_{k}" in adata.obs
+            assert f"cas_annotation_name_{k}" in adata.obs
+            assert f"cas_annotation_label_{k}" in adata.obs
+        assert adata.obs["cas_annotation_name_1"].iloc[0] == "CL:0000540"
+        assert not [c for c in adata.obs.columns if c.startswith("cas_annotation_") and c.endswith("_5")]
         assert len(adata.obs) == num_cells
 
-    def test_compute_most_granular_top_k_calls_cluster(self):
+    def test_compute_annotation_levels_cluster(self):
         import pandas as pd
 
         num_cells = 10
@@ -586,24 +586,24 @@ class TestCasClient:
 
         cas_client = CASClient(api_token=TEST_TOKEN, api_url=TEST_URL)
         adata = self.__mock_anndata_matrix(num_cells=num_cells)
-        # add a categorical cluster_label column required by compute_most_granular_top_k_calls_cluster
+        # add a categorical cluster_label column required by compute_annotation_levels_cluster
         adata.obs["cluster_label"] = pd.Categorical(["A"] * 5 + ["B"] * 5)
 
         response = cas_client.annotate_matrix_cell_type_ontology_aware_strategy(matrix=adata, chunk_size=10)
         cas_client.insert_ontology_aware_response(response, adata)
-        cas_client.compute_most_granular_top_k_calls_cluster(
+        cas_client.compute_annotation_levels_cluster(
             adata=adata,
             min_acceptable_score=0.2,
             cluster_label_obs_column="cluster_label",
-            obs_prefix="cas_cluster_type",
+            obs_prefix="cas_annotation_cluster",
         )
 
         for k in range(1, 5):
-            assert f"cas_cluster_type_score_{k}" in adata.obs
-            assert f"cas_cluster_type_name_{k}" in adata.obs
-            assert f"cas_cluster_type_label_{k}" in adata.obs
+            assert f"cas_annotation_cluster_score_{k}" in adata.obs
+            assert f"cas_annotation_cluster_name_{k}" in adata.obs
+            assert f"cas_annotation_cluster_label_{k}" in adata.obs
 
-    def test_compute_most_granular_top_k_calls_knn(self):
+    def test_compute_annotation_levels_knn(self):
         from sklearn.neighbors import NearestNeighbors
 
         num_cells = 10
@@ -625,14 +625,128 @@ class TestCasClient:
 
         response = cas_client.annotate_matrix_cell_type_ontology_aware_strategy(matrix=adata, chunk_size=10)
         cas_client.insert_ontology_aware_response(response, adata)
+        cas_client.compute_annotation_levels_knn(
+            adata=adata,
+            min_acceptable_score=0.2,
+            k_neighbors=k_neighbors,
+            obs_prefix="cas_annotation_knn",
+        )
+
+        for k in range(1, 5):
+            assert f"cas_annotation_knn_score_{k}" in adata.obs
+            assert f"cas_annotation_knn_name_{k}" in adata.obs
+            assert f"cas_annotation_knn_label_{k}" in adata.obs
+        # single-cell resolution: one refined annotation per cell
+        assert len(adata.obs) == num_cells
+        assert adata.obs["cas_annotation_knn_label_1"].notna().all()
+        assert adata.obs["cas_annotation_knn_score_1"].notna().all()
+
+        with pytest.raises(ValueError, match="Requested k_neighbors=4"):
+            cas_client.compute_annotation_levels_knn(
+                adata=adata,
+                min_acceptable_score=0.2,
+                k_neighbors=4,
+            )
+
+    def test_compute_annotation_levels_knn_requires_graph_when_flag_false(self):
+        num_cells = 10
+        self.__mock_constructor_calls()
+        self.__mock_annotate_matrix_cell_type_ontology_aware_strategy_calls(num_cells=num_cells)
+        self.__mock_cell_ontology_resource()
+        self.__mock_cell_granularity_resource()
+
+        cas_client = CASClient(api_token=TEST_TOKEN, api_url=TEST_URL)
+        adata = self.__mock_anndata_matrix(num_cells=num_cells)
+        # no obsp['distances'] precomputed
+        assert "distances" not in adata.obsp
+
+        response = cas_client.annotate_matrix_cell_type_ontology_aware_strategy(matrix=adata, chunk_size=10)
+        cas_client.insert_ontology_aware_response(response, adata)
+        with pytest.raises(ValueError):
+            cas_client.compute_annotation_levels_knn(
+                adata=adata,
+                min_acceptable_score=0.2,
+                k_neighbors=3,
+                compute_neighbors_if_missing=False,
+            )
+
+    def test_compute_most_granular_top_k_calls_single(self):
+        num_cells = 10
+        self.__mock_constructor_calls()
+        self.__mock_annotate_matrix_cell_type_ontology_aware_strategy_calls(num_cells=num_cells)
+        self.__mock_cell_ontology_resource()
+
+        cas_client = CASClient(api_token=TEST_TOKEN, api_url=TEST_URL)
+        adata = self.__mock_anndata_matrix(num_cells=num_cells)
+        response = cas_client.annotate_matrix_cell_type_ontology_aware_strategy(matrix=adata, chunk_size=10)
+        cas_client.insert_ontology_aware_response(response, adata)
+        with pytest.warns(DeprecationWarning):
+            cas_client.compute_most_granular_top_k_calls_single(adata=adata, min_acceptable_score=0.2, top_k=3)
+
+        for k in range(1, 4):
+            assert f"cas_cell_type_score_{k}" in adata.obs
+            assert f"cas_cell_type_name_{k}" in adata.obs
+            assert f"cas_cell_type_label_{k}" in adata.obs
+        assert len(adata.obs) == num_cells
+
+    def test_compute_most_granular_top_k_calls_cluster(self):
+        import pandas as pd
+
+        num_cells = 10
+        self.__mock_constructor_calls()
+        self.__mock_annotate_matrix_cell_type_ontology_aware_strategy_calls(num_cells=num_cells)
+        self.__mock_cell_ontology_resource()
+
+        cas_client = CASClient(api_token=TEST_TOKEN, api_url=TEST_URL)
+        adata = self.__mock_anndata_matrix(num_cells=num_cells)
+        # add a categorical cluster_label column required by compute_most_granular_top_k_calls_cluster
+        adata.obs["cluster_label"] = pd.Categorical(["A"] * 5 + ["B"] * 5)
+
+        response = cas_client.annotate_matrix_cell_type_ontology_aware_strategy(matrix=adata, chunk_size=10)
+        cas_client.insert_ontology_aware_response(response, adata)
+        cas_client.compute_most_granular_top_k_calls_cluster(
+            adata=adata,
+            min_acceptable_score=0.2,
+            cluster_label_obs_column="cluster_label",
+            top_k=3,
+            obs_prefix="cas_cluster_type",
+        )
+
+        for k in range(1, 4):
+            assert f"cas_cluster_type_score_{k}" in adata.obs
+            assert f"cas_cluster_type_name_{k}" in adata.obs
+            assert f"cas_cluster_type_label_{k}" in adata.obs
+
+    def test_compute_most_granular_top_k_calls_knn(self):
+        from sklearn.neighbors import NearestNeighbors
+
+        num_cells = 10
+        k_neighbors = 3
+        self.__mock_constructor_calls()
+        self.__mock_annotate_matrix_cell_type_ontology_aware_strategy_calls(num_cells=num_cells)
+        self.__mock_cell_ontology_resource()
+
+        cas_client = CASClient(api_token=TEST_TOKEN, api_url=TEST_URL)
+        adata = self.__mock_anndata_matrix(num_cells=num_cells)
+        # build a scanpy-style kNN graph (self excluded) so the unit test does not depend on scanpy
+        nn = NearestNeighbors(n_neighbors=k_neighbors + 1).fit(adata.X)
+        distances, indices = nn.kneighbors(adata.X, return_distance=True)
+        rows = np.repeat(np.arange(num_cells), k_neighbors)
+        cols = indices[:, 1:].ravel()  # drop self
+        data = distances[:, 1:].ravel()
+        adata.obsp["distances"] = sp.csr_matrix((data, (rows, cols)), shape=(num_cells, num_cells))
+
+        response = cas_client.annotate_matrix_cell_type_ontology_aware_strategy(matrix=adata, chunk_size=10)
+        cas_client.insert_ontology_aware_response(response, adata)
         cas_client.compute_most_granular_top_k_calls_knn(
             adata=adata,
             min_acceptable_score=0.2,
             k_neighbors=k_neighbors,
+            top_k=3,
             obs_prefix="cas_knn_cell_type",
         )
 
-        for k in range(1, 5):
+        for k in range(1, 4):
             assert f"cas_knn_cell_type_score_{k}" in adata.obs
             assert f"cas_knn_cell_type_name_{k}" in adata.obs
             assert f"cas_knn_cell_type_label_{k}" in adata.obs
@@ -653,7 +767,6 @@ class TestCasClient:
         self.__mock_constructor_calls()
         self.__mock_annotate_matrix_cell_type_ontology_aware_strategy_calls(num_cells=num_cells)
         self.__mock_cell_ontology_resource()
-        self.__mock_cell_granularity_resource()
 
         cas_client = CASClient(api_token=TEST_TOKEN, api_url=TEST_URL)
         adata = self.__mock_anndata_matrix(num_cells=num_cells)

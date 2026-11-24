@@ -72,10 +72,10 @@ def annotate(
     :param save_ontology_resource: If ``True``, save ``ontology_resource.json`` for offline benchmarking.
     :param output_h5ad: If provided, insert CAS annotations into ``adata`` and save it as an ``.h5ad`` file at this path.
     :param cluster_label_obs_column: If provided, run cluster-level label inference using this ``adata.obs`` column
-        and include ``cas_cluster_type_*`` columns in ``inferred_labels.csv``. Results are also written to the h5ad
+        and include ``cas_annotation_cluster_*`` columns in ``inferred_labels.csv``. Results are also written to the h5ad
         when ``output_h5ad`` is set.
     :param knn_smoothing: If provided, run kNN-based score smoothing with this many query-cell neighbors and
-        include ``cas_knn_cell_type_*`` columns in ``inferred_labels.csv``. Results are also written to the h5ad
+        include ``cas_annotation_knn_*`` columns in ``inferred_labels.csv``. Results are also written to the h5ad
         when ``output_h5ad`` is set.
 
     :returns: Dict of paths written:
@@ -132,41 +132,36 @@ def annotate(
         cas.insert_ontology_aware_response(response, adata)
 
     if infer_labels:
-        cas.compute_most_granular_top_k_calls_single(
+        cas.compute_annotation_levels_single(
             adata=adata,
             min_acceptable_score=min_acceptable_score,
-            )
+        )
 
     if cluster_label_obs_column is not None:
-        cas.compute_most_granular_top_k_calls_cluster(
+        cas.compute_annotation_levels_cluster(
             adata=adata,
             min_acceptable_score=min_acceptable_score,
             cluster_label_obs_column=cluster_label_obs_column,
-                obs_prefix="cas_cluster_type",
         )
 
     if knn_smoothing is not None:
-        cas.compute_most_granular_top_k_calls_knn(
+        cas.compute_annotation_levels_knn(
             adata=adata,
             min_acceptable_score=min_acceptable_score,
             k_neighbors=knn_smoothing,
-                obs_prefix="cas_knn_cell_type",
         )
 
     if infer_labels or cluster_label_obs_column is not None or knn_smoothing is not None:
+
         def _inference_columns(prefix: str, enabled: bool) -> t.List[str]:
             if not enabled:
                 return []
-            return [
-                f"{prefix}_{suffix}_{level}"
-                for level in range(1, 5)
-                for suffix in ("label", "name", "score")
-            ]
+            return [f"{prefix}_{suffix}_{level}" for level in range(1, 5) for suffix in ("label", "name", "score")]
 
         inference_cols = (
-            _inference_columns("cas_cell_type", infer_labels)
-            + _inference_columns("cas_cluster_type", cluster_label_obs_column is not None)
-            + _inference_columns("cas_knn_cell_type", knn_smoothing is not None)
+            _inference_columns("cas_annotation", infer_labels)
+            + _inference_columns("cas_annotation_cluster", cluster_label_obs_column is not None)
+            + _inference_columns("cas_annotation_knn", knn_smoothing is not None)
         )
         all_cols = [c for c in inference_cols if c in adata.obs.columns]
         df = pd.DataFrame(adata.obs[all_cols], index=adata.obs.index)

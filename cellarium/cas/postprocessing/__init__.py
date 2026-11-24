@@ -22,6 +22,9 @@ from .ontology_aware import (
     CellOntologyScoresAggregationDomain,
     CellOntologyScoresAggregationOp,
     GranularityCellTypeCall,
+    compute_annotation_levels_cluster,
+    compute_annotation_levels_knn,
+    compute_annotation_levels_single,
     compute_most_granular_top_k_calls_cluster,
     compute_most_granular_top_k_calls_knn,
     compute_most_granular_top_k_calls_single,
@@ -30,6 +33,7 @@ from .ontology_aware import (
     generate_phyloxml_from_scored_cell_ontology_tree,
     get_aggregated_cas_ontology_aware_scores,
     get_most_granular_call,
+    get_most_granular_top_k_calls,
     insert_cas_ontology_aware_response_into_adata,
 )
 
@@ -48,6 +52,10 @@ __all__ = [
     "get_obs_indices_for_cluster",
     # ontology aware
     "get_most_granular_call",
+    "get_most_granular_top_k_calls",
+    "compute_annotation_levels_single",
+    "compute_annotation_levels_cluster",
+    "compute_annotation_levels_knn",
     "compute_most_granular_top_k_calls_single",
     "compute_most_granular_top_k_calls_cluster",
     "compute_most_granular_top_k_calls_knn",
