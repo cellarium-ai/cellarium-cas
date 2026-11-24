@@ -184,6 +184,7 @@ class CASClient:
         min_acceptable_score: float,
         top_k: int = 3,
         obs_prefix: str = "cas_cell_type",
+        fill_missing_levels: bool = True,
     ) -> None:
         """
         Assign the most granular top-k cell type calls to individual cells in ``adata.obs``.
@@ -194,6 +195,8 @@ class CASClient:
         :param min_acceptable_score: Minimum evidence score for a cell type call to be considered.
         :param top_k: Number of top calls to make per cell.
         :param obs_prefix: Prefix for the ``.obs`` columns to write results into.
+        :param fill_missing_levels: If True, an undefined L2-L4 level repeats the nearest shallower defined level
+            of the same term; if False, it stays null.
         """
         resource_name = (
             adata.uns.get(CAS_METADATA_ANNDATA_UNS_KEY, {}).get("ontology_resource_name")
@@ -208,6 +211,7 @@ class CASClient:
             min_acceptable_score=min_acceptable_score,
             top_k=top_k,
             obs_prefix=obs_prefix,
+            fill_missing_levels=fill_missing_levels,
         )
 
     def compute_most_granular_top_k_calls_cluster(
@@ -217,6 +221,7 @@ class CASClient:
         cluster_label_obs_column: str,
         top_k: int = 3,
         obs_prefix: str = "cas_cell_type",
+        fill_missing_levels: bool = True,
     ) -> None:
         """
         Assign the most granular top-k cell type calls per cluster in ``adata.obs``.
@@ -228,6 +233,8 @@ class CASClient:
         :param cluster_label_obs_column: The ``.obs`` column name containing cluster labels.
         :param top_k: Number of top calls to make per cluster.
         :param obs_prefix: Prefix for the ``.obs`` columns to write results into.
+        :param fill_missing_levels: If True, an undefined L2-L4 level repeats the nearest shallower defined level
+            of the same term; if False, it stays null.
         """
         resource_name = (
             adata.uns.get(CAS_METADATA_ANNDATA_UNS_KEY, {}).get("ontology_resource_name")
@@ -243,6 +250,7 @@ class CASClient:
             cluster_label_obs_column=cluster_label_obs_column,
             top_k=top_k,
             obs_prefix=obs_prefix,
+            fill_missing_levels=fill_missing_levels,
         )
 
     def compute_most_granular_top_k_calls_knn(
@@ -254,6 +262,7 @@ class CASClient:
         compute_neighbors_if_missing: bool = True,
         top_k: int = 3,
         obs_prefix: str = "cas_knn_cell_type",
+        fill_missing_levels: bool = True,
     ) -> None:
         """
         Assign the most granular top-k cell type calls per kNN neighborhood in ``adata.obs``.
@@ -275,6 +284,8 @@ class CASClient:
             ``k_neighbors`` non-self neighbors for any cell.
         :param top_k: Number of top calls to make per neighborhood.
         :param obs_prefix: Prefix for the ``.obs`` columns to write results into.
+        :param fill_missing_levels: If True, an undefined L2-L4 level repeats the nearest shallower defined level
+            of the same term; if False, it stays null.
         """
         resource_name = (
             adata.uns.get(CAS_METADATA_ANNDATA_UNS_KEY, {}).get("ontology_resource_name")
@@ -292,6 +303,7 @@ class CASClient:
             compute_neighbors_if_missing=compute_neighbors_if_missing,
             top_k=top_k,
             obs_prefix=obs_prefix,
+            fill_missing_levels=fill_missing_levels,
         )
 
     @staticmethod

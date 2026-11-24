@@ -207,6 +207,24 @@ def test_deterministic_tie_break_by_cl_name():
     assert [call.cl_name for call in calls] == ["CL:0000004", "CL:0000005"]
 
 
+def test_fill_missing_levels_flag_controls_undefined_levels():
+    cache = CellGranularityCache(TEST_GRANULARITY_RESOURCE)
+    cl = _make_cl()
+    for fill in (True, False):
+        adata = _make_adata(np.array([[0.92, 0.75, 0.1, 0.05, 0.05, 0.0]]))
+        compute_most_granular_top_k_calls_single(
+            adata=adata,
+            cl=cl,
+            granularity_cache=cache,
+            min_acceptable_score=0.8,
+            top_k=1,
+            fill_missing_levels=fill,
+        )
+        assert adata.obs["cas_cell_type_l1_name_1"].iloc[0] == "CL:0000001"
+        assert (adata.obs["cas_cell_type_l4_name_1"].iloc[0] == "CL:0000001") is fill
+        assert pd.isna(adata.obs["cas_cell_type_l4_label_1"].iloc[0]) is (not fill)
+
+
 def test_single_cell_outputs_and_missing_call_padding():
     cache = CellGranularityCache(TEST_GRANULARITY_RESOURCE)
     cl = _make_cl()
@@ -226,6 +244,10 @@ def test_single_cell_outputs_and_missing_call_padding():
     assert adata.obs["cas_cell_type_name_1"].iloc[0] == "CL:0000001"
     assert adata.obs["cas_cell_type_score_1"].iloc[0] == 0.92
     assert adata.obs["cas_cell_type_l1_name_1"].iloc[0] == "CL:0000001"
+    assert adata.obs["cas_cell_type_l1_label_1"].iloc[0] == cl.cl_names_to_labels_map["CL:0000001"]
+    # CL:0000001 only defines L1, so L2-L4 inherit it.
+    assert adata.obs["cas_cell_type_l4_name_1"].iloc[0] == "CL:0000001"
+    assert adata.obs["cas_cell_type_l4_label_1"].iloc[0] == cl.cl_names_to_labels_map["CL:0000001"]
     assert pd.isna(adata.obs["cas_cell_type_name_2"].iloc[0])
     assert pd.isna(adata.obs["cas_cell_type_score_2"].iloc[0])
     assert pd.isna(adata.obs["cas_cell_type_l4_name_2"].iloc[0])

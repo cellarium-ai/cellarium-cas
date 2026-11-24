@@ -113,7 +113,12 @@ Candidates below ``min_acceptable_score`` or without a curated granularity mappi
 excluded. Eligible terms are ranked by curated depth descending, then by evidence score
 descending, with CL term ID as a deterministic tie-breaker. The selected term's L1-L4
 mappings are written alongside each rank as ``{obs_prefix}_l1_name_{k}`` through
-``{obs_prefix}_l4_name_{k}``. When no eligible term exists, the rank columns are ``None``
+``{obs_prefix}_l4_name_{k}`` (CL IDs), with readable names in ``{obs_prefix}_l1_label_{k}``
+through ``{obs_prefix}_l4_label_{k}``. Here ``k`` is the candidate rank, not the granularity
+level; plot ``{obs_prefix}_l1_label_1`` to ``{obs_prefix}_l4_label_1`` for the levels of the
+best call. By default (``fill_missing_levels=True``) an undefined level inherits the nearest shallower
+defined level of the same term (for example a missing L4 repeats L3); pass
+``fill_missing_levels=False`` to leave it null. When no eligible term exists, the rank columns are ``None``
 rather than a fabricated root-cell prediction.
 
 Interactive visualization

@@ -374,7 +374,7 @@ def get_most_granular_top_k_calls(
 def _initialize_top_k_obs_columns(obs_prefix: str, top_k: int, n_obs: int) -> t.Dict[str, t.List]:
     """Create empty per-rank output columns, including curated L1-L4 annotations."""
     columns: t.Dict[str, t.List] = {}
-    suffixes = ["score", "name", "label"] + [f"{level}_name" for level in GRANULARITY_LEVELS]
+    suffixes = ["score", "name", "label"] + [f"{level}_{kind}" for level in GRANULARITY_LEVELS for kind in ("name", "label")]
     for rank in range(1, top_k + 1):
         for suffix in suffixes:
             columns[f"{obs_prefix}_{suffix}_{rank}"] = [None] * n_obs
@@ -387,6 +387,8 @@ def _assign_top_k_call(
     obs_prefix: str,
     rank: int,
     call: GranularityCellTypeCall,
+    cl: CellOntologyCache,
+    fill_missing_levels: bool,
 ) -> None:
     """Write one selected call (or the missing-call placeholder) into the output columns."""
     values = {
@@ -394,7 +396,13 @@ def _assign_top_k_call(
         f"{obs_prefix}_name_{rank}": call.cl_name,
         f"{obs_prefix}_label_{rank}": call.label,
     }
-    values.update({f"{obs_prefix}_{level}_name_{rank}": call.levels[level] for level in GRANULARITY_LEVELS})
+    filled_level_name = None
+    for level in GRANULARITY_LEVELS:
+        # Undefined level: reuse the nearest shallower defined level (None if there is none).
+        level_name = call.levels[level] or (filled_level_name if fill_missing_levels else None)
+        filled_level_name = level_name
+        values[f"{obs_prefix}_{level}_name_{rank}"] = level_name
+        values[f"{obs_prefix}_{level}_label_{rank}"] = cl.cl_names_to_labels_map.get(level_name)
     for column_name, value in values.items():
         for idx in obs_indices:
             columns[column_name][idx] = value
@@ -407,6 +415,7 @@ def compute_most_granular_top_k_calls_single(
     min_acceptable_score: float,
     top_k: int = 3,
     obs_prefix: str = "cas_cell_type",
+    fill_missing_levels: bool = True,
 ):
     """
     Assign the most granular top-k cell type calls to individual cells in ``adata.obs``.
@@ -417,6 +426,8 @@ def compute_most_granular_top_k_calls_single(
     :param min_acceptable_score: Minimum evidence score for a cell type call to be considered.
     :param top_k: Number of top calls to make per cell.
     :param obs_prefix: Prefix for the ``.obs`` columns to write results into.
+    :param fill_missing_levels: If True, an undefined L2-L4 level repeats the nearest shallower defined level
+        of the same term; if False, it stays null.
     """
     scores_array_nc = adata.obsm[CAS_CL_SCORES_ANNDATA_OBSM_KEY].toarray()
     top_k_calls_dict = _initialize_top_k_obs_columns(obs_prefix, top_k, adata.n_obs)
@@ -439,7 +450,7 @@ def compute_most_granular_top_k_calls_single(
         )
         for k in range(top_k):
             call = top_k_output[k] if k < len(top_k_output) else MISSING_GRANULARITY_CELL_TYPE_CALL
-            _assign_top_k_call(top_k_calls_dict, [i_cell], obs_prefix, k + 1, call)
+            _assign_top_k_call(top_k_calls_dict, [i_cell], obs_prefix, k + 1, call, cl, fill_missing_levels)
 
     for k, v in top_k_calls_dict.items():
         adata.obs[k] = v
@@ -523,6 +534,7 @@ def compute_most_granular_top_k_calls_knn(
     aggregation_score_threshold: float = 1e-4,
     top_k: int = 3,
     obs_prefix: str = "cas_knn_cell_type",
+    fill_missing_levels: bool = True,
 ):
     """
     Assign the most granular top-k cell type calls per kNN neighborhood in ``adata.obs``.
@@ -546,6 +558,8 @@ def compute_most_granular_top_k_calls_knn(
     :param aggregation_score_threshold: The threshold value for considering a CAS score as non-zero.
     :param top_k: Number of top calls to make per neighborhood.
     :param obs_prefix: Prefix for the ``.obs`` columns to write results into.
+    :param fill_missing_levels: If True, an undefined L2-L4 level repeats the nearest shallower defined level
+        of the same term; if False, it stays null.
     """
     neighbor_indices = get_knn_neighbor_indices(
         adata=adata,
@@ -568,7 +582,7 @@ def compute_most_granular_top_k_calls_knn(
         )
         for k in range(top_k):
             call = top_k_output[k] if k < len(top_k_output) else MISSING_GRANULARITY_CELL_TYPE_CALL
-            _assign_top_k_call(top_k_calls_dict, [i_cell], obs_prefix, k + 1, call)
+            _assign_top_k_call(top_k_calls_dict, [i_cell], obs_prefix, k + 1, call, cl, fill_missing_levels)
 
     for k, v in top_k_calls_dict.items():
         adata.obs[k] = v
@@ -585,6 +599,7 @@ def compute_most_granular_top_k_calls_cluster(
     aggregation_score_threshod: float = 1e-4,
     top_k: int = 3,
     obs_prefix: str = "cas_cell_type",
+    fill_missing_levels: bool = True,
 ):
     """
     Assign the most granular top-k cell type calls per cluster in ``adata.obs``.
@@ -599,6 +614,8 @@ def compute_most_granular_top_k_calls_cluster(
     :param aggregation_score_threshod: The threshold value for considering a CAS score as non-zero.
     :param top_k: Number of top calls to make per cluster.
     :param obs_prefix: Prefix for the ``.obs`` columns to write results into.
+    :param fill_missing_levels: If True, an undefined L2-L4 level repeats the nearest shallower defined level
+        of the same term; if False, it stays null.
     """
     top_k_calls_dict = _initialize_top_k_obs_columns(obs_prefix, top_k, adata.n_obs)
 
@@ -612,7 +629,7 @@ def compute_most_granular_top_k_calls_cluster(
         )
         for k in range(top_k):
             call = top_k_output[k] if k < len(top_k_output) else MISSING_GRANULARITY_CELL_TYPE_CALL
-            _assign_top_k_call(top_k_calls_dict, obs_indices, obs_prefix, k + 1, call)
+            _assign_top_k_call(top_k_calls_dict, obs_indices, obs_prefix, k + 1, call, cl, fill_missing_levels)
 
     for k, v in top_k_calls_dict.items():
         adata.obs[k] = v

@@ -32,7 +32,7 @@ Changed
 ~~~~~~~
 - Top-k cell type calls are now ranked by curated granularity depth (1-4) instead of Cell Ontology path depth. Deeper curated terms win over higher-scoring shallower terms; evidence score breaks ties within the same curated depth, then CL term ID provides deterministic ordering.
 - ``CASClient`` now fetches and caches the curated granularity resource from the backend, using the same ontology resource name as the cell ontology resource. A prefilled ``client._granularity_cache`` can override the source for offline tests.
-- Selected calls now include the source term's curated L1-L4 mappings as ``{obs_prefix}_l1_name_{k}`` through ``{obs_prefix}_l4_name_{k}``.
+- Selected calls now include the source term's curated L1-L4 mappings as ``{obs_prefix}_l1_name_{k}`` through ``{obs_prefix}_l4_name_{k}``, plus readable ``{obs_prefix}_l1_label_{k}`` through ``{obs_prefix}_l4_label_{k}``. ``k`` is the candidate rank, not the granularity level. With ``fill_missing_levels=True`` (default) an undefined level inherits the nearest shallower defined level of the same term (a missing L4 repeats L3); ``False`` leaves it null.
 - ``annotate`` CLI writes the curated level columns to ``inferred_labels.csv``.
 
 Removed
