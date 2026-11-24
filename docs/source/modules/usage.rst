@@ -65,17 +65,15 @@ in ``adata.uns['cas_metadata']``::
 Best cell type label assignment
 ---------------------------------
 
-Top-k calls are ranked by a curated L1-L4 granularity lookup, not by Cell Ontology graph
-depth. The ``CASClient`` fetches the granularity resource from the backend using the same
+The cell type call is selected with a curated L1-L4 granularity lookup. The ``CASClient`` fetches the granularity resource from the backend using the same
 ontology resource name as the cell ontology resource, and caches the resulting
 ``CellGranularityCache`` on the client.
 
-Assign the most granular top-k cell type calls to individual cells::
+Assign the most granular cell type call to individual cells::
 
     cas.compute_most_granular_top_k_calls_single(
         adata=adata,
         min_acceptable_score=0.2,
-        top_k=3,
         obs_prefix="cas_cell_type",
     )
 
@@ -85,7 +83,6 @@ Or assign calls per cluster::
         adata=adata,
         min_acceptable_score=0.2,
         cluster_label_obs_column="cluster_label",
-        top_k=3,
         obs_prefix="cas_cell_type_cluster",
     )
 
@@ -95,7 +92,6 @@ Or smooth scores over each cell's local kNN neighborhood while keeping one resul
         adata=adata,
         min_acceptable_score=0.2,
         k_neighbors=30,
-        top_k=3,
         obs_prefix="cas_knn_cell_type",
     )
 
@@ -110,16 +106,21 @@ offline testing, preload ``client._granularity_cache[resource_name]`` before cal
 client methods.
 
 Candidates below ``min_acceptable_score`` or without a curated granularity mapping are
-excluded. Eligible terms are ranked by curated depth descending, then by evidence score
-descending, with CL term ID as a deterministic tie-breaker. The selected term's L1-L4
-mappings are written alongside each rank as ``{obs_prefix}_l1_name_{k}`` through
-``{obs_prefix}_l4_name_{k}`` (CL IDs), with readable names in ``{obs_prefix}_l1_label_{k}``
-through ``{obs_prefix}_l4_label_{k}``. Here ``k`` is the candidate rank, not the granularity
-level; plot ``{obs_prefix}_l1_label_1`` to ``{obs_prefix}_l4_label_1`` for the levels of the
-best call. By default (``fill_missing_levels=True``) an undefined level inherits the nearest shallower
-defined level of the same term (for example a missing L4 repeats L3); pass
-``fill_missing_levels=False`` to leave it null. When no eligible term exists, the rank columns are ``None``
-rather than a fabricated root-cell prediction.
+excluded. The single selected term maximizes curated depth, then Cell Ontology longest path
+depth (so the most granular term within one curated level wins), then evidence score, with CL
+term ID as a deterministic tie-breaker.
+
+The selected term's curated mapping is written as four granularity positions, from most to least
+granular (position ``1`` is the lookup's ``l4``, position ``4`` its ``l1``):
+
+- ``{obs_prefix}_label_{n}``: readable name of the term at position ``n``.
+- ``{obs_prefix}_name_{n}``: its CL ID.
+- ``{obs_prefix}_score_{n}``: its aggregated evidence score.
+
+By default (``fill_missing_levels=True``) an undefined level inherits the nearest shallower
+defined level of the selected term (for example a missing L4 repeats L3); pass
+``fill_missing_levels=False`` to leave it null. When no eligible term exists, all columns are
+``None`` rather than a fabricated root-cell prediction.
 
 Interactive visualization
 --------------------------

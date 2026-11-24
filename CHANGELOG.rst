@@ -30,16 +30,18 @@ Added
 
 Changed
 ~~~~~~~
-- Top-k cell type calls are now ranked by curated granularity depth (1-4) instead of Cell Ontology path depth. Deeper curated terms win over higher-scoring shallower terms; evidence score breaks ties within the same curated depth, then CL term ID provides deterministic ordering.
+- The cell type call is now selected by curated granularity depth (1-4) instead of Cell Ontology path depth. Deeper curated terms win over higher-scoring shallower terms; within the same curated depth, terms with the longest Cell Ontology path from the cell root rank first, then evidence score, then CL term ID for deterministic ordering.
 - ``CASClient`` now fetches and caches the curated granularity resource from the backend, using the same ontology resource name as the cell ontology resource. A prefilled ``client._granularity_cache`` can override the source for offline tests.
-- Selected calls now include the source term's curated L1-L4 mappings as ``{obs_prefix}_l1_name_{k}`` through ``{obs_prefix}_l4_name_{k}``, plus readable ``{obs_prefix}_l1_label_{k}`` through ``{obs_prefix}_l4_label_{k}``. ``k`` is the candidate rank, not the granularity level. With ``fill_missing_levels=True`` (default) an undefined level inherits the nearest shallower defined level of the same term (a missing L4 repeats L3); ``False`` leaves it null.
-- ``annotate`` CLI writes the curated level columns to ``inferred_labels.csv``.
+- ``compute_most_granular_top_k_calls_{single,cluster,knn}`` now select one source term per cell/cluster/neighborhood and write its curated mapping as four granularity positions: ``{obs_prefix}_{label,name,score}_{n}`` for ``n`` = 1 (most granular, lookup ``l4``) to 4 (least granular, lookup ``l1``). With ``fill_missing_levels=True`` (default) an undefined level inherits the nearest shallower defined level of the same term; ``False`` leaves it null.
+- ``get_most_granular_top_k_calls`` is replaced by ``get_most_granular_call``, which returns a single ``GranularityCellTypeCall``.
+- ``annotate`` CLI writes the granularity position columns to ``inferred_labels.csv``.
 
 Removed
 ~~~~~~~
+- Removed the ``top_k`` argument from ``compute_most_granular_top_k_calls_*``, ``CASClient`` methods and the ``annotate --top-k`` CLI option; output is always the four granularity positions.
 - Removed ``use_shortest_path`` and ``root_note`` from annotation selection; path-depth ranking is retired.
 - Removed the ``annotate --shortest-path/--longest-path`` CLI option.
-- Removed fabricated root-cell padding: ranks without an eligible term are written as ``None``.
+- Removed fabricated root-cell padding: a call without an eligible term is written as ``None``.
 
 Fixed
 ~~~~~

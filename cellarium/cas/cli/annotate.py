@@ -43,7 +43,6 @@ def annotate(
     weighting_prefactor: float = DEFAULT_WEIGHTING_PREFACTOR,
     infer_labels: bool = False,
     min_acceptable_score: float = 0.2,
-    top_k: int = 3,
     save_metadata: bool = True,
     save_ontology_resource: bool = True,
     output_h5ad: t.Optional[str] = None,
@@ -69,7 +68,6 @@ def annotate(
     :param weighting_prefactor: Weighting prefactor controlling neighbor distance weight decay.
     :param infer_labels: If ``True``, run postprocessing and save ``inferred_labels.csv``.
     :param min_acceptable_score: Minimum score for a cell type call. Used when ``infer_labels=True``.
-    :param top_k: Number of top cell type calls per cell. Used when ``infer_labels=True``.
     :param save_metadata: If ``True``, save ``metadata.json`` with run provenance info.
     :param save_ontology_resource: If ``True``, save ``ontology_resource.json`` for offline benchmarking.
     :param output_h5ad: If provided, insert CAS annotations into ``adata`` and save it as an ``.h5ad`` file at this path.
@@ -137,16 +135,14 @@ def annotate(
         cas.compute_most_granular_top_k_calls_single(
             adata=adata,
             min_acceptable_score=min_acceptable_score,
-            top_k=top_k,
-        )
+            )
 
     if cluster_label_obs_column is not None:
         cas.compute_most_granular_top_k_calls_cluster(
             adata=adata,
             min_acceptable_score=min_acceptable_score,
             cluster_label_obs_column=cluster_label_obs_column,
-            top_k=top_k,
-            obs_prefix="cas_cluster_type",
+                obs_prefix="cas_cluster_type",
         )
 
     if knn_smoothing is not None:
@@ -154,20 +150,17 @@ def annotate(
             adata=adata,
             min_acceptable_score=min_acceptable_score,
             k_neighbors=knn_smoothing,
-            top_k=top_k,
-            obs_prefix="cas_knn_cell_type",
+                obs_prefix="cas_knn_cell_type",
         )
 
     if infer_labels or cluster_label_obs_column is not None or knn_smoothing is not None:
-        level_suffixes = tuple(f"l{level}_name" for level in range(1, 5))
-
         def _inference_columns(prefix: str, enabled: bool) -> t.List[str]:
             if not enabled:
                 return []
             return [
-                f"{prefix}_{suffix}_{rank}"
-                for rank in range(1, top_k + 1)
-                for suffix in ("label", "name", "score") + level_suffixes
+                f"{prefix}_{suffix}_{level}"
+                for level in range(1, 5)
+                for suffix in ("label", "name", "score")
             ]
 
         inference_cols = (
@@ -260,19 +253,13 @@ def annotate(
     "--infer-labels/--no-infer-labels",
     default=False,
     show_default=True,
-    help="Run postprocessing to infer top-k cell type labels and save inferred_labels.csv.",
+    help="Run postprocessing to infer cell type labels and save inferred_labels.csv.",
 )
 @click.option(
     "--min-acceptable-score",
     default=0.2,
     show_default=True,
     help="Minimum score for a cell type call to be included. Used when --infer-labels is set.",
-)
-@click.option(
-    "--top-k",
-    default=3,
-    show_default=True,
-    help="Number of top cell type calls per cell. Used when --infer-labels is set.",
 )
 @click.option(
     "--save-metadata/--no-save-metadata",
@@ -317,7 +304,6 @@ def annotate_command(
     weighting_prefactor: float,
     infer_labels: bool,
     min_acceptable_score: float,
-    top_k: int,
     save_metadata: bool,
     save_ontology_resource: bool,
     output_h5ad: t.Optional[str],
@@ -347,7 +333,6 @@ def annotate_command(
         weighting_prefactor=weighting_prefactor,
         infer_labels=infer_labels,
         min_acceptable_score=min_acceptable_score,
-        top_k=top_k,
         save_metadata=save_metadata,
         save_ontology_resource=save_ontology_resource,
         output_h5ad=output_h5ad,

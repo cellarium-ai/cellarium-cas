@@ -565,16 +565,14 @@ class TestCasClient:
         adata = self.__mock_anndata_matrix(num_cells=num_cells)
         response = cas_client.annotate_matrix_cell_type_ontology_aware_strategy(matrix=adata, chunk_size=10)
         cas_client.insert_ontology_aware_response(response, adata)
-        cas_client.compute_most_granular_top_k_calls_single(adata=adata, min_acceptable_score=0.2, top_k=3)
+        cas_client.compute_most_granular_top_k_calls_single(adata=adata, min_acceptable_score=0.2)
 
-        for k in range(1, 4):
+        for k in range(1, 5):
             assert f"cas_cell_type_score_{k}" in adata.obs
             assert f"cas_cell_type_name_{k}" in adata.obs
             assert f"cas_cell_type_label_{k}" in adata.obs
-            for level in range(1, 5):
-                assert f"cas_cell_type_l{level}_name_{k}" in adata.obs
         assert adata.obs["cas_cell_type_name_1"].iloc[0] == "CL:0000540"
-        assert adata.obs["cas_cell_type_l4_name_1"].iloc[0] == "CL:0000540"
+        assert not [c for c in adata.obs.columns if c.startswith("cas_cell_type_") and c.endswith("_5")]
         assert len(adata.obs) == num_cells
 
     def test_compute_most_granular_top_k_calls_cluster(self):
@@ -597,16 +595,13 @@ class TestCasClient:
             adata=adata,
             min_acceptable_score=0.2,
             cluster_label_obs_column="cluster_label",
-            top_k=3,
             obs_prefix="cas_cluster_type",
         )
 
-        for k in range(1, 4):
+        for k in range(1, 5):
             assert f"cas_cluster_type_score_{k}" in adata.obs
             assert f"cas_cluster_type_name_{k}" in adata.obs
             assert f"cas_cluster_type_label_{k}" in adata.obs
-            for level in range(1, 5):
-                assert f"cas_cluster_type_l{level}_name_{k}" in adata.obs
 
     def test_compute_most_granular_top_k_calls_knn(self):
         from sklearn.neighbors import NearestNeighbors
@@ -634,16 +629,13 @@ class TestCasClient:
             adata=adata,
             min_acceptable_score=0.2,
             k_neighbors=k_neighbors,
-            top_k=3,
             obs_prefix="cas_knn_cell_type",
         )
 
-        for k in range(1, 4):
+        for k in range(1, 5):
             assert f"cas_knn_cell_type_score_{k}" in adata.obs
             assert f"cas_knn_cell_type_name_{k}" in adata.obs
             assert f"cas_knn_cell_type_label_{k}" in adata.obs
-            for level in range(1, 5):
-                assert f"cas_knn_cell_type_l{level}_name_{k}" in adata.obs
         # single-cell resolution: one refined annotation per cell
         assert len(adata.obs) == num_cells
         assert adata.obs["cas_knn_cell_type_label_1"].notna().all()

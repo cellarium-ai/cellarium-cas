@@ -1,6 +1,6 @@
 import typing as t
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 import numpy as np
@@ -304,16 +304,20 @@ def generate_phyloxml_from_scored_cell_ontology_tree(
 @dataclass(frozen=True)
 class GranularityCellTypeCall:
     """
-    A selected cell type call with its curated L1-L4 granularity annotations.
+    The selected cell type call with its curated L1-L4 granularity annotations.
 
-    A missing call is represented by ``score=None``, ``cl_name=None``, ``label=None``, and all levels
-    set to ``None``. No confidence score is fabricated when no eligible term exists.
+    ``levels`` maps ``"l1"`` (coarsest) to ``"l4"`` (most granular) to CL IDs as defined by the lookup.
+    ``level_scores`` holds the aggregated evidence score of each CL term appearing in ``levels``.
+
+    A missing call is represented by ``score=None``, ``cl_name=None``, ``label=None``, all levels set to
+    ``None``, and no level scores. No confidence score is fabricated when no eligible term exists.
     """
 
     score: t.Optional[float]
     cl_name: t.Optional[str]
     label: t.Optional[str]
     levels: t.Dict[str, t.Optional[str]]
+    level_scores: t.Dict[str, float] = field(default_factory=dict)
 
 
 MISSING_GRANULARITY_CELL_TYPE_CALL = GranularityCellTypeCall(
@@ -324,88 +328,100 @@ MISSING_GRANULARITY_CELL_TYPE_CALL = GranularityCellTypeCall(
 )
 
 
-def get_most_granular_top_k_calls(
+def get_most_granular_call(
     aggregated_scores: AggregatedCellOntologyScores,
     cl: CellOntologyCache,
     granularity_cache: CellGranularityCache,
     min_acceptable_score: float,
-    top_k: int = 1,
-) -> t.List[GranularityCellTypeCall]:
+) -> GranularityCellTypeCall:
     """
-    Select top-k ontology terms by curated granularity depth, then by evidence score.
+    Select the single most granular ontology term by curated granularity depth.
 
     Only terms with ``score >= min_acceptable_score`` and a non-zero curated depth in
-    ``granularity_cache`` are eligible. The selected term is ranked by
-    ``(curated_depth, score)`` descending; ties are broken deterministically by CL term ID
-    ascending. L1-L4 annotations are retrieved from the selected term's curated mapping.
+    ``granularity_cache`` are eligible. The selected term maximizes
+    ``(curated_depth, longest_path_depth, score)``, so that within one curated level the most granular
+    term in the ontology is preferred; ties are broken deterministically by CL term ID ascending. Terms
+    absent from the ontology path lengths have longest path depth 0. L1-L4 annotations are retrieved from
+    the selected term's curated mapping.
 
     :param aggregated_scores: Aggregated CAS ontology-aware evidence scores.
     :param cl: The CellOntologyCache used to resolve human-readable labels.
     :param granularity_cache: The curated granularity lookup.
     :param min_acceptable_score: Minimum evidence score for a term to be eligible.
-    :param top_k: Maximum number of calls to return.
 
-    :returns: Up to ``top_k`` selected calls. If fewer eligible terms exist, fewer calls are
-        returned; callers pad with :data:`MISSING_GRANULARITY_CELL_TYPE_CALL` to keep output
-        columns consistent.
+    :returns: The selected call, or :data:`MISSING_GRANULARITY_CELL_TYPE_CALL` if no term is eligible.
     """
-    candidates = []
+    longest_path_depths = cl.get_longest_path_lengths_from_target(CL_CELL_ROOT_NODE)
+    best_key = None
+    best_name = None
     for score, cl_name in zip(aggregated_scores.aggregated_scores_c, aggregated_scores.cl_names):
         if score < min_acceptable_score:
             continue
         depth = granularity_cache.get_depth(cl_name)
         if depth == 0:
             continue
-        candidates.append((depth, score, cl_name))
+        key = (depth, longest_path_depths.get(cl_name, 0), score)
+        if best_key is None or key > best_key or (key == best_key and cl_name < best_name):
+            best_key, best_name = key, cl_name
+    if best_key is None:
+        return MISSING_GRANULARITY_CELL_TYPE_CALL
 
-    candidates.sort(key=lambda candidate: (-candidate[0], -candidate[1], candidate[2]))
-
-    return [
-        GranularityCellTypeCall(
-            score=score,
-            cl_name=cl_name,
-            label=cl.cl_names_to_labels_map.get(cl_name),
-            levels=granularity_cache.get_levels(cl_name),
-        )
-        for _, score, cl_name in candidates[:top_k]
-    ]
-
-
-def _initialize_top_k_obs_columns(obs_prefix: str, top_k: int, n_obs: int) -> t.Dict[str, t.List]:
-    """Create empty per-rank output columns, including curated L1-L4 annotations."""
-    columns: t.Dict[str, t.List] = {}
-    suffixes = ["score", "name", "label"] + [f"{level}_{kind}" for level in GRANULARITY_LEVELS for kind in ("name", "label")]
-    for rank in range(1, top_k + 1):
-        for suffix in suffixes:
-            columns[f"{obs_prefix}_{suffix}_{rank}"] = [None] * n_obs
-    return columns
+    cl_name = best_name
+    levels = granularity_cache.get_levels(cl_name)
+    level_names = {name for name in levels.values() if name is not None}
+    level_scores = {
+        name: float(score)
+        for score, name in zip(aggregated_scores.aggregated_scores_c, aggregated_scores.cl_names)
+        if name in level_names
+    }
+    return GranularityCellTypeCall(
+        score=float(best_key[2]),
+        cl_name=cl_name,
+        label=cl.cl_names_to_labels_map.get(cl_name),
+        levels=levels,
+        level_scores=level_scores,
+    )
 
 
-def _assign_top_k_call(
+def _initialize_obs_columns(obs_prefix: str, n_obs: int) -> t.Dict[str, t.List]:
+    """Create empty output columns for granularity positions 1 (most granular) to 4 (least granular)."""
+    return {
+        f"{obs_prefix}_{suffix}_{position}": [None] * n_obs
+        for position in range(1, len(GRANULARITY_LEVELS) + 1)
+        for suffix in ("score", "name", "label")
+    }
+
+
+def _assign_call(
     columns: t.Dict[str, t.List],
     obs_indices: t.Sequence[int],
     obs_prefix: str,
-    rank: int,
     call: GranularityCellTypeCall,
     cl: CellOntologyCache,
     fill_missing_levels: bool,
 ) -> None:
-    """Write one selected call (or the missing-call placeholder) into the output columns."""
-    values = {
-        f"{obs_prefix}_score_{rank}": call.score,
-        f"{obs_prefix}_name_{rank}": call.cl_name,
-        f"{obs_prefix}_label_{rank}": call.label,
-    }
-    filled_level_name = None
+    """
+    Write the selected call into the output columns.
+
+    Position 1 holds the most granular level (lookup ``l4``) and position 4 the least granular (lookup ``l1``).
+    """
+    level_names: t.Dict[str, t.Optional[str]] = {}
+    filled_name = None
     for level in GRANULARITY_LEVELS:
         # Undefined level: reuse the nearest shallower defined level (None if there is none).
-        level_name = call.levels[level] or (filled_level_name if fill_missing_levels else None)
-        filled_level_name = level_name
-        values[f"{obs_prefix}_{level}_name_{rank}"] = level_name
-        values[f"{obs_prefix}_{level}_label_{rank}"] = cl.cl_names_to_labels_map.get(level_name)
-    for column_name, value in values.items():
-        for idx in obs_indices:
-            columns[column_name][idx] = value
+        filled_name = call.levels[level] or (filled_name if fill_missing_levels else None)
+        level_names[level] = filled_name
+
+    for position, level in enumerate(reversed(GRANULARITY_LEVELS), start=1):
+        name = level_names[level]
+        values = {
+            f"{obs_prefix}_score_{position}": call.level_scores.get(name),
+            f"{obs_prefix}_name_{position}": name,
+            f"{obs_prefix}_label_{position}": cl.cl_names_to_labels_map.get(name),
+        }
+        for column_name, value in values.items():
+            for idx in obs_indices:
+                columns[column_name][idx] = value
 
 
 def compute_most_granular_top_k_calls_single(
@@ -413,24 +429,26 @@ def compute_most_granular_top_k_calls_single(
     cl: CellOntologyCache,
     granularity_cache: CellGranularityCache,
     min_acceptable_score: float,
-    top_k: int = 3,
     obs_prefix: str = "cas_cell_type",
     fill_missing_levels: bool = True,
 ):
     """
-    Assign the most granular top-k cell type calls to individual cells in ``adata.obs``.
+    Assign the most granular cell type call to individual cells in ``adata.obs``.
 
     :param adata: AnnData object with ``cas_cl_scores`` already inserted.
     :param cl: The CellOntologyCache object containing cell ontology term names and labels.
     :param granularity_cache: The curated L1-L4 granularity lookup.
     :param min_acceptable_score: Minimum evidence score for a cell type call to be considered.
-    :param top_k: Number of top calls to make per cell.
     :param obs_prefix: Prefix for the ``.obs`` columns to write results into.
-    :param fill_missing_levels: If True, an undefined L2-L4 level repeats the nearest shallower defined level
-        of the same term; if False, it stays null.
+    :param fill_missing_levels: If True, an undefined level repeats the nearest shallower defined level
+        of the selected term; if False, it stays null.
+
+    Writes ``{obs_prefix}_score_{n}``, ``{obs_prefix}_name_{n}`` and ``{obs_prefix}_label_{n}`` for
+    ``n`` = 1 (most granular level, lookup ``l4``) to 4 (least granular level, lookup ``l1``). ``name`` holds the
+    CL ID, ``label`` its readable name, and ``score`` the aggregated evidence score of that term.
     """
     scores_array_nc = adata.obsm[CAS_CL_SCORES_ANNDATA_OBSM_KEY].toarray()
-    top_k_calls_dict = _initialize_top_k_obs_columns(obs_prefix, top_k, adata.n_obs)
+    columns = _initialize_obs_columns(obs_prefix, adata.n_obs)
 
     # make a wrapped aggregated scores dataclass for the single cell in question
     aggregated_scores = AggregatedCellOntologyScores(
@@ -445,15 +463,11 @@ def compute_most_granular_top_k_calls_single(
 
     for i_cell in range(adata.n_obs):
         aggregated_scores.aggregated_scores_c = scores_array_nc[i_cell]
-        top_k_output = get_most_granular_top_k_calls(
-            aggregated_scores, cl, granularity_cache, min_acceptable_score, top_k
-        )
-        for k in range(top_k):
-            call = top_k_output[k] if k < len(top_k_output) else MISSING_GRANULARITY_CELL_TYPE_CALL
-            _assign_top_k_call(top_k_calls_dict, [i_cell], obs_prefix, k + 1, call, cl, fill_missing_levels)
+        call = get_most_granular_call(aggregated_scores, cl, granularity_cache, min_acceptable_score)
+        _assign_call(columns, [i_cell], obs_prefix, call, cl, fill_missing_levels)
 
-    for k, v in top_k_calls_dict.items():
-        adata.obs[k] = v
+    for column_name, values in columns.items():
+        adata.obs[column_name] = values
 
 
 def get_knn_neighbor_indices(
@@ -532,12 +546,11 @@ def compute_most_granular_top_k_calls_knn(
     aggregation_op: CellOntologyScoresAggregationOp = CellOntologyScoresAggregationOp.MEAN,
     aggregation_domain: CellOntologyScoresAggregationDomain = CellOntologyScoresAggregationDomain.ALL_CELLS,
     aggregation_score_threshold: float = 1e-4,
-    top_k: int = 3,
     obs_prefix: str = "cas_knn_cell_type",
     fill_missing_levels: bool = True,
 ):
     """
-    Assign the most granular top-k cell type calls per kNN neighborhood in ``adata.obs``.
+    Assign the most granular cell type call per kNN neighborhood in ``adata.obs``.
 
     Keeps single-cell resolution: for each cell, its CAS scores are aggregated over the cell itself
     plus its ``k_neighbors`` nearest query-cell neighbors (instead of over a hard Leiden cluster).
@@ -556,10 +569,13 @@ def compute_most_granular_top_k_calls_knn(
     :param aggregation_op: The aggregation operation to apply to the CAS scores within each neighborhood.
     :param aggregation_domain: The domain over which to perform the aggregation.
     :param aggregation_score_threshold: The threshold value for considering a CAS score as non-zero.
-    :param top_k: Number of top calls to make per neighborhood.
     :param obs_prefix: Prefix for the ``.obs`` columns to write results into.
-    :param fill_missing_levels: If True, an undefined L2-L4 level repeats the nearest shallower defined level
-        of the same term; if False, it stays null.
+    :param fill_missing_levels: If True, an undefined level repeats the nearest shallower defined level
+        of the selected term; if False, it stays null.
+
+    Writes ``{obs_prefix}_score_{n}``, ``{obs_prefix}_name_{n}`` and ``{obs_prefix}_label_{n}`` for
+    ``n`` = 1 (most granular level, lookup ``l4``) to 4 (least granular level, lookup ``l1``). ``name`` holds the
+    CL ID, ``label`` its readable name, and ``score`` the aggregated evidence score of that term.
     """
     neighbor_indices = get_knn_neighbor_indices(
         adata=adata,
@@ -569,7 +585,7 @@ def compute_most_granular_top_k_calls_knn(
     )
 
     n_obs = adata.n_obs
-    top_k_calls_dict = _initialize_top_k_obs_columns(obs_prefix, top_k, n_obs)
+    columns = _initialize_obs_columns(obs_prefix, n_obs)
 
     for i_cell in range(n_obs):
         # self + its k nearest query-cell neighbors
@@ -577,15 +593,11 @@ def compute_most_granular_top_k_calls_knn(
         aggregated_scores = get_aggregated_cas_ontology_aware_scores(
             adata, obs_indices, aggregation_op, aggregation_domain, aggregation_score_threshold
         )
-        top_k_output = get_most_granular_top_k_calls(
-            aggregated_scores, cl, granularity_cache, min_acceptable_score, top_k
-        )
-        for k in range(top_k):
-            call = top_k_output[k] if k < len(top_k_output) else MISSING_GRANULARITY_CELL_TYPE_CALL
-            _assign_top_k_call(top_k_calls_dict, [i_cell], obs_prefix, k + 1, call, cl, fill_missing_levels)
+        call = get_most_granular_call(aggregated_scores, cl, granularity_cache, min_acceptable_score)
+        _assign_call(columns, [i_cell], obs_prefix, call, cl, fill_missing_levels)
 
-    for k, v in top_k_calls_dict.items():
-        adata.obs[k] = v
+    for column_name, values in columns.items():
+        adata.obs[column_name] = values
 
 
 def compute_most_granular_top_k_calls_cluster(
@@ -597,12 +609,11 @@ def compute_most_granular_top_k_calls_cluster(
     aggregation_op: CellOntologyScoresAggregationOp = CellOntologyScoresAggregationOp.MEAN,
     aggregation_domain: CellOntologyScoresAggregationDomain = CellOntologyScoresAggregationDomain.ALL_CELLS,
     aggregation_score_threshod: float = 1e-4,
-    top_k: int = 3,
     obs_prefix: str = "cas_cell_type",
     fill_missing_levels: bool = True,
 ):
     """
-    Assign the most granular top-k cell type calls per cluster in ``adata.obs``.
+    Assign the most granular cell type call per cluster in ``adata.obs``.
 
     :param adata: AnnData object with ``cas_cl_scores`` already inserted.
     :param cl: The CellOntologyCache object containing cell ontology term names and labels.
@@ -612,24 +623,23 @@ def compute_most_granular_top_k_calls_cluster(
     :param aggregation_op: The aggregation operation to apply to the CAS scores within each cluster.
     :param aggregation_domain: The domain over which to perform the aggregation.
     :param aggregation_score_threshod: The threshold value for considering a CAS score as non-zero.
-    :param top_k: Number of top calls to make per cluster.
     :param obs_prefix: Prefix for the ``.obs`` columns to write results into.
-    :param fill_missing_levels: If True, an undefined L2-L4 level repeats the nearest shallower defined level
-        of the same term; if False, it stays null.
+    :param fill_missing_levels: If True, an undefined level repeats the nearest shallower defined level
+        of the selected term; if False, it stays null.
+
+    Writes ``{obs_prefix}_score_{n}``, ``{obs_prefix}_name_{n}`` and ``{obs_prefix}_label_{n}`` for
+    ``n`` = 1 (most granular level, lookup ``l4``) to 4 (least granular level, lookup ``l1``). ``name`` holds the
+    CL ID, ``label`` its readable name, and ``score`` the aggregated evidence score of that term.
     """
-    top_k_calls_dict = _initialize_top_k_obs_columns(obs_prefix, top_k, adata.n_obs)
+    columns = _initialize_obs_columns(obs_prefix, adata.n_obs)
 
     for cluster_label in adata.obs[cluster_label_obs_column].cat.categories:
         obs_indices = get_obs_indices_for_cluster(adata, cluster_label_obs_column, cluster_label)
         aggregated_scores = get_aggregated_cas_ontology_aware_scores(
             adata, obs_indices, aggregation_op, aggregation_domain, aggregation_score_threshod
         )
-        top_k_output = get_most_granular_top_k_calls(
-            aggregated_scores, cl, granularity_cache, min_acceptable_score, top_k
-        )
-        for k in range(top_k):
-            call = top_k_output[k] if k < len(top_k_output) else MISSING_GRANULARITY_CELL_TYPE_CALL
-            _assign_top_k_call(top_k_calls_dict, obs_indices, obs_prefix, k + 1, call, cl, fill_missing_levels)
+        call = get_most_granular_call(aggregated_scores, cl, granularity_cache, min_acceptable_score)
+        _assign_call(columns, obs_indices, obs_prefix, call, cl, fill_missing_levels)
 
-    for k, v in top_k_calls_dict.items():
-        adata.obs[k] = v
+    for column_name, values in columns.items():
+        adata.obs[column_name] = values

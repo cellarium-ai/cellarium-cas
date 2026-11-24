@@ -30,7 +30,8 @@ from cellarium.cas.postprocessing.ontology_aware import (
     compute_most_granular_top_k_calls_cluster,
     compute_most_granular_top_k_calls_knn,
     compute_most_granular_top_k_calls_single,
-    get_most_granular_top_k_calls,
+    MISSING_GRANULARITY_CELL_TYPE_CALL,
+    get_most_granular_call,
 )
 
 TEST_CL_NAMES = [
@@ -131,145 +132,117 @@ def test_missing_levels_and_unknown_values_are_normalized():
     assert cache.get_levels("CL:MISSING") == {"l1": None, "l2": None, "l3": None, "l4": None}
 
 
-def test_deeper_candidates_win_over_higher_scoring_shallow_candidates():
-    cl = _make_cl()
-    cache = CellGranularityCache(TEST_GRANULARITY_RESOURCE)
-    calls = get_most_granular_top_k_calls(
-        aggregated_scores=_aggregated_scores({"CL:0000001": 0.92, "CL:0000003": 0.75, "CL:0000004": 0.45}),
-        cl=cl,
-        granularity_cache=cache,
-        min_acceptable_score=0.2,
-        top_k=1,
+def _select(scores: t.Dict[str, float], cl: t.Optional[CellOntologyCache] = None, min_score: float = 0.2):
+    return get_most_granular_call(
+        aggregated_scores=_aggregated_scores(scores),
+        cl=cl or _make_cl(),
+        granularity_cache=CellGranularityCache(TEST_GRANULARITY_RESOURCE),
+        min_acceptable_score=min_score,
     )
-    assert [call.cl_name for call in calls] == ["CL:0000004"]
-    assert calls[0].score == 0.45
-    assert calls[0].levels == TEST_GRANULARITY_RESOURCE["CL:0000004"]
 
 
-def test_highest_score_wins_within_same_curated_depth():
+def test_deeper_candidate_wins_over_higher_scoring_shallow_candidate():
+    call = _select({"CL:0000001": 0.92, "CL:0000003": 0.75, "CL:0000004": 0.45})
+    assert call.cl_name == "CL:0000004"
+    assert call.score == 0.45
+    assert call.levels == TEST_GRANULARITY_RESOURCE["CL:0000004"]
+
+
+def test_longest_path_depth_breaks_ties_within_same_curated_depth_before_score():
     cl = _make_cl()
-    cache = CellGranularityCache(TEST_GRANULARITY_RESOURCE)
-    calls = get_most_granular_top_k_calls(
-        aggregated_scores=_aggregated_scores({"CL:0000004": 0.4, "CL:0000005": 0.8}),
-        cl=cl,
-        granularity_cache=cache,
-        min_acceptable_score=0.2,
-        top_k=2,
-    )
-    assert [call.cl_name for call in calls] == ["CL:0000005", "CL:0000004"]
+    cl._longest_path_lengths["CL:0000005"] = 7  # same curated depth 4 as CL:0000004, deeper in CL
+    call = _select({"CL:0000004": 0.9, "CL:0000005": 0.3, "CL:0000003": 0.99}, cl=cl)
+    assert call.cl_name == "CL:0000005"
+
+
+def test_highest_score_wins_within_same_curated_and_path_depth():
+    assert _select({"CL:0000004": 0.4, "CL:0000005": 0.8}).cl_name == "CL:0000005"
 
 
 def test_fallback_when_no_l4_candidate_meets_threshold():
-    cl = _make_cl()
-    cache = CellGranularityCache(TEST_GRANULARITY_RESOURCE)
-    calls = get_most_granular_top_k_calls(
-        aggregated_scores=_aggregated_scores({"CL:0000003": 0.75, "CL:0000004": 0.1}),
-        cl=cl,
-        granularity_cache=cache,
-        min_acceptable_score=0.2,
-        top_k=1,
-    )
-    assert [call.cl_name for call in calls] == ["CL:0000003"]
+    assert _select({"CL:0000003": 0.75, "CL:0000004": 0.1}).cl_name == "CL:0000003"
 
 
 def test_terms_absent_from_lookup_or_with_depth_zero_are_excluded():
-    cl = _make_cl()
-    cache = CellGranularityCache(TEST_GRANULARITY_RESOURCE)
-    calls = get_most_granular_top_k_calls(
-        aggregated_scores=_aggregated_scores({"CL:0000006": 0.99}),
-        cl=cl,
-        granularity_cache=cache,
-        min_acceptable_score=0.2,
-        top_k=3,
-    )
-    assert calls == []
+    assert _select({"CL:0000006": 0.99}) is MISSING_GRANULARITY_CELL_TYPE_CALL
+    assert _select({"CL:0000002": 0.99, "CL:NOT_IN_LOOKUP": 0.99}).cl_name == "CL:0000002"
 
-    calls = get_most_granular_top_k_calls(
-        aggregated_scores=_aggregated_scores({"CL:0000002": 0.99, "CL:NOT_IN_LOOKUP": 0.99}),
-        cl=cl,
-        granularity_cache=cache,
-        min_acceptable_score=0.2,
-        top_k=3,
-    )
-    assert [call.cl_name for call in calls] == ["CL:0000002"]
+
+def test_no_eligible_candidate_returns_missing_call():
+    call = _select({"CL:0000004": 0.1})
+    assert call is MISSING_GRANULARITY_CELL_TYPE_CALL
+    assert call.score is None and call.cl_name is None and call.level_scores == {}
 
 
 def test_deterministic_tie_break_by_cl_name():
-    cl = _make_cl()
-    cache = CellGranularityCache(TEST_GRANULARITY_RESOURCE)
-    calls = get_most_granular_top_k_calls(
-        aggregated_scores=_aggregated_scores({"CL:0000004": 0.5, "CL:0000005": 0.5}),
-        cl=cl,
-        granularity_cache=cache,
-        min_acceptable_score=0.2,
-        top_k=2,
+    assert _select({"CL:0000005": 0.5, "CL:0000004": 0.5}).cl_name == "CL:0000004"
+
+
+def test_level_scores_hold_aggregated_scores_of_level_terms_even_below_threshold():
+    call = _select({"CL:0000001": 0.1, "CL:0000002": 0.3, "CL:0000003": 0.6, "CL:0000004": 0.45, "CL:0000005": 0.9})
+    assert call.cl_name == "CL:0000005"
+    assert call.level_scores == {"CL:0000001": 0.1, "CL:0000002": 0.3, "CL:0000005": 0.9}
+
+
+def _run_single(scores_row, min_score: float = 0.2, **kwargs) -> AnnData:
+    adata = _make_adata(np.array([scores_row]))
+    compute_most_granular_top_k_calls_single(
+        adata=adata,
+        cl=_make_cl(),
+        granularity_cache=CellGranularityCache(TEST_GRANULARITY_RESOURCE),
+        min_acceptable_score=min_score,
+        **kwargs,
     )
-    assert [call.cl_name for call in calls] == ["CL:0000004", "CL:0000005"]
+    return adata
+
+
+def test_single_positions_run_from_most_to_least_granular_level():
+    # CL:0000004 is selected (depth 4): position 1 = l4 ... position 4 = l1.
+    adata = _run_single([0.9, 0.8, 0.7, 0.6, 0.0, 0.0])
+    obs = adata.obs
+    assert [obs[f"cas_cell_type_name_{n}"].iloc[0] for n in range(1, 5)] == [
+        "CL:0000004",
+        "CL:0000003",
+        "CL:0000002",
+        "CL:0000001",
+    ]
+    assert [obs[f"cas_cell_type_label_{n}"].iloc[0] for n in range(1, 5)] == [
+        "label_CL:0000004",
+        "label_CL:0000003",
+        "label_CL:0000002",
+        "label_CL:0000001",
+    ]
+    assert np.allclose([obs[f"cas_cell_type_score_{n}"].iloc[0] for n in range(1, 5)], [0.6, 0.7, 0.8, 0.9])
+    assert not [c for c in obs.columns if c.startswith("cas_cell_type_") and c.endswith(("_5", "_0"))]
+
+
+def test_identical_l3_l4_term_fills_two_positions():
+    adata = _run_single([0.0, 0.0, 0.0, 0.0, 0.7, 0.0])
+    assert adata.obs["cas_cell_type_name_1"].iloc[0] == "CL:0000005"
+    assert adata.obs["cas_cell_type_name_2"].iloc[0] == "CL:0000005"
+    assert adata.obs["cas_cell_type_name_3"].iloc[0] == "CL:0000002"
 
 
 def test_fill_missing_levels_flag_controls_undefined_levels():
-    cache = CellGranularityCache(TEST_GRANULARITY_RESOURCE)
-    cl = _make_cl()
-    for fill in (True, False):
-        adata = _make_adata(np.array([[0.92, 0.75, 0.1, 0.05, 0.05, 0.0]]))
-        compute_most_granular_top_k_calls_single(
-            adata=adata,
-            cl=cl,
-            granularity_cache=cache,
-            min_acceptable_score=0.8,
-            top_k=1,
-            fill_missing_levels=fill,
-        )
-        assert adata.obs["cas_cell_type_l1_name_1"].iloc[0] == "CL:0000001"
-        assert (adata.obs["cas_cell_type_l4_name_1"].iloc[0] == "CL:0000001") is fill
-        assert pd.isna(adata.obs["cas_cell_type_l4_label_1"].iloc[0]) is (not fill)
+    # CL:0000003 selected (depth 3): lookup l4 is undefined.
+    row = [0.9, 0.8, 0.7, 0.0, 0.0, 0.0]
+    filled = _run_single(row, fill_missing_levels=True).obs
+    assert filled["cas_cell_type_name_1"].iloc[0] == "CL:0000003"
+    assert filled["cas_cell_type_label_1"].iloc[0] == "label_CL:0000003"
+    assert filled["cas_cell_type_score_1"].iloc[0] == 0.7
 
-
-def test_single_cell_outputs_and_missing_call_padding():
-    cache = CellGranularityCache(TEST_GRANULARITY_RESOURCE)
-    cl = _make_cl()
-    # Only the depth-2 term clears the threshold, so rank 1 is filled and rank 2 is missing.
-    scores = np.array([[0.92, 0.75, 0.1, 0.05, 0.05, 0.0]])
-    adata = _make_adata(scores)
-
-    compute_most_granular_top_k_calls_single(
-        adata=adata,
-        cl=cl,
-        granularity_cache=cache,
-        min_acceptable_score=0.8,
-        top_k=2,
-        obs_prefix="cas_cell_type",
-    )
-
-    assert adata.obs["cas_cell_type_name_1"].iloc[0] == "CL:0000001"
-    assert adata.obs["cas_cell_type_score_1"].iloc[0] == 0.92
-    assert adata.obs["cas_cell_type_l1_name_1"].iloc[0] == "CL:0000001"
-    assert adata.obs["cas_cell_type_l1_label_1"].iloc[0] == cl.cl_names_to_labels_map["CL:0000001"]
-    # CL:0000001 only defines L1, so L2-L4 inherit it.
-    assert adata.obs["cas_cell_type_l4_name_1"].iloc[0] == "CL:0000001"
-    assert adata.obs["cas_cell_type_l4_label_1"].iloc[0] == cl.cl_names_to_labels_map["CL:0000001"]
-    assert pd.isna(adata.obs["cas_cell_type_name_2"].iloc[0])
-    assert pd.isna(adata.obs["cas_cell_type_score_2"].iloc[0])
-    assert pd.isna(adata.obs["cas_cell_type_l4_name_2"].iloc[0])
+    unfilled = _run_single(row, fill_missing_levels=False).obs
+    assert pd.isna(unfilled["cas_cell_type_name_1"].iloc[0])
+    assert pd.isna(unfilled["cas_cell_type_label_1"].iloc[0])
+    assert pd.isna(unfilled["cas_cell_type_score_1"].iloc[0])
+    assert unfilled["cas_cell_type_name_2"].iloc[0] == "CL:0000003"
 
 
 def test_no_eligible_candidates_do_not_fabricate_confidence():
-    cache = CellGranularityCache(TEST_GRANULARITY_RESOURCE)
-    cl = _make_cl()
-    adata = _make_adata(np.array([[0.1, 0.1, 0.1, 0.1, 0.1, 0.1]]))
-
-    compute_most_granular_top_k_calls_single(
-        adata=adata,
-        cl=cl,
-        granularity_cache=cache,
-        min_acceptable_score=0.2,
-        top_k=3,
-    )
-
-    for rank in range(1, 4):
-        assert pd.isna(adata.obs[f"cas_cell_type_name_{rank}"].iloc[0])
-        assert pd.isna(adata.obs[f"cas_cell_type_score_{rank}"].iloc[0])
-        assert pd.isna(adata.obs[f"cas_cell_type_l1_name_{rank}"].iloc[0])
+    adata = _run_single([0.1] * 6)
+    for position in range(1, 5):
+        for suffix in ("name", "label", "score"):
+            assert pd.isna(adata.obs[f"cas_cell_type_{suffix}_{position}"].iloc[0])
 
 
 def test_cluster_outputs_use_aggregated_scores():
@@ -279,6 +252,7 @@ def test_cluster_outputs_use_aggregated_scores():
     # Cluster A has mean depth-2 score 0.5; cluster B has mean 0.3.
     scores = np.zeros((4, len(TEST_CL_NAMES)))
     scores[:, 1] = [0.4, 0.6, 0.2, 0.4]
+    scores[:, 0] = [0.8, 0.8, 0.8, 0.8]
     adata = _make_adata(scores)
     adata.obs["cluster_label"] = pd.Categorical(["A", "A", "B", "B"])
 
@@ -288,14 +262,15 @@ def test_cluster_outputs_use_aggregated_scores():
         granularity_cache=cache,
         min_acceptable_score=0.2,
         cluster_label_obs_column="cluster_label",
-        top_k=2,
         obs_prefix="cas_cluster_type",
     )
 
-    assert adata.obs["cas_cluster_type_name_1"].tolist() == ["CL:0000002"] * 4
-    assert np.allclose(adata.obs["cas_cluster_type_score_1"].to_numpy(), [0.5, 0.5, 0.3, 0.3])
-    assert adata.obs["cas_cluster_type_l2_name_1"].tolist() == ["CL:0000002"] * 4
-    assert pd.isna(adata.obs["cas_cluster_type_name_2"].iloc[0])
+    # CL:0000002 selected; lookup l3/l4 undefined so positions 1-3 repeat it; position 4 is l1.
+    for position in (1, 2, 3):
+        assert adata.obs[f"cas_cluster_type_name_{position}"].tolist() == ["CL:0000002"] * 4
+        assert np.allclose(adata.obs[f"cas_cluster_type_score_{position}"].to_numpy(), [0.5, 0.5, 0.3, 0.3])
+    assert adata.obs["cas_cluster_type_name_4"].tolist() == ["CL:0000001"] * 4
+    assert np.allclose(adata.obs["cas_cluster_type_score_4"].to_numpy(), [0.8] * 4)
 
 
 def test_knn_outputs_use_neighborhood_aggregation():
@@ -317,11 +292,10 @@ def test_knn_outputs_use_neighborhood_aggregation():
         granularity_cache=cache,
         min_acceptable_score=0.2,
         k_neighbors=2,
-        top_k=1,
         obs_prefix="cas_knn_cell_type",
     )
 
     expected_score = np.mean(scores[:, 2])
     assert adata.obs["cas_knn_cell_type_name_1"].tolist() == ["CL:0000003"] * 3
     assert np.allclose(pd.to_numeric(adata.obs["cas_knn_cell_type_score_1"]).to_numpy(), expected_score)
-    assert adata.obs["cas_knn_cell_type_l3_name_1"].tolist() == ["CL:0000003"] * 3
+    assert adata.obs["cas_knn_cell_type_name_2"].tolist() == ["CL:0000003"] * 3

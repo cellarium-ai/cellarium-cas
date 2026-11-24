@@ -182,18 +182,16 @@ class CASClient:
         self,
         adata: "anndata.AnnData",
         min_acceptable_score: float,
-        top_k: int = 3,
         obs_prefix: str = "cas_cell_type",
         fill_missing_levels: bool = True,
     ) -> None:
         """
-        Assign the most granular top-k cell type calls to individual cells in ``adata.obs``.
+        Assign the most granular cell type call to individual cells in ``adata.obs``.
 
         Fetches and caches the curated granularity resource for the model automatically.
 
         :param adata: AnnData object with ``cas_cl_scores`` already inserted via :meth:`insert_ontology_aware_response`.
         :param min_acceptable_score: Minimum evidence score for a cell type call to be considered.
-        :param top_k: Number of top calls to make per cell.
         :param obs_prefix: Prefix for the ``.obs`` columns to write results into.
         :param fill_missing_levels: If True, an undefined L2-L4 level repeats the nearest shallower defined level
             of the same term; if False, it stays null.
@@ -209,7 +207,6 @@ class CASClient:
             cl=cl,
             granularity_cache=granularity_cache,
             min_acceptable_score=min_acceptable_score,
-            top_k=top_k,
             obs_prefix=obs_prefix,
             fill_missing_levels=fill_missing_levels,
         )
@@ -219,19 +216,17 @@ class CASClient:
         adata: "anndata.AnnData",
         min_acceptable_score: float,
         cluster_label_obs_column: str,
-        top_k: int = 3,
         obs_prefix: str = "cas_cell_type",
         fill_missing_levels: bool = True,
     ) -> None:
         """
-        Assign the most granular top-k cell type calls per cluster in ``adata.obs``.
+        Assign the most granular cell type call per cluster in ``adata.obs``.
 
         Fetches and caches the curated granularity resource for the model automatically.
 
         :param adata: AnnData object with ``cas_cl_scores`` already inserted via :meth:`insert_ontology_aware_response`.
         :param min_acceptable_score: Minimum evidence score for a cell type call to be considered.
         :param cluster_label_obs_column: The ``.obs`` column name containing cluster labels.
-        :param top_k: Number of top calls to make per cluster.
         :param obs_prefix: Prefix for the ``.obs`` columns to write results into.
         :param fill_missing_levels: If True, an undefined L2-L4 level repeats the nearest shallower defined level
             of the same term; if False, it stays null.
@@ -248,7 +243,6 @@ class CASClient:
             granularity_cache=granularity_cache,
             min_acceptable_score=min_acceptable_score,
             cluster_label_obs_column=cluster_label_obs_column,
-            top_k=top_k,
             obs_prefix=obs_prefix,
             fill_missing_levels=fill_missing_levels,
         )
@@ -260,12 +254,11 @@ class CASClient:
         k_neighbors: int = 5,
         representation_obsm_key: t.Optional[str] = None,
         compute_neighbors_if_missing: bool = True,
-        top_k: int = 3,
         obs_prefix: str = "cas_knn_cell_type",
         fill_missing_levels: bool = True,
     ) -> None:
         """
-        Assign the most granular top-k cell type calls per kNN neighborhood in ``adata.obs``.
+        Assign the most granular cell type call per kNN neighborhood in ``adata.obs``.
 
         Keeps single-cell resolution: for each cell its CAS scores are aggregated over the cell plus its
         ``k_neighbors`` nearest query-cell neighbors. Requires ``cas_cl_scores`` inserted in ``adata.obsm``
@@ -282,7 +275,6 @@ class CASClient:
             compute one with ``scanpy.pp.neighbors``. Defaults to True.
         :raises ValueError: If no graph exists and computation is disabled, or if the graph has fewer than
             ``k_neighbors`` non-self neighbors for any cell.
-        :param top_k: Number of top calls to make per neighborhood.
         :param obs_prefix: Prefix for the ``.obs`` columns to write results into.
         :param fill_missing_levels: If True, an undefined L2-L4 level repeats the nearest shallower defined level
             of the same term; if False, it stays null.
@@ -301,7 +293,6 @@ class CASClient:
             k_neighbors=k_neighbors,
             representation_obsm_key=representation_obsm_key,
             compute_neighbors_if_missing=compute_neighbors_if_missing,
-            top_k=top_k,
             obs_prefix=obs_prefix,
             fill_missing_levels=fill_missing_levels,
         )

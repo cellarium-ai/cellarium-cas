@@ -19,11 +19,11 @@ annotate
 Annotate a local ``.h5ad`` file using the CAS ontology-aware strategy and write outputs
 to a directory. The output directory will contain ``ontology_response.json``,
 ``ontology_resource.json``, and ``metadata.json`` by default. Pass ``--infer-labels``
-to also write ``inferred_labels.csv`` with per-cell top-k cell type assignments.
+to also write ``inferred_labels.csv`` with per-cell cell type assignments at four granularity positions.
 Pass ``--cluster-label`` to additionally compute cluster-level label calls. Pass
 ``--knn-smoothing K`` to smooth CAS scores for each cell over its ``K`` nearest query-cell
 neighbors while preserving single-cell resolution; this writes ``cas_knn_cell_type_*`` columns.
-Top-k ranking uses the curated L1-L4 granularity lookup. The lookup is fetched from the
+Call selection uses the curated L1-L4 granularity lookup. The lookup is fetched from the
 backend with the same ontology resource name as the cell ontology resource and cached on the
 ``CASClient``.
 
