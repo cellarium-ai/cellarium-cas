@@ -23,9 +23,9 @@ to also write ``inferred_labels.csv`` with per-cell top-k cell type assignments.
 Pass ``--cluster-label`` to additionally compute cluster-level label calls. Pass
 ``--knn-smoothing K`` to smooth CAS scores for each cell over its ``K`` nearest query-cell
 neighbors while preserving single-cell resolution; this writes ``cas_knn_cell_type_*`` columns.
-Top-k ranking uses longest ontology path depth by default; pass ``--shortest-path`` to rank
-by shortest path depth instead (applies to ``--infer-labels``, ``--cluster-label`` and
-``--knn-smoothing``).
+Top-k ranking uses the curated L1-L4 granularity lookup. The lookup is fetched from the
+backend with the same ontology resource name as the cell ontology resource and cached on the
+``CASClient``.
 
 .. code-block:: bash
 

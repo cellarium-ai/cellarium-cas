@@ -65,6 +65,11 @@ in ``adata.uns['cas_metadata']``::
 Best cell type label assignment
 ---------------------------------
 
+Top-k calls are ranked by a curated L1-L4 granularity lookup, not by Cell Ontology graph
+depth. The ``CASClient`` fetches the granularity resource from the backend using the same
+ontology resource name as the cell ontology resource, and caches the resulting
+``CellGranularityCache`` on the client.
+
 Assign the most granular top-k cell type calls to individual cells::
 
     cas.compute_most_granular_top_k_calls_single(
@@ -99,16 +104,17 @@ it computes one with ``scanpy.pp.neighbors`` by default. Set
 ``compute_neighbors_if_missing=False`` to require a precomputed graph. The graph must
 contain at least ``k_neighbors`` non-self neighbors per cell.
 
-All three methods accept ``use_shortest_path`` (default ``False``). By default calls are ranked
-by longest ontology path depth from the cell root; pass ``use_shortest_path=True`` to rank by
-shortest path depth instead::
+The lower-level postprocessing functions still accept an externally constructed
+``CellGranularityCache``. The client fetches and caches the resource automatically; for
+offline testing, preload ``client._granularity_cache[resource_name]`` before calling the
+client methods.
 
-    cas.compute_most_granular_top_k_calls_single(
-        adata=adata,
-        min_acceptable_score=0.2,
-        top_k=3,
-        use_shortest_path=True,
-    )
+Candidates below ``min_acceptable_score`` or without a curated granularity mapping are
+excluded. Eligible terms are ranked by curated depth descending, then by evidence score
+descending, with CL term ID as a deterministic tie-breaker. The selected term's L1-L4
+mappings are written alongside each rank as ``{obs_prefix}_l1_name_{k}`` through
+``{obs_prefix}_l4_name_{k}``. When no eligible term exists, the rank columns are ``None``
+rather than a fabricated root-cell prediction.
 
 Interactive visualization
 --------------------------

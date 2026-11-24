@@ -370,6 +370,15 @@ class CASAPIService(_BaseService):
         """
         return self.get_json(endpoint=endpoints.CELL_ONTOLOGY_RESOURCE.format(name=name))
 
+    def get_cell_granularity_resource(self, name: str) -> t.Dict[str, t.Any]:
+        """
+        Retrieve precomputed curated granularity resource by name.
+
+        :param name: The ontology resource name (from the model's ontological_columns).
+        :return: Cell granularity resource dictionary.
+        """
+        return self.get_json(endpoint=endpoints.CELL_GRANULARITY_RESOURCE.format(name=name))
+
     def get_user_quota(self) -> t.Dict[str, t.Any]:
         """
         Retrieve user quota information

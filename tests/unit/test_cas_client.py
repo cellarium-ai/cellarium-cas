@@ -15,6 +15,7 @@ from parameterized import parameterized
 
 from cellarium.cas import constants, exceptions
 from cellarium.cas.client import CASClient
+from cellarium.cas.postprocessing.cell_ontology.granularity_cache import CellGranularityCache
 from tests.unit.test_utils import async_context_manager_decorator
 
 TEST_TOKEN = "test_token"
@@ -51,6 +52,13 @@ TEST_ONTOLOGY_RESOURCE = {
         "CL:0000540": 2,
         "CL:0000404": 2,
     },
+}
+
+TEST_GRANULARITY_RESOURCE = {
+    "CL:0000000": {"l1": "CL:0000000", "l2": None, "l3": None, "l4": None},
+    "CL:0000255": {"l1": "CL:0000000", "l2": "CL:0000255", "l3": None, "l4": None},
+    "CL:0000404": {"l1": "CL:0000000", "l2": "CL:0000255", "l3": "CL:0000404", "l4": None},
+    "CL:0000540": {"l1": "CL:0000000", "l2": "CL:0000255", "l3": "CL:0000404", "l4": "CL:0000540"},
 }
 
 NP_RANDOM_STATE = np.random.RandomState(0)
@@ -471,6 +479,16 @@ class TestCasClient:
             response_body=TEST_ONTOLOGY_RESOURCE,
         )
 
+    def __mock_cell_granularity_resource(self):
+        """
+        Mocks the GET call for the curated cell granularity resource endpoint.
+        """
+        self.__mock_response(
+            url=f"{TEST_URL}/api/cellarium-general/cell-granularity-resource/{TEST_ONTOLOGY_RESOURCE_NAME}",
+            status_code=200,
+            response_body=TEST_GRANULARITY_RESOURCE,
+        )
+
     def test_insert_ontology_aware_response(self):
         num_cells = 10
         self.__mock_constructor_calls()
@@ -507,11 +525,41 @@ class TestCasClient:
             headers=ANY,
         )
 
+    def test_granularity_cache_is_reused(self):
+        """Verify that get_cell_granularity_resource is called once when _get_granularity_cache is called twice."""
+        self.__mock_constructor_calls()
+        self.__mock_cell_granularity_resource()
+
+        cas_client = CASClient(api_token=TEST_TOKEN, api_url=TEST_URL)
+        cache1 = cas_client._get_granularity_cache(TEST_ONTOLOGY_RESOURCE_NAME)
+        cache2 = cas_client._get_granularity_cache(TEST_ONTOLOGY_RESOURCE_NAME)
+
+        assert cache1 is cache2
+        verify(requests, times=1).get(
+            url=f"{TEST_URL}/api/cellarium-general/cell-granularity-resource/{TEST_ONTOLOGY_RESOURCE_NAME}",
+            headers=ANY,
+        )
+
+    def test_granularity_cache_override_for_tests_skips_api(self):
+        """Verify a preloaded granularity cache is used without calling the granularity endpoint."""
+        self.__mock_constructor_calls()
+
+        cas_client = CASClient(api_token=TEST_TOKEN, api_url=TEST_URL)
+        override = CellGranularityCache(TEST_GRANULARITY_RESOURCE)
+        cas_client._granularity_cache[TEST_ONTOLOGY_RESOURCE_NAME] = override
+
+        assert cas_client._get_granularity_cache(TEST_ONTOLOGY_RESOURCE_NAME) is override
+        verify(requests, times=0).get(
+            url=f"{TEST_URL}/api/cellarium-general/cell-granularity-resource/{TEST_ONTOLOGY_RESOURCE_NAME}",
+            headers=ANY,
+        )
+
     def test_compute_most_granular_top_k_calls_single(self):
         num_cells = 10
         self.__mock_constructor_calls()
         self.__mock_annotate_matrix_cell_type_ontology_aware_strategy_calls(num_cells=num_cells)
         self.__mock_cell_ontology_resource()
+        self.__mock_cell_granularity_resource()
 
         cas_client = CASClient(api_token=TEST_TOKEN, api_url=TEST_URL)
         adata = self.__mock_anndata_matrix(num_cells=num_cells)
@@ -523,6 +571,10 @@ class TestCasClient:
             assert f"cas_cell_type_score_{k}" in adata.obs
             assert f"cas_cell_type_name_{k}" in adata.obs
             assert f"cas_cell_type_label_{k}" in adata.obs
+            for level in range(1, 5):
+                assert f"cas_cell_type_l{level}_name_{k}" in adata.obs
+        assert adata.obs["cas_cell_type_name_1"].iloc[0] == "CL:0000540"
+        assert adata.obs["cas_cell_type_l4_name_1"].iloc[0] == "CL:0000540"
         assert len(adata.obs) == num_cells
 
     def test_compute_most_granular_top_k_calls_cluster(self):
@@ -532,6 +584,7 @@ class TestCasClient:
         self.__mock_constructor_calls()
         self.__mock_annotate_matrix_cell_type_ontology_aware_strategy_calls(num_cells=num_cells)
         self.__mock_cell_ontology_resource()
+        self.__mock_cell_granularity_resource()
 
         cas_client = CASClient(api_token=TEST_TOKEN, api_url=TEST_URL)
         adata = self.__mock_anndata_matrix(num_cells=num_cells)
@@ -552,6 +605,8 @@ class TestCasClient:
             assert f"cas_cluster_type_score_{k}" in adata.obs
             assert f"cas_cluster_type_name_{k}" in adata.obs
             assert f"cas_cluster_type_label_{k}" in adata.obs
+            for level in range(1, 5):
+                assert f"cas_cluster_type_l{level}_name_{k}" in adata.obs
 
     def test_compute_most_granular_top_k_calls_knn(self):
         from sklearn.neighbors import NearestNeighbors
@@ -561,6 +616,7 @@ class TestCasClient:
         self.__mock_constructor_calls()
         self.__mock_annotate_matrix_cell_type_ontology_aware_strategy_calls(num_cells=num_cells)
         self.__mock_cell_ontology_resource()
+        self.__mock_cell_granularity_resource()
 
         cas_client = CASClient(api_token=TEST_TOKEN, api_url=TEST_URL)
         adata = self.__mock_anndata_matrix(num_cells=num_cells)
@@ -586,6 +642,8 @@ class TestCasClient:
             assert f"cas_knn_cell_type_score_{k}" in adata.obs
             assert f"cas_knn_cell_type_name_{k}" in adata.obs
             assert f"cas_knn_cell_type_label_{k}" in adata.obs
+            for level in range(1, 5):
+                assert f"cas_knn_cell_type_l{level}_name_{k}" in adata.obs
         # single-cell resolution: one refined annotation per cell
         assert len(adata.obs) == num_cells
         assert adata.obs["cas_knn_cell_type_label_1"].notna().all()
@@ -603,6 +661,7 @@ class TestCasClient:
         self.__mock_constructor_calls()
         self.__mock_annotate_matrix_cell_type_ontology_aware_strategy_calls(num_cells=num_cells)
         self.__mock_cell_ontology_resource()
+        self.__mock_cell_granularity_resource()
 
         cas_client = CASClient(api_token=TEST_TOKEN, api_url=TEST_URL)
         adata = self.__mock_anndata_matrix(num_cells=num_cells)

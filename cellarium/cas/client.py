@@ -21,6 +21,7 @@ from cellarium.cas.service import action_context_manager
 from . import _io, constants, exceptions, models, preprocessing, service, settings, version
 from .postprocessing import ontology_aware as _pp_ontology_aware
 from .postprocessing.cell_ontology.cell_ontology_cache import CellOntologyCache
+from .postprocessing.cell_ontology.granularity_cache import CellGranularityCache
 from .postprocessing.ontology_aware import CAS_METADATA_ANNDATA_UNS_KEY, insert_cas_ontology_aware_response_into_adata
 
 
@@ -102,6 +103,7 @@ class CASClient:
         self.feature_schemas = self.cas_api_service.get_feature_schemas()
         self._feature_schemas_cache = {}
         self._ontology_cache: t.Dict[str, t.Any] = {}
+        self._granularity_cache: t.Dict[str, CellGranularityCache] = {}
 
         self.num_attempts_per_chunk = num_attempts_per_chunk
         self.__print(f"Authenticated in Cellarium CAS server v. {application_info['application_version']}")
@@ -126,12 +128,35 @@ class CASClient:
             )
         return ontological_columns[0]["ontology_resource_name"]
 
+    def _get_cached_resource(
+        self,
+        cache: t.Dict[str, t.Any],
+        resource_name: str,
+        fetch_resource: t.Callable[[str], t.Dict[str, t.Any]],
+        build_cache: t.Callable[[t.Dict[str, t.Any]], t.Any],
+    ) -> t.Any:
+        """Return a cached resource, loading and constructing it on first use."""
+        if resource_name not in cache:
+            cache[resource_name] = build_cache(fetch_resource(resource_name))
+        return cache[resource_name]
+
     def _get_ontology_cache(self, ontology_resource_name: str) -> CellOntologyCache:
         """Fetch and cache a CellOntologyCache for the given resource name."""
-        if ontology_resource_name not in self._ontology_cache:
-            resource = self.cas_api_service.get_cell_ontology_resource(ontology_resource_name)
-            self._ontology_cache[ontology_resource_name] = CellOntologyCache(resource)
-        return self._ontology_cache[ontology_resource_name]
+        return self._get_cached_resource(
+            cache=self._ontology_cache,
+            resource_name=ontology_resource_name,
+            fetch_resource=self.cas_api_service.get_cell_ontology_resource,
+            build_cache=CellOntologyCache,
+        )
+
+    def _get_granularity_cache(self, resource_name: str) -> CellGranularityCache:
+        """Fetch and cache a CellGranularityCache for the given resource name."""
+        return self._get_cached_resource(
+            cache=self._granularity_cache,
+            resource_name=resource_name,
+            fetch_resource=self.cas_api_service.get_cell_granularity_resource,
+            build_cache=CellGranularityCache,
+        )
 
     def insert_ontology_aware_response(
         self,
@@ -159,29 +184,30 @@ class CASClient:
         min_acceptable_score: float,
         top_k: int = 3,
         obs_prefix: str = "cas_cell_type",
-        use_shortest_path: bool = False,
     ) -> None:
         """
         Assign the most granular top-k cell type calls to individual cells in ``adata.obs``.
+
+        Fetches and caches the curated granularity resource for the model automatically.
 
         :param adata: AnnData object with ``cas_cl_scores`` already inserted via :meth:`insert_ontology_aware_response`.
         :param min_acceptable_score: Minimum evidence score for a cell type call to be considered.
         :param top_k: Number of top calls to make per cell.
         :param obs_prefix: Prefix for the ``.obs`` columns to write results into.
-        :param use_shortest_path: Whether to use shortest (True) or longest (False) path depth for ranking.
         """
         resource_name = (
             adata.uns.get(CAS_METADATA_ANNDATA_UNS_KEY, {}).get("ontology_resource_name")
             or self._resolve_ontology_resource_name()
         )
         cl = self._get_ontology_cache(resource_name)
+        granularity_cache = self._get_granularity_cache(resource_name)
         _pp_ontology_aware.compute_most_granular_top_k_calls_single(
             adata=adata,
             cl=cl,
+            granularity_cache=granularity_cache,
             min_acceptable_score=min_acceptable_score,
             top_k=top_k,
             obs_prefix=obs_prefix,
-            use_shortest_path=use_shortest_path,
         )
 
     def compute_most_granular_top_k_calls_cluster(
@@ -191,31 +217,32 @@ class CASClient:
         cluster_label_obs_column: str,
         top_k: int = 3,
         obs_prefix: str = "cas_cell_type",
-        use_shortest_path: bool = False,
     ) -> None:
         """
         Assign the most granular top-k cell type calls per cluster in ``adata.obs``.
+
+        Fetches and caches the curated granularity resource for the model automatically.
 
         :param adata: AnnData object with ``cas_cl_scores`` already inserted via :meth:`insert_ontology_aware_response`.
         :param min_acceptable_score: Minimum evidence score for a cell type call to be considered.
         :param cluster_label_obs_column: The ``.obs`` column name containing cluster labels.
         :param top_k: Number of top calls to make per cluster.
         :param obs_prefix: Prefix for the ``.obs`` columns to write results into.
-        :param use_shortest_path: Whether to use shortest (True) or longest (False) path depth for ranking.
         """
         resource_name = (
             adata.uns.get(CAS_METADATA_ANNDATA_UNS_KEY, {}).get("ontology_resource_name")
             or self._resolve_ontology_resource_name()
         )
         cl = self._get_ontology_cache(resource_name)
+        granularity_cache = self._get_granularity_cache(resource_name)
         _pp_ontology_aware.compute_most_granular_top_k_calls_cluster(
             adata=adata,
             cl=cl,
+            granularity_cache=granularity_cache,
             min_acceptable_score=min_acceptable_score,
             cluster_label_obs_column=cluster_label_obs_column,
             top_k=top_k,
             obs_prefix=obs_prefix,
-            use_shortest_path=use_shortest_path,
         )
 
     def compute_most_granular_top_k_calls_knn(
@@ -227,14 +254,14 @@ class CASClient:
         compute_neighbors_if_missing: bool = True,
         top_k: int = 3,
         obs_prefix: str = "cas_knn_cell_type",
-        use_shortest_path: bool = False,
     ) -> None:
         """
         Assign the most granular top-k cell type calls per kNN neighborhood in ``adata.obs``.
 
         Keeps single-cell resolution: for each cell its CAS scores are aggregated over the cell plus its
         ``k_neighbors`` nearest query-cell neighbors. Requires ``cas_cl_scores`` inserted in ``adata.obsm``
-        via :meth:`insert_ontology_aware_response`.
+        via :meth:`insert_ontology_aware_response`. Fetches and caches the curated granularity resource
+        for the model automatically.
 
         :param adata: AnnData object with ``cas_cl_scores`` already inserted via :meth:`insert_ontology_aware_response`.
         :param min_acceptable_score: Minimum evidence score for a cell type call to be considered.
@@ -248,23 +275,23 @@ class CASClient:
             ``k_neighbors`` non-self neighbors for any cell.
         :param top_k: Number of top calls to make per neighborhood.
         :param obs_prefix: Prefix for the ``.obs`` columns to write results into.
-        :param use_shortest_path: Whether to use shortest (True) or longest (False) path depth for ranking.
         """
         resource_name = (
             adata.uns.get(CAS_METADATA_ANNDATA_UNS_KEY, {}).get("ontology_resource_name")
             or self._resolve_ontology_resource_name()
         )
         cl = self._get_ontology_cache(resource_name)
+        granularity_cache = self._get_granularity_cache(resource_name)
         _pp_ontology_aware.compute_most_granular_top_k_calls_knn(
             adata=adata,
             cl=cl,
+            granularity_cache=granularity_cache,
             min_acceptable_score=min_acceptable_score,
             k_neighbors=k_neighbors,
             representation_obsm_key=representation_obsm_key,
             compute_neighbors_if_missing=compute_neighbors_if_missing,
             top_k=top_k,
             obs_prefix=obs_prefix,
-            use_shortest_path=use_shortest_path,
         )
 
     @staticmethod

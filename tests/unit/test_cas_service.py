@@ -128,6 +128,39 @@ class TestCasService:
         with pytest.raises(exceptions.HTTPError404, match="Not found"):
             self.cas_service.get_cell_ontology_resource(resource_name)
 
+    def test_get_cell_granularity_resource(self):
+        resource_name = "human_cl_v2024"
+        response_body = {
+            "CL:0000000": {"l1": "CL:0000000", "l2": None, "l3": None, "l4": None},
+            "CL:0000540": {
+                "l1": "CL:0000000",
+                "l2": "CL:0000255",
+                "l3": "CL:0000540",
+                "l4": None,
+            },
+        }
+        self._mock_response(
+            url=f"{TEST_URL}/api/cellarium-general/cell-granularity-resource/{resource_name}",
+            token=TEST_TOKEN,
+            status_code=200,
+            response_body=response_body,
+        )
+
+        result = self.cas_service.get_cell_granularity_resource(resource_name)
+        assert result == response_body
+
+    def test_get_cell_granularity_resource_not_found(self):
+        resource_name = "nonexistent_resource"
+        self._mock_response(
+            url=f"{TEST_URL}/api/cellarium-general/cell-granularity-resource/{resource_name}",
+            token=TEST_TOKEN,
+            status_code=404,
+            response_body={"detail": "Not found"},
+        )
+
+        with pytest.raises(exceptions.HTTPError404, match="Not found"):
+            self.cas_service.get_cell_granularity_resource(resource_name)
+
     def _mock_response(self, url: str, token: str, status_code: int, response_body: t.Union[dict, list]):
         response = mock(requests.Response)
         response.status_code = status_code

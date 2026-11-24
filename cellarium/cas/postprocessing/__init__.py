@@ -1,4 +1,5 @@
 # classes
+from .cell_ontology.granularity_cache import CellGranularityCache
 from .cell_type_summary_statistics import (
     get_interpolated_cell_type_colors,
     reduce_cas_cell_type_summary_statistics_response_by_majority_vote_per_cluster,
@@ -16,9 +17,11 @@ from .ontology_aware import (
     CAS_FRACTION_PROPERTY_REF,
     CAS_METADATA_ANNDATA_UNS_KEY,
     CAS_SCORE_PROPERTY_REF,
+    MISSING_GRANULARITY_CELL_TYPE_CALL,
     AggregatedCellOntologyScores,
     CellOntologyScoresAggregationDomain,
     CellOntologyScoresAggregationOp,
+    GranularityCellTypeCall,
     compute_most_granular_top_k_calls_cluster,
     compute_most_granular_top_k_calls_knn,
     compute_most_granular_top_k_calls_single,
@@ -34,6 +37,9 @@ __all__ = [
     "AggregatedCellOntologyScores",
     "CellOntologyScoresAggregationOp",
     "CellOntologyScoresAggregationDomain",
+    "CellGranularityCache",
+    "GranularityCellTypeCall",
+    "MISSING_GRANULARITY_CELL_TYPE_CALL",
     "convert_cas_ontology_aware_response_to_score_matrix",
     "insert_cas_ontology_aware_response_into_adata",
     "get_aggregated_cas_ontology_aware_scores",

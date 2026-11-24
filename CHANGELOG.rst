@@ -21,6 +21,31 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
   Fixed
   ~~~~~
 
+Unreleased
+----------
+
+Added
+~~~~~
+- Added ``CellGranularityCache`` for the curated L1-L4 granularity lookup, and ``GranularityCellTypeCall`` / ``MISSING_GRANULARITY_CELL_TYPE_CALL`` for selected annotations.
+
+Changed
+~~~~~~~
+- Top-k cell type calls are now ranked by curated granularity depth (1-4) instead of Cell Ontology path depth. Deeper curated terms win over higher-scoring shallower terms; evidence score breaks ties within the same curated depth, then CL term ID provides deterministic ordering.
+- ``CASClient`` now fetches and caches the curated granularity resource from the backend, using the same ontology resource name as the cell ontology resource. A prefilled ``client._granularity_cache`` can override the source for offline tests.
+- Selected calls now include the source term's curated L1-L4 mappings as ``{obs_prefix}_l1_name_{k}`` through ``{obs_prefix}_l4_name_{k}``.
+- ``annotate`` CLI writes the curated level columns to ``inferred_labels.csv``.
+
+Removed
+~~~~~~~
+- Removed ``use_shortest_path`` and ``root_note`` from annotation selection; path-depth ranking is retired.
+- Removed the ``annotate --shortest-path/--longest-path`` CLI option.
+- Removed fabricated root-cell padding: ranks without an eligible term are written as ``None``.
+
+Fixed
+~~~~~
+- Excluded ``pytest==9.2.0`` from test requirements. That release can raise
+  ``AttributeError: 'NodeId' object has no attribute '_str_cache'`` on Python 3.10.0 during pytest startup.
+
 1.9.1 - 2026-11-18
 ------------------
 
