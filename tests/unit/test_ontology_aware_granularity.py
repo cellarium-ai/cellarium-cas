@@ -187,6 +187,13 @@ def test_deeper_candidate_wins_over_higher_scoring_shallow_candidate():
 def test_highest_score_wins_within_same_curated_depth():
     assert _select({"CL:0000004": 0.4, "CL:0000005": 0.8}).cl_name == "CL:0000005"
 
+def test_longest_path_depth_wins_within_curated_depth_before_score():
+    cl = _make_cl()
+    cl._longest_path_lengths.update({"CL:0000001": 20, "CL:0000004": 3, "CL:0000005": 5})
+    call = _select({"CL:0000001": 0.99, "CL:0000004": 0.9, "CL:0000005": 0.4}, cl=cl)
+    assert call.cl_name == "CL:0000005"
+    assert call.score == 0.4
+
 
 def test_fallback_when_no_l4_candidate_meets_threshold():
     assert _select({"CL:0000003": 0.75, "CL:0000004": 0.1}).cl_name == "CL:0000003"

@@ -106,8 +106,9 @@ offline testing, preload ``client._granularity_cache[resource_name]`` before cal
 client methods.
 
 Candidates below ``min_acceptable_score`` or without a curated granularity mapping are
-excluded. The single selected term maximizes curated depth, then evidence score, with CL term ID as a
-deterministic tie-breaker. Cell Ontology graph depth is not used.
+excluded. The single selected term maximizes curated depth, then Cell Ontology longest-path depth,
+then evidence score, with CL term ID as a deterministic tie-breaker. Missing ontology path depths
+count as zero.
 
 The selected term's curated mapping is written as four granularity positions, from most to least
 granular (position ``1`` is the lookup's ``l4``, position ``4`` its ``l1``):
