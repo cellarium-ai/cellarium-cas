@@ -267,6 +267,21 @@ def test_fill_missing_levels_flag_controls_undefined_levels():
     assert unfilled["cas_annotation_name_2"].iloc[0] == "CL:0000003"
 
 
+@parameterized.expand([(0, None), (1, "CL:0000002")])
+def test_shallow_terms_do_not_fill_more_granular_levels(term_index: int, l2_name: str | None):
+    row = [0.0] * len(TEST_CL_NAMES)
+    row[term_index] = 0.8
+    obs = _run_single(row).obs
+    for position in (1, 2):
+        for suffix in ("name", "label", "score"):
+            assert pd.isna(obs[f"cas_annotation_{suffix}_{position}"].iloc[0])
+    if l2_name is None:
+        assert pd.isna(obs["cas_annotation_name_3"].iloc[0])
+    else:
+        assert obs["cas_annotation_name_3"].iloc[0] == l2_name
+    assert obs["cas_annotation_name_4"].iloc[0] == "CL:0000001"
+
+
 def test_no_eligible_candidates_do_not_fabricate_confidence():
     adata = _run_single([0.1] * 6)
     for position in range(1, 5):
@@ -294,10 +309,12 @@ def test_cluster_outputs_use_aggregated_scores():
         obs_prefix="cas_annotation_cluster",
     )
 
-    # CL:0000002 selected; lookup l3/l4 undefined so positions 1-3 repeat it; position 4 is l1.
-    for position in (1, 2, 3):
-        assert adata.obs[f"cas_annotation_cluster_name_{position}"].tolist() == ["CL:0000002"] * 4
-        assert np.allclose(adata.obs[f"cas_annotation_cluster_score_{position}"].to_numpy(), [0.5, 0.5, 0.3, 0.3])
+    # CL:0000002 selected; absent L3/L4 remain null even with fill_missing_levels=True.
+    for position in (1, 2):
+        for suffix in ("name", "label", "score"):
+            assert adata.obs[f"cas_annotation_cluster_{suffix}_{position}"].isna().all()
+    assert adata.obs["cas_annotation_cluster_name_3"].tolist() == ["CL:0000002"] * 4
+    assert np.allclose(adata.obs["cas_annotation_cluster_score_3"].to_numpy(), [0.5, 0.5, 0.3, 0.3])
     assert adata.obs["cas_annotation_cluster_name_4"].tolist() == ["CL:0000001"] * 4
     assert np.allclose(adata.obs["cas_annotation_cluster_score_4"].to_numpy(), [0.8] * 4)
 

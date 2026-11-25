@@ -193,8 +193,8 @@ class CASClient:
         :param adata: AnnData object with ``cas_cl_scores`` already inserted via :meth:`insert_ontology_aware_response`.
         :param min_acceptable_score: Minimum evidence score for a cell type call to be considered.
         :param obs_prefix: Prefix for the ``.obs`` columns to write results into.
-        :param fill_missing_levels: If True, an undefined level repeats the nearest shallower defined level
-            of the same term; if False, it stays null.
+        :param fill_missing_levels: If True, fill missing L4 from L3 only. Other undefined levels
+            remain null; if False, L4 stays null too.
         """
         resource_name = (
             adata.uns.get(CAS_METADATA_ANNDATA_UNS_KEY, {}).get("ontology_resource_name")
@@ -228,8 +228,8 @@ class CASClient:
         :param min_acceptable_score: Minimum evidence score for a cell type call to be considered.
         :param cluster_label_obs_column: The ``.obs`` column name containing cluster labels.
         :param obs_prefix: Prefix for the ``.obs`` columns to write results into.
-        :param fill_missing_levels: If True, an undefined level repeats the nearest shallower defined level
-            of the same term; if False, it stays null.
+        :param fill_missing_levels: If True, fill missing L4 from L3 only. Other undefined levels
+            remain null; if False, L4 stays null too.
         """
         resource_name = (
             adata.uns.get(CAS_METADATA_ANNDATA_UNS_KEY, {}).get("ontology_resource_name")
@@ -276,8 +276,8 @@ class CASClient:
         :raises ValueError: If no graph exists and computation is disabled, or if the graph has fewer than
             ``k_neighbors`` non-self neighbors for any cell.
         :param obs_prefix: Prefix for the ``.obs`` columns to write results into.
-        :param fill_missing_levels: If True, an undefined level repeats the nearest shallower defined level
-            of the same term; if False, it stays null.
+        :param fill_missing_levels: If True, fill missing L4 from L3 only. Other undefined levels
+            remain null; if False, L4 stays null too.
         """
         resource_name = (
             adata.uns.get(CAS_METADATA_ANNDATA_UNS_KEY, {}).get("ontology_resource_name")

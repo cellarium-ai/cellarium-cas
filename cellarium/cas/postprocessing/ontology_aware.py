@@ -597,15 +597,10 @@ def _assign_call(
 
     Position 1 holds the most granular level (lookup ``l4``) and position 4 the least granular (lookup ``l1``).
     """
-    level_names: t.Dict[str, t.Optional[str]] = {}
-    filled_name = None
-    for level in GRANULARITY_LEVELS:
-        # Undefined level: reuse the nearest shallower defined level (None if there is none).
-        filled_name = call.levels[level] or (filled_name if fill_missing_levels else None)
-        level_names[level] = filled_name
-
     for position, level in enumerate(reversed(GRANULARITY_LEVELS), start=1):
-        name = level_names[level]
+        name = call.levels[level]
+        if level == "l4" and name is None and fill_missing_levels:
+            name = call.levels["l3"]
         values = {
             f"{obs_prefix}_score_{position}": call.level_scores.get(name),
             f"{obs_prefix}_name_{position}": name,
@@ -632,8 +627,8 @@ def compute_annotation_levels_single(
     :param granularity_cache: The curated L1-L4 granularity lookup.
     :param min_acceptable_score: Minimum evidence score for a cell type call to be considered.
     :param obs_prefix: Prefix for the ``.obs`` columns to write results into.
-    :param fill_missing_levels: If True, an undefined level repeats the nearest shallower defined level
-        of the selected term; if False, it stays null.
+    :param fill_missing_levels: If True, fill missing L4 from L3 only. Other undefined levels
+        remain null; if False, L4 stays null too.
 
     Writes ``{obs_prefix}_score_{n}``, ``{obs_prefix}_name_{n}`` and ``{obs_prefix}_label_{n}`` for
     ``n`` = 1 (most granular level, lookup ``l4``) to 4 (least granular level, lookup ``l1``). ``name`` holds the
@@ -762,8 +757,8 @@ def compute_annotation_levels_knn(
     :param aggregation_domain: The domain over which to perform the aggregation.
     :param aggregation_score_threshold: The threshold value for considering a CAS score as non-zero.
     :param obs_prefix: Prefix for the ``.obs`` columns to write results into.
-    :param fill_missing_levels: If True, an undefined level repeats the nearest shallower defined level
-        of the selected term; if False, it stays null.
+    :param fill_missing_levels: If True, fill missing L4 from L3 only. Other undefined levels
+        remain null; if False, L4 stays null too.
 
     Writes ``{obs_prefix}_score_{n}``, ``{obs_prefix}_name_{n}`` and ``{obs_prefix}_label_{n}`` for
     ``n`` = 1 (most granular level, lookup ``l4``) to 4 (least granular level, lookup ``l1``). ``name`` holds the
@@ -816,8 +811,8 @@ def compute_annotation_levels_cluster(
     :param aggregation_domain: The domain over which to perform the aggregation.
     :param aggregation_score_threshod: The threshold value for considering a CAS score as non-zero.
     :param obs_prefix: Prefix for the ``.obs`` columns to write results into.
-    :param fill_missing_levels: If True, an undefined level repeats the nearest shallower defined level
-        of the selected term; if False, it stays null.
+    :param fill_missing_levels: If True, fill missing L4 from L3 only. Other undefined levels
+        remain null; if False, L4 stays null too.
 
     Writes ``{obs_prefix}_score_{n}``, ``{obs_prefix}_name_{n}`` and ``{obs_prefix}_label_{n}`` for
     ``n`` = 1 (most granular level, lookup ``l4``) to 4 (least granular level, lookup ``l1``). ``name`` holds the

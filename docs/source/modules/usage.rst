@@ -116,10 +116,10 @@ granular (position ``1`` is the lookup's ``l4``, position ``4`` its ``l1``):
 - ``{obs_prefix}_name_{n}``: its CL ID.
 - ``{obs_prefix}_score_{n}``: its aggregated evidence score.
 
-By default (``fill_missing_levels=True``) an undefined level inherits the nearest shallower
-defined level of the selected term (for example a missing L4 repeats L3); pass
-``fill_missing_levels=False`` to leave it null. When no eligible term exists, all columns are
-``None`` rather than a fabricated root-cell prediction.
+By default (``fill_missing_levels=True``), missing L4 repeats L3 only when L3 exists.
+Missing L3 never inherits L2; missing L4 with no L3 stays null (N/A).
+Pass ``fill_missing_levels=False`` to leave L4 null too. When no eligible term
+exists, all columns are ``None`` rather than a fabricated root-cell prediction.
 
 Deprecated top-k API
 ~~~~~~~~~~~~~~~~~~~~
