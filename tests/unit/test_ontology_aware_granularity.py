@@ -268,7 +268,7 @@ def test_fill_missing_levels_flag_controls_undefined_levels():
 
 
 @parameterized.expand([(0, None), (1, "CL:0000002")])
-def test_shallow_terms_do_not_fill_more_granular_levels(term_index: int, l2_name: str | None):
+def test_shallow_terms_do_not_fill_more_granular_levels(term_index: int, l2_name: t.Optional[str]):
     row = [0.0] * len(TEST_CL_NAMES)
     row[term_index] = 0.8
     obs = _run_single(row).obs
